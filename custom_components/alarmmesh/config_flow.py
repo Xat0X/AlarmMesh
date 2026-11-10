@@ -9,7 +9,7 @@ from homeassistant.config_entries import (
     ConfigEntry,
     ConfigFlow,
     ConfigFlowResult,
-    OptionsFlow,
+    OptionsFlowWithReload,
 )
 from homeassistant.const import ATTR_DEVICE_CLASS, Platform
 from homeassistant.core import HomeAssistant, callback, split_entity_id, valid_entity_id
@@ -115,11 +115,8 @@ class AlarmMeshConfigFlow(ConfigFlow, domain=DOMAIN):
         )
 
 
-class AlarmMeshOptionsFlow(OptionsFlow):
-    """Replace the saved selection only after successful validation.
-
-    No reload or update listener is needed: no runtime consumes these options.
-    """
+class AlarmMeshOptionsFlow(OptionsFlowWithReload):
+    """Save validated sources and let Home Assistant reload changed options."""
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None

@@ -4,7 +4,7 @@
     "step": {
       "user": {
         "title": "AlarmMesh-bronnen selecteren",
-        "description": "AlarmMesh slaat alleen je bronselectie op. Deze versie bewaakt geen rookmelders, koppelt geen alarmen, activeert geen sirenes, verstuurt geen meldingen en voert geen alarmtests uit.",
+        "description": "AlarmMesh volgt geselecteerde rookmeldertoestanden passief binnen Home Assistant. Resultaten blijven intern: deze versie heeft geen overzichtsentiteiten, alarmkoppeling, sireneactivering, meldingen of alarmtests.",
         "data": {
           "source_entity_ids": "Rookmelderbronnen"
         },
@@ -30,7 +30,7 @@
     "step": {
       "init": {
         "title": "AlarmMesh-bronnen aanpassen",
-        "description": "AlarmMesh slaat alleen je bronselectie op. Deze versie bewaakt geen rookmelders, koppelt geen alarmen, activeert geen sirenes, verstuurt geen meldingen en voert geen alarmtests uit.",
+        "description": "AlarmMesh volgt geselecteerde rookmeldertoestanden passief binnen Home Assistant. Resultaten blijven intern: deze versie heeft geen overzichtsentiteiten, alarmkoppeling, sireneactivering, meldingen of alarmtests.",
         "data": {
           "source_entity_ids": "Rookmelderbronnen"
         },
