@@ -1,0 +1,14 @@
+{
+  "title": "AlarmMesh",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Set up AlarmMesh foundation",
+        "description": "This development version only creates an empty configuration. It does not monitor smoke detectors, link alarms, activate sirens, send notifications, or run alarm tests. Continue to create the foundation configuration."
+      }
+    },
+    "abort": {
+      "already_configured": "AlarmMesh is already configured."
+    }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "title": "AlarmMesh",
+  "config": {
+    "step": {
+      "user": {
+        "title": "AlarmMesh-projectbasis instellen",
+        "description": "Deze ontwikkelversie maakt alleen een lege configuratie aan. Ze bewaakt geen rookmelders, koppelt geen alarmen, activeert geen sirenes, verstuurt geen meldingen en voert geen alarmtests uit. Ga verder om de basisconfiguratie aan te maken."
+      }
+    },
+    "abort": {
+      "already_configured": "AlarmMesh is al geconfigureerd."
+    }
+  }
+}

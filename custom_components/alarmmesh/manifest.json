@@ -1,0 +1,13 @@
+{
+  "domain": "alarmmesh",
+  "name": "AlarmMesh",
+  "codeowners": ["@Xat0X"],
+  "config_flow": true,
+  "documentation": "https://github.com/Xat0X/AlarmMesh",
+  "integration_type": "service",
+  "iot_class": "calculated",
+  "issue_tracker": "https://github.com/Xat0X/AlarmMesh/issues",
+  "requirements": [],
+  "single_config_entry": true,
+  "version": "0.0.1"
+}
