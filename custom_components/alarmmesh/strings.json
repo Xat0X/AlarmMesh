@@ -3,12 +3,50 @@
   "config": {
     "step": {
       "user": {
-        "title": "Set up AlarmMesh foundation",
-        "description": "This development version only creates an empty configuration. It does not monitor smoke detectors, link alarms, activate sirens, send notifications, or run alarm tests. Continue to create the foundation configuration."
+        "title": "Select AlarmMesh sources",
+        "description": "AlarmMesh only saves your source selection. This version does not monitor smoke detectors, link alarms, activate sirens, send notifications, or run alarm tests.",
+        "data": {
+          "source_entity_ids": "Smoke detector sources"
+        },
+        "data_description": {
+          "source_entity_ids": "Select one or more existing smoke detector entities. A temporarily unknown or unavailable detector can remain selected when its smoke detector metadata is available."
+        }
       }
+    },
+    "error": {
+      "no_sources": "Select at least one smoke detector.",
+      "invalid_sources": "Select a list of valid entity IDs.",
+      "duplicate_sources": "Select each smoke detector only once.",
+      "unknown_entity": "A selected entity no longer exists. Select an existing smoke detector.",
+      "wrong_domain": "Only binary sensor entities can be selected.",
+      "wrong_device_class": "Each selected entity must have the smoke device class.",
+      "own_source": "Entities provided by AlarmMesh cannot be used as sources."
     },
     "abort": {
       "already_configured": "AlarmMesh is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Change AlarmMesh sources",
+        "description": "AlarmMesh only saves your source selection. This version does not monitor smoke detectors, link alarms, activate sirens, send notifications, or run alarm tests.",
+        "data": {
+          "source_entity_ids": "Smoke detector sources"
+        },
+        "data_description": {
+          "source_entity_ids": "Select one or more existing smoke detector entities. A temporarily unknown or unavailable detector can remain selected when its smoke detector metadata is available."
+        }
+      }
+    },
+    "error": {
+      "no_sources": "Select at least one smoke detector.",
+      "invalid_sources": "Select a list of valid entity IDs.",
+      "duplicate_sources": "Select each smoke detector only once.",
+      "unknown_entity": "A selected entity no longer exists. Select an existing smoke detector.",
+      "wrong_domain": "Only binary sensor entities can be selected.",
+      "wrong_device_class": "Each selected entity must have the smoke device class.",
+      "own_source": "Entities provided by AlarmMesh cannot be used as sources."
     }
   }
 }

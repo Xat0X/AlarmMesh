@@ -30,7 +30,7 @@ def test_packaging_metadata() -> None:
 
 
 def test_translation_keys() -> None:
-    """Every shipped language contains the confirmation and duplicate texts."""
+    """Every language supplies source selection, options and validation texts."""
     strings = json.loads((INTEGRATION / "strings.json").read_text("utf-8"))
     english = json.loads((INTEGRATION / "translations" / "en.json").read_text("utf-8"))
     assert english == strings
@@ -40,3 +40,19 @@ def test_translation_keys() -> None:
         assert translated["config"]["step"]["user"]["title"]
         assert translated["config"]["step"]["user"]["description"]
         assert translated["config"]["abort"]["already_configured"]
+        for flow, step in (("config", "user"), ("options", "init")):
+            form = translated[flow]["step"][step]
+            assert form["title"]
+            assert form["description"]
+            assert form["data"]["source_entity_ids"]
+            assert form["data_description"]["source_entity_ids"]
+            assert set(translated[flow]["error"]) == {
+                "no_sources",
+                "invalid_sources",
+                "duplicate_sources",
+                "unknown_entity",
+                "wrong_domain",
+                "wrong_device_class",
+                "own_source",
+            }
+            assert all(translated[flow]["error"].values())

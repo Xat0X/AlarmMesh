@@ -4,22 +4,32 @@ Vendor-independent smoke alarm linking, monitoring and testing for Home Assistan
 
 > AlarmMesh is not a certified fire alarm system and must not replace certified standalone smoke detectors.
 
-## Current status: foundation only
+## Current status: source selection only
 
 The description above is the project direction, not functionality available today.
-Version 0.0.1 provides a Home Assistant custom integration skeleton, prepared for
-HACS packaging. It creates one empty configuration entry after confirmation.
-It does not monitor smoke detectors, link alarms, activate sirens, send
-notifications, or perform device tests. No entities or actions are exposed.
+AlarmMesh lets you select existing smoke detector entities during setup and
+replace that selection later through the integration options. Select at least
+one `binary_sensor` with device class `smoke`. The selection is saved, but sources
+are not monitored and their smoke reports are not read or processed. AlarmMesh
+does not link alarms, activate sirens, send notifications, or perform device
+tests. No entities or actions are exposed.
 
-## Try the foundation
+## Select sources
 
 Use an isolated development Home Assistant instance (baseline: 2026.10.4).
 Copy `custom_components/alarmmesh` into its configuration directory under
 `custom_components/alarmmesh`, then restart Home Assistant. In **Settings >
-Devices & services > Add integration**, select **AlarmMesh** and confirm the
-foundation notice. Only one configuration can be added. Remove it from the
-integration page to undo the setup.
+Devices & services > Add integration**, select **AlarmMesh**, choose one or more
+smoke detector entities, and submit the form. Only one configuration can be added.
+Use **Configure** on the integration entry to view or replace the selection.
+Closing the form or submitting invalid input keeps the saved selection unchanged.
+Remove the integration entry to undo the setup.
+
+Temporarily `unknown` or `unavailable` detectors can remain selected when Home
+Assistant's entity metadata identifies them as smoke detectors. Duplicate,
+nonexistent, non-smoke and AlarmMesh-owned entities are rejected. Existing empty
+foundation configurations still load; open **Configure** to add sources. Selecting
+sources does not establish alarm readiness or start monitoring.
 
 Do not add `alarmmesh:` to `configuration.yaml`; configuration is UI-only.
 HACS metadata is included, but this is not a published or approved HACS release.

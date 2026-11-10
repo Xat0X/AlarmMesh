@@ -3,12 +3,50 @@
   "config": {
     "step": {
       "user": {
-        "title": "AlarmMesh-projectbasis instellen",
-        "description": "Deze ontwikkelversie maakt alleen een lege configuratie aan. Ze bewaakt geen rookmelders, koppelt geen alarmen, activeert geen sirenes, verstuurt geen meldingen en voert geen alarmtests uit. Ga verder om de basisconfiguratie aan te maken."
+        "title": "AlarmMesh-bronnen selecteren",
+        "description": "AlarmMesh slaat alleen je bronselectie op. Deze versie bewaakt geen rookmelders, koppelt geen alarmen, activeert geen sirenes, verstuurt geen meldingen en voert geen alarmtests uit.",
+        "data": {
+          "source_entity_ids": "Rookmelderbronnen"
+        },
+        "data_description": {
+          "source_entity_ids": "Selecteer één of meer bestaande rookmelderentiteiten. Een tijdelijk onbekende of onbeschikbare rookmelder mag geselecteerd blijven als de rookmeldermetadata beschikbaar is."
+        }
       }
+    },
+    "error": {
+      "no_sources": "Selecteer minstens één rookmelder.",
+      "invalid_sources": "Selecteer een lijst met geldige entiteits-ID's.",
+      "duplicate_sources": "Selecteer elke rookmelder slechts één keer.",
+      "unknown_entity": "Een geselecteerde entiteit bestaat niet meer. Selecteer een bestaande rookmelder.",
+      "wrong_domain": "Alleen binary_sensor-entiteiten kunnen worden geselecteerd.",
+      "wrong_device_class": "Elke geselecteerde entiteit moet de apparaatklasse smoke hebben.",
+      "own_source": "Entiteiten die AlarmMesh zelf levert, kunnen niet als bron worden gebruikt."
     },
     "abort": {
       "already_configured": "AlarmMesh is al geconfigureerd."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "AlarmMesh-bronnen aanpassen",
+        "description": "AlarmMesh slaat alleen je bronselectie op. Deze versie bewaakt geen rookmelders, koppelt geen alarmen, activeert geen sirenes, verstuurt geen meldingen en voert geen alarmtests uit.",
+        "data": {
+          "source_entity_ids": "Rookmelderbronnen"
+        },
+        "data_description": {
+          "source_entity_ids": "Selecteer één of meer bestaande rookmelderentiteiten. Een tijdelijk onbekende of onbeschikbare rookmelder mag geselecteerd blijven als de rookmeldermetadata beschikbaar is."
+        }
+      }
+    },
+    "error": {
+      "no_sources": "Selecteer minstens één rookmelder.",
+      "invalid_sources": "Selecteer een lijst met geldige entiteits-ID's.",
+      "duplicate_sources": "Selecteer elke rookmelder slechts één keer.",
+      "unknown_entity": "Een geselecteerde entiteit bestaat niet meer. Selecteer een bestaande rookmelder.",
+      "wrong_domain": "Alleen binary_sensor-entiteiten kunnen worden geselecteerd.",
+      "wrong_device_class": "Elke geselecteerde entiteit moet de apparaatklasse smoke hebben.",
+      "own_source": "Entiteiten die AlarmMesh zelf levert, kunnen niet als bron worden gebruikt."
     }
   }
 }
