@@ -139,6 +139,38 @@ and clearing result listeners. Normal unload removes entity listeners before
 stopping sources. Failed platform unload is reported as failure rather than
 claiming a successful teardown.
 
+## Restart and interrupted lifecycle contract
+
+The step-5 regressions retain the implementation above: no production change was
+needed for the tested source changes and lifecycle paths. Selected IDs are fixed
+strings. A real entity-registry rename removes the old source state; AlarmMesh
+marks that selected ID `MISSING`, does not subscribe to the renamed ID and does
+not change options. Selecting the new ID in options replaces the subscription.
+Repeated switches, including returning to a previous source, create fresh runtime
+objects; old runtimes remain detached. Recovering another source cannot clear
+an active smoke report.
+
+Disabling the integration unloads it; enabling it takes a fresh snapshot. Both
+overview entities may also be disabled together without stopping source tracking.
+Re-enabling them uses Home Assistant's existing delayed reload; AlarmMesh adds no
+timer. A source report does not expire merely because it has not changed.
+
+On the pinned Home Assistant 2026.10.4 baseline, a failed platform unload returns
+failure and leaves the entry in `FAILED_UNLOAD`, which HA marks non-recoverable
+for in-process unload/reload. A remaining platform keeps its result subscription;
+already removed entities remain detached. Source cleanup is not falsely claimed
+while a platform is still active. Neither HA's state nor its recovery checks are
+overridden. After the fault is resolved, restarting HA loads the saved entry and
+registry into new objects and rebuilds the result from current sources. An entry
+reload after `SETUP_ERROR` remains supported, as covered by the existing tests.
+
+The restart tests stop one fixture HA instance, then create a separate instance
+and run HA's base bootstrap against the saved configuration and entity-registry
+fixtures. They check current `on`, `off` and absent sources, subsequent source
+appearance, preserved custom overview identities/names and recovery after failed
+unload. This is a storage-based restart simulation, not a real process restart
+or a renamed entry-reload test. No AlarmMesh observations are persisted.
+
 There are no device requests, network connections, polling, timers, background
 tasks or AlarmMesh storage of observations. Home Assistant's own Recorder may
 record the exposed states according to its configuration. These read-only

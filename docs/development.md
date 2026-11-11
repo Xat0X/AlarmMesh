@@ -43,6 +43,31 @@ services. Packaging and translation tests supplement these.
 Network sockets are disabled during tests except Unix sockets required by the
 local test runtime. No test controls hardware.
 
+## Restart and failure regression coverage
+
+The earlier suites already cover initial smoke, missing/reappearing sources,
+single selection changes, overview identity/customizations, repeated reloads,
+and recovery from failures injected into either overview platform's setup.
+`tests/test_resilience.py` adds focused step-5 cases without changing production
+code or weakening the existing assertions:
+
+| Area | Additional fixture proof |
+| --- | --- |
+| Restart | Stop one HA instance, read saved config entries and registry through base bootstrap in a new HA instance, preserve custom names/IDs, and use current source states |
+| Source registry | Rename/remove an actual simulated HA entity, keep the selected ID fixed as `MISSING`, then explicitly select the new ID through options |
+| Options | Repeated swaps and switch-back, save an unavailable source using registry metadata, and reject/cancel edits during active smoke without interrupting tracking |
+| Disabled lifecycle | Disable/re-enable the integration; reload with both overviews disabled, then let HA's existing re-enable delay reload them |
+| Unload boundary | Change a source during platform teardown; check no old-runtime updates or duplicate processing after unload/reload |
+| Failed unload | Inject both False and an exception in a platform's unload, assert `FAILED_UNLOAD` and its reason, retain only the surviving platform, and recover in a new storage-bootstrapped HA instance |
+| Unchanged reports | Advance fixture time without changing a source; no arbitrary stale-report threshold turns an explicit off report into a fault |
+
+HA 2026.10.4 rejects in-process reload from `FAILED_UNLOAD`. The regression tests
+assert that restriction, rather than forcing entry state or patching HA's recovery
+policy. Resolving the fault and restarting HA is the tested recovery route. The
+new-instance tests are restart simulations using storage/setup fixtures, not real
+process restarts. Manual UI and physical-device validation remain separate and
+were not performed for this step.
+
 The GitHub workflow runs lint, format, tests, and official hassfest on push or PR.
 Hassfest checks Home Assistant metadata and translations independently of pytest.
 To run the official custom-integration validator locally with Docker:
