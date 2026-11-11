@@ -27,17 +27,25 @@ No smoke reported is not a guarantee of safety. AlarmMesh does not link alarms,
 activate sirens, send notifications, or perform device tests. There are no alarm
 actions or AlarmMesh services.
 
-## Select sources
+## Install and select sources
 
-Use an isolated development Home Assistant instance (baseline: 2026.10.4).
-Copy `custom_components/alarmmesh` into its configuration directory under
-`custom_components/alarmmesh`, then restart Home Assistant. In **Settings >
-Devices & services > Add integration**, select **AlarmMesh**, choose one or more
-smoke detector entities, and submit the form. Only one configuration can be added.
+On **HA 2026.11+**, use the built-in **Settings > Marketplace > Add from link**
+with `https://github.com/Xat0X/AlarmMesh`. On the older **2026.10.4** baseline,
+use HACS's **Custom repositories**, type **Integration**, with the same URL.
+See [installation, updates and removal](docs/installation.md) for the supported
+steps and restart prompts. Adding a repository does not mean public catalog
+admission or Home Assistant approval.
+
+After installation, in **Settings > Devices & services > Add integration**,
+select **AlarmMesh**, choose an existing smoke detector entity, and submit the
+form. Check both overviews: an explicit `off` source gives smoke `off` and source
+availability `complete`. More sources can be selected. Only one configuration
+can be added.
 Use **Configure** on the integration entry to view or replace the selection.
 Saving changed options reloads the integration to follow the new selection.
 Closing the form or submitting invalid input keeps the saved selection unchanged.
-Remove the integration entry to stop tracking and remove the configuration.
+Remove the integration entry to stop tracking and remove its configuration;
+uninstall through the installer separately to remove the installed files.
 
 Temporarily `unknown` or `unavailable` detectors can remain selected when Home
 Assistant's entity metadata identifies them as smoke detectors. Duplicate,
@@ -62,13 +70,17 @@ AlarmMesh does not directly query devices, poll sources, or create network
 connections. The overviews do not establish alarm readiness.
 
 Do not add `alarmmesh:` to `configuration.yaml`; configuration is UI-only.
-HACS metadata is included, but this is not a published or approved HACS release.
-There is no need to install it through HACS to develop the project.
+Repository metadata supports custom-repository installation. No catalog
+approval or published release is claimed. Development does not require an
+installer; use the isolated environment described below.
 
 ## Development and design
 
 - [Development setup and checks](docs/development.md)
+- [Installation, updates and removal](docs/installation.md)
+- [Reproducible compatibility checks: 2026.10.4 and 2026.11.1](docs/compatibility.md)
 - [Isolated local MVP acceptance environment and results](docs/mvp-acceptance.md)
+- [Read-only pilot and passive observation protocol](docs/read-only-pilot.md)
 - [Architecture and scope](docs/architecture.md)
 - [Guidelines and publication readiness](docs/guidelines.md)
 
@@ -80,3 +92,6 @@ The optional acceptance environment uses HA 2026.10.4 on localhost port 8124
 with simulated sources only. The twelve documented UI acceptance scenarios were
 executed on 2026-11-11, including a real container restart. Results and limitations
 are recorded in the acceptance guide; physical-device validation is outside scope.
+The real-device pilot records user-reported installation and current status on
+Core 2026.11.1 separately. Physical smoke transitions, connection loss/recovery
+and a production restart remain unvalidated.

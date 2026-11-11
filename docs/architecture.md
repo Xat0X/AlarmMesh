@@ -3,7 +3,8 @@
 ## Foundation contract
 
 AlarmMesh uses domain `alarmmesh`. Home Assistant loads it from
-`custom_components/alarmmesh`; HACS packages only that integration directory.
+`custom_components/alarmmesh`; the Marketplace/HACS installers package only that
+integration directory.
 All runtime code and translations live there. Tests, documentation, and developer
 tooling live outside it and are not runtime dependencies.
 
@@ -194,6 +195,22 @@ The overview platforms follow the official [binary sensor](https://contributors.
 [entity properties and availability](https://contributors.home-assistant.io/core/entities/entity-class/),
 [stable unique ID](https://contributors.home-assistant.io/core/quality-scale/entity-unique-id/)
 and config-entry platform lifecycle guidance, reviewed on 2026-11-11.
+
+## Verification and pilot evidence
+
+The [compatibility runner](compatibility.md) uses this unchanged runtime in fresh
+official HA 2026.10.4 and 2026.11.1 containers. It drives HA's actual config/options
+flows and simulated local sources, then checks the two entities, current-state
+rebuild, stable identities and detached old subscriptions. It is development
+tooling, never loaded by the installed integration. The default harness remains
+2026.10.4; this package changes no product code, persisted schema or dependencies.
+
+[UI simulation acceptance](mvp-acceptance.md), technical compatibility and the
+[user-reported pilot](read-only-pilot.md) are different evidence categories.
+`complete` only describes usable current HA values; it proves neither recent
+radio traffic nor physical smoke detection. No ageing threshold or extra model
+property is interpreted. Installation and publication boundaries follow the
+[installation guide](installation.md) and [guideline review](guidelines.md).
 
 ## Deliberately outside this change
 

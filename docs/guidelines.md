@@ -1,6 +1,7 @@
 # Guideline review and publication readiness
 
-Reviewed against official documentation on 2026-11-10.
+Core guideline review: 2026-11-10. Marketplace/HACS repository, installation and
+publication guidance rechecked against official sources on **2026-11-11**.
 
 ## Applied guidelines
 
@@ -12,28 +13,38 @@ Reviewed against official documentation on 2026-11-10.
 - [Config flow](https://contributors.home-assistant.io/core/integrations/config-flow/):
   domain-bound ConfigFlow class, versioned entry, asynchronous user step, and
   translated confirmation/abort text. Custom integrations ship translations.
-- [HACS integration requirements](https://hacs.dev/docs/publish/integration/):
-  one integration per repo, self-contained runtime directory, and required
-  manifest fields, including issue tracker and version.
-- [HACS general requirements](https://hacs.dev/docs/publish/start/):
-  root `hacs.json` with name and `render_readme: true` so a separate `info.md`
-  is unnecessary. The repository README explains available behavior.
+- [Marketplace repository structure](https://contributors.home-assistant.io/marketplace/reference/repository-structure/):
+  public GitHub repository, root README and `hacs.json`, one self-contained
+  integration and manifest metadata. Catalog requirements are a separate step.
+- [Marketplace metadata reference](https://contributors.home-assistant.io/marketplace/reference/hacs-json/):
+  the existing `hacs.json` remains the repository metadata, including minimum HA
+  version. No minimum or package version was changed for these checks.
+- [Custom integration guide](https://contributors.home-assistant.io/marketplace/guides/integrations/):
+  manifest, shipped translations, restart behavior and local brand assets.
 - [HACS validation action](https://hacs.dev/docs/publish/action/):
   official validation exists and is distinct from Home Assistant hassfest.
 
 ## Deferred publication work
 
-This foundation is not a HACS approval or release. Before publication, review
-current rules again, provide the required integration branding in
-`home-assistant/brands`, verify public GitHub description/topics and issue access,
-and run official HACS validation against the intended remote branch or release.
-Brand submission is deliberately not part of a local foundation change.
-Releases are optional for branch-based installation but should be planned with
-version consistency before distributing usable functionality.
+Custom-repository installation does not imply catalog admission, approval or a
+published release. The built-in Marketplace is the route from HA 2026.11; HACS
+is the older 2026.10.4 route. See [installation](installation.md) for the reviewed
+owner-operated installation/update/removal steps. The reported pilot installation
+is recorded separately from independently tested compatibility.
 
-No HACS workflow bypasses branding or claims successful store validation. The
-included CI uses hassfest for Home Assistant structure. A successful local test
-run or hassfest check is not evidence that HACS publication requirements are met.
+Before any catalog request, review current rules, repository description/topics,
+issue access, releases, branding and official HACS validation against the intended
+remote revision. Current custom-integration guidance places images in the
+integration's `brand/` folder; the old blanket instruction to submit custom
+branding to `home-assistant/brands` is superseded. No branding is created here.
+Default-branch installation without a release can identify a commit hash; catalog
+admission requires releases. No release, metadata or catalog change is part of
+this package.
+([Official release requirements](https://contributors.home-assistant.io/marketplace/guides/releases/))
+
+The included CI uses hassfest for Home Assistant structure. Successful tests,
+compatibility checks or hassfest do not establish store approval. No extra CI
+workflow or catalog validation/submission is introduced.
 
 No license was selected on behalf of the owner. Choose a project license before
 inviting reuse or publishing a distributable release.

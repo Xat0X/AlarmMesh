@@ -10,7 +10,9 @@ used for editing or simple syntax checks.
 The test harness is pinned to `pytest-homeassistant-custom-component==0.13.375`,
 which pins `homeassistant==2026.10.4`. This is the tested baseline, not a claim
 that every later Home Assistant version is already verified. `hacs.json` declares
-the same minimum. Update the harness and minimum deliberately and rerun checks.
+the same minimum. Separate [technical compatibility checks](compatibility.md)
+also verify exact **2026.11.1** without changing the harness or baseline. Update
+the harness and minimum deliberately and rerun checks.
 Direct developer tools are pinned; their transitive dependencies are not a full
 lockfile. The devcontainer Python image follows the 3.14 tag.
 
@@ -42,6 +44,12 @@ disabled entities and setup-failure cleanup. AlarmMesh creates no devices or
 services. Packaging and translation tests supplement these.
 Network sockets are disabled during tests except Unix sockets required by the
 local test runtime. No test controls hardware.
+
+The original suite contains 233 tests. Two additional tooling tests reject an
+unsupported version and an actual/requested HA-version mismatch before setup;
+the complete suite now contains 235 tests. Existing tests and status rules remain
+unchanged. Run the two image-based compatibility checks separately; passing
+pytest on 2026.10.4 is not evidence for another HA version.
 
 ## Restart and failure regression coverage
 
@@ -90,6 +98,27 @@ already ignored `config/mvp-acceptance/`. Technical checks, a real container
 restart and manual UI acceptance are reported separately. Onboarding requires
 the user's account input. After user onboarding, the twelve UI scenarios were
 executed on 2026-11-11; the guide records observations and remaining scope limits.
+
+`mvp-acceptance.ps1 -Action Check` defaults to **2026.10.4** and accepts an explicit
+`-HaVersion 2026.11.1`. Only those two versions are allowed; the version parameter
+does not change the web environment. Each technical run uses a new ignored
+`config/compatibility/<version>/<run-id>/`, a dedicated internal network, no web
+port and read-only product code. It never reads the web instance's account or
+storage. Commands, scenarios and reports are in [compatibility](compatibility.md).
+For a script syntax check without Docker:
+
+```powershell
+$parseErrors = $null
+[System.Management.Automation.Language.Parser]::ParseFile(
+    (Resolve-Path 'dev/mvp-acceptance/mvp-acceptance.ps1'),
+    [ref]$null, [ref]$parseErrors) | Out-Null
+if ($parseErrors) { throw ($parseErrors | Out-String) }
+```
+
+Use the [installation guide](installation.md) for Marketplace versus older HACS
+installation. The [pilot register](read-only-pilot.md) separates user reports from
+simulated checks and defines passive follow-up; no live access is part of these
+developer commands.
 
 Keep any disposable Home Assistant instance configuration in the ignored `config/`
 directory. Never commit `.storage`, credentials, `secrets.yaml`, logs, databases,

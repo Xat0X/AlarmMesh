@@ -7,6 +7,12 @@ Prepared on 2026-11-11 for Home Assistant **2026.10.4** and AlarmMesh commit
 The working-tree changes in step 6 are environment examples, tooling and docs;
 production integration code is unchanged.
 
+This is the historical UI acceptance record retained in base commit `1c9aae2`.
+The subsequent documentation/compatibility package does not rerun or extend
+these UI observations. Current technical commands/results are in
+[compatibility](compatibility.md); the separate user-reported real-device pilot
+and its open physical observations are in [the pilot register](read-only-pilot.md).
+
 This is simulated-source acceptance only. No smoke detection, hardware, sirens,
 notifications, physical tests or fire-safety certification is being validated.
 **Geen rook gemeld is geen garantie op veiligheid.**
@@ -27,8 +33,8 @@ notifications, physical tests or fire-safety certification is being validated.
 - Web container: a dedicated Docker bridge, `alarmmesh-mvp-acceptance-web`, with
   only `127.0.0.1:8124 -> 8123/tcp` published. This bridge is not an outbound
   firewall. The minimal configuration does not enable device discovery or cloud
-  integrations. Technical checks use a separate internal Docker network without
-  an external route, `alarmmesh-mvp-acceptance`.
+  integrations. Current technical checks use a fresh internal Docker network
+  without an external route per run, named `alarmmesh-compat-<version>-<run-id>-net`.
 
 The user completed onboarding and supplied the existing signed-in browser session.
 At the user's explicit request, the assistant then executed the UI scenarios
@@ -64,20 +70,23 @@ ownership labels, image, privileges, device mounts, port binding or config/sourc
 mounts is rejected. If port 8124 is occupied, stop and investigate; do not stop
 another user's service or silently choose a different binding.
 
-`Check` validates Compose, then runs HA's `check_config` and an actual HA bootstrap
-in new directories below `config/mvp-acceptance/technical-checks/`. The check
-container has no published port. Its integration mount is read-only and its
-network is internal. The bootstrap loads the example helpers/templates, creates
-an AlarmMesh entry through its backend config flow, checks its runtime result
-and unloads it. It never creates an owner account or touches the main instance's
-`.storage`. `technical-result.json` and checker logs remain in those ignored
-directories. This is technical proof, **not** completion of any UI scenario.
+`Check` now uses the tracked YAML examples and fresh directories below
+`config/compatibility/<version>/<run-id>/`, without reading this web instance's
+accounts or storage. It validates Compose, HA configuration and twelve technical
+runtime scenarios. The default remains 2026.10.4; `-HaVersion 2026.11.1` checks that
+exact image separately. Containers have no published port, mount the integration
+read-only and use a dedicated internal network. Containers/networks are cleaned
+up; ignored JSON reports and logs remain. See [compatibility](compatibility.md)
+for commands, scenarios, nonzero failure exits and results. `Start` also validates
+the web YAML through a fresh check configuration before starting a stopped/new
+web container. This is technical proof, **not** completion of any UI scenario.
 
 Normal startup may emit Home Assistant's standard custom-integration warning
 and an upstream `rich/segment.py` Python `SyntaxWarning`. The final configuration
 and bootstrap checks completed without a configuration/setup error. Earlier
 failed checker attempts are retained in their separate technical-check folders;
-only the successful final checks count as PASS.
+only the successful final checks count as PASS. Those older folders describe the
+original preparation; current reproducible checks use the location above.
 
 Docker Desktop did not publish a port for a web container attached exclusively
 to an internal network (`NetworkSettings.Ports` was empty). The final web setup

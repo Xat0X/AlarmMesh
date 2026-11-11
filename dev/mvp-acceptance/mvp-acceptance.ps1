@@ -1,16 +1,20 @@
 param(
     [ValidateSet('Prepare', 'Check', 'Start', 'Stop', 'Restart', 'Status')]
-    [string]$Action = 'Status'
+    [string]$Action = 'Status',
+    [ValidateSet('2026.10.4', '2026.11.1')]
+    [string]$HaVersion = '2026.10.4'
 )
 
 $ErrorActionPreference = 'Stop'
+if ($Action -ne 'Check' -and $HaVersion -ne '2026.10.4') {
+    throw 'HaVersion applies only to Check. The web environment stays on 2026.10.4.'
+}
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 $runtimePath = Join-Path $repoRoot 'config/mvp-acceptance'
 $composePath = Join-Path $PSScriptRoot 'compose.yaml'
 $containerName = 'alarmmesh-mvp-acceptance'
-$networkName = 'alarmmesh-mvp-acceptance'
 $webNetworkName = 'alarmmesh-mvp-acceptance-web'
-$imageName = 'ghcr.io/home-assistant/home-assistant:2026.10.4'
+$imageName = "ghcr.io/home-assistant/home-assistant:$HaVersion"
 $exampleFiles = @('configuration.yaml', 'ui-lovelace.yaml')
 
 function Invoke-Docker {
@@ -92,30 +96,110 @@ function Get-OwnedContainer {
 }
 
 function Check-Config {
+    param([switch]$UseWebConfig)
+    # Check never reads web accounts/config; Start explicitly validates its YAML.
+    $sourcePath = if ($UseWebConfig) { $runtimePath } else { $PSScriptRoot }
     foreach ($file in $exampleFiles) {
-        if (-not (Test-Path -LiteralPath (Join-Path $runtimePath $file))) {
-            throw 'Run Prepare first. No files will be overwritten.'
+        if (-not (Test-Path -LiteralPath (Join-Path $sourcePath $file))) {
+            throw "Missing public configuration example: $file"
         }
     }
+    & git -C $repoRoot check-ignore -q -- 'config/compatibility/local-data'
+    if ($LASTEXITCODE -ne 0) { throw 'Compatibility output must be ignored by Git.' }
     Invoke-Docker -DockerArgs @('compose', '-f', $composePath, 'config', '--quiet')
-    Ensure-IsolatedNetwork -Name $networkName -Internal $true
-    Ensure-IsolatedNetwork -Name $webNetworkName -Internal $false
-    $checksRoot = Join-Path $runtimePath 'technical-checks'
+    $runId = [guid]::NewGuid().ToString('N')
+    $runName = "alarmmesh-compat-$HaVersion-$($runId.Substring(0, 12))"
+    $runNetwork = "$runName-net"
+    $checksRoot = Join-Path $repoRoot "config/compatibility/$HaVersion"
     New-Item -ItemType Directory -Path $checksRoot -Force | Out-Null
-    $checkPath = Join-Path $checksRoot ([guid]::NewGuid().ToString('N'))
+    $checkPath = Join-Path $checksRoot $runId
     New-Item -ItemType Directory -Path $checkPath | Out-Null
     foreach ($file in $exampleFiles) {
-        Copy-Item -LiteralPath (Join-Path $runtimePath $file) -Destination $checkPath
+        Copy-Item -LiteralPath (Join-Path $sourcePath $file) -Destination $checkPath
+    }
+    $commit = & git -C $repoRoot rev-parse HEAD
+    if ($LASTEXITCODE -ne 0) { throw 'Cannot identify tested Git commit.' }
+    $changes = @(& git -C $repoRoot status --porcelain --untracked-files=all -- custom_components/alarmmesh dev/mvp-acceptance)
+    if ($LASTEXITCODE -ne 0) { throw 'Cannot identify relevant local changes.' }
+    $dirty = @(& git -C $repoRoot status --porcelain --untracked-files=all).Count -gt 0
+    $context = [ordered]@{
+        requested_ha_version = $HaVersion
+        git_commit = $commit
+        worktree_dirty = $dirty
+        relevant_local_changes = $changes
+    }
+    $utf8 = [System.Text.UTF8Encoding]::new($false)
+    [System.IO.File]::WriteAllText((Join-Path $checkPath 'run-context.json'), ($context | ConvertTo-Json -Depth 5), $utf8)
+    $report = [ordered]@{
+        scope = 'technische controle met simulatiebronnen, geen fysieke apparaatvalidatie'
+        requested_ha_version = $HaVersion
+        actual_ha_version = $null
+        git_commit = $commit
+        worktree_dirty = $dirty
+        relevant_local_changes = $changes
+        configuration_check = 'NIET UITGEVOERD'
+        result = 'FAIL'
+        scenarios = @{}
     }
     $mounts = @(
         '--mount', "type=bind,source=$checkPath,target=/config",
         '--mount', "type=bind,source=$(Join-Path $repoRoot 'custom_components/alarmmesh'),target=/config/custom_components/alarmmesh,readonly",
         '--mount', "type=bind,source=$PSScriptRoot,target=/acceptance,readonly"
     )
-    $common = @('run', '--rm', '--network', $networkName, '-e', 'PYTHONDONTWRITEBYTECODE=1') + $mounts + @('--entrypoint', 'python', $imageName)
-    Invoke-Docker -DockerArgs ($common + @('-m', 'homeassistant', '--script', 'check_config', '--config', '/config'))
-    Invoke-Docker -DockerArgs ($common + @('/acceptance/check_runtime.py'))
-    Write-Output "Technical results retained under: $checkPath"
+    $networkCreated = $false
+    $stage = 'network'
+    function Invoke-CheckContainer {
+        param([string]$Phase, [string[]]$Command)
+        $dockerArgs = @('run', '--rm', '--name', "$runName-$Phase", '--network', $runNetwork,
+            '--label', 'org.alarmmesh.purpose=compatibility', '--label', "org.alarmmesh.run=$runId",
+            '-e', 'PYTHONDONTWRITEBYTECODE=1') + $mounts + @('--entrypoint', 'python', $imageName) + $Command
+        & docker @dockerArgs > (Join-Path $checkPath "$Phase.log") 2>&1
+        if ($LASTEXITCODE -ne 0) { throw "Compatibility $Phase failed (exit $LASTEXITCODE)." }
+    }
+    try {
+        Invoke-Docker -DockerArgs @('network', 'create', '--internal', '--label', 'org.alarmmesh.purpose=compatibility', '--label', "org.alarmmesh.run=$runId", $runNetwork)
+        $networkCreated = $true
+        $stage = 'version'
+        Invoke-CheckContainer -Phase 'version' -Command @('-c', 'from homeassistant.const import __version__; print(__version__)')
+        $actual = (Get-Content -LiteralPath (Join-Path $checkPath 'version.log') -Tail 1).Trim()
+        if ($actual -match '^\d+\.\d+\.\d+$') { $report.actual_ha_version = $actual }
+        if ($actual -ne $HaVersion) { throw 'Image version differs from requested version.' }
+        $stage = 'configuration'
+        Invoke-CheckContainer -Phase 'configuration' -Command @('-m', 'homeassistant', '--script', 'check_config', '--config', '/config')
+        $report.configuration_check = 'PASS'
+        $stage = 'runtime'
+        Invoke-CheckContainer -Phase 'runtime' -Command @('/acceptance/check_runtime.py', '--ha-version', $HaVersion)
+        $technical = Get-Content -Raw -LiteralPath (Join-Path $checkPath 'technical-result.json') | ConvertFrom-Json
+        $report.scenarios = $technical.scenarios
+        if ($technical.result -ne 'PASS' -or $technical.actual_ha_version -ne $HaVersion) {
+            throw 'Technical report did not confirm the requested version and PASS.'
+        }
+        $report.result = 'PASS'
+    } catch {
+        $report.failed_phase = $stage
+        if ($stage -eq 'configuration') { $report.configuration_check = 'FAIL' }
+        $technicalPath = Join-Path $checkPath 'technical-result.json'
+        if (Test-Path -LiteralPath $technicalPath) {
+            $report.scenarios = (Get-Content -Raw -LiteralPath $technicalPath | ConvertFrom-Json).scenarios
+        }
+        throw
+    } finally {
+        # Exact run-owned names only; never touch web containers or shared networks.
+        foreach ($phase in @('version', 'configuration', 'runtime')) {
+            $ownedName = "$runName-$phase"
+            $nameFilter = 'name=^/' + $ownedName + '$'
+            $leftover = & docker container ls -a --filter $nameFilter --format '{{.Names}}'
+            if ($leftover) {
+                $label = & docker inspect $ownedName --format '{{index .Config.Labels "org.alarmmesh.run"}}'
+                if ($label -eq $runId) { Invoke-Docker -DockerArgs @('rm', '-f', $ownedName) }
+            }
+        }
+        if ($networkCreated) { Invoke-Docker -DockerArgs @('network', 'rm', $runNetwork) }
+        [System.IO.File]::WriteAllText((Join-Path $checkPath 'compatibility-result.json'), ($report | ConvertTo-Json -Depth 8), $utf8)
+        Write-Output "$($report.result): requested=$HaVersion actual=$($report.actual_ha_version) commit=$commit local_changes=$dirty"
+        Write-Output $report.scope
+        Write-Output "Results: $checkPath"
+    }
 }
 
 switch ($Action) {
@@ -128,7 +212,8 @@ switch ($Action) {
             break
         }
         Assert-LocalPortFree
-        Check-Config
+        Check-Config -UseWebConfig
+        Ensure-IsolatedNetwork -Name $webNetworkName -Internal $false
         if ($existing) {
             Invoke-Docker -DockerArgs @('start', $containerName)
         } else {
