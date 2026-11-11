@@ -414,13 +414,16 @@ async def test_configuration_unchanged(
     assert entry.options == original_options
 
 
-async def test_no_exposed_resources(
+async def test_only_read_only_overviews(
     hass: HomeAssistant, entry: MockConfigEntry
 ) -> None:
-    """An active smoke report only updates internal data, without exposing resources."""
+    """Smoke adds only two overview entities without devices or alarm services."""
     hass.states.async_set(SOURCE, "on")
     assert await hass.config_entries.async_setup(entry.entry_id)
-    assert not er.async_entries_for_config_entry(er.async_get(hass), entry.entry_id)
+    entities = er.async_entries_for_config_entry(er.async_get(hass), entry.entry_id)
+    assert len(entities) == 2
+    assert {entity.domain for entity in entities} == {"binary_sensor", "sensor"}
+    assert all(entity.device_id is None for entity in entities)
     assert not dr.async_entries_for_config_entry(dr.async_get(hass), entry.entry_id)
     assert DOMAIN not in hass.services.async_services()
     assert not hass.states.async_all(DOMAIN)

@@ -36,8 +36,10 @@ docker run --rm --mount "type=bind,source=$($PWD.Path),target=/workspace,readonl
 
 Tests run real Home Assistant flow and entry APIs using the custom-integration
 fixtures: opening and confirming the form, empty entry data, duplicate rejection,
-two open dialogs, setup, unload, reload, removal, and absence of AlarmMesh devices,
-entities, states, and services. Packaging and translation tests supplement these.
+two open dialogs, setup, unload, reload, removal, and the two read-only overview
+entities. Tests cover local source changes, availability, stable entity identity,
+disabled entities and setup-failure cleanup. AlarmMesh creates no devices or
+services. Packaging and translation tests supplement these.
 Network sockets are disabled during tests except Unix sockets required by the
 local test runtime. No test controls hardware.
 

@@ -4,7 +4,7 @@
     "step": {
       "user": {
         "title": "AlarmMesh-bronnen selecteren",
-        "description": "AlarmMesh volgt geselecteerde rookmeldertoestanden passief binnen Home Assistant. Resultaten blijven intern: deze versie heeft geen overzichtsentiteiten, alarmkoppeling, sireneactivering, meldingen of alarmtests.",
+        "description": "AlarmMesh biedt twee alleen-lezen overzichten: samengevoegde rookmeldingen en volledigheid van broninformatie. Geen rook gemeld is geen garantie op veiligheid. Deze versie koppelt geen alarmen, activeert geen sirenes, verstuurt geen meldingen en voert geen alarmtests uit.",
         "data": {
           "source_entity_ids": "Rookmelderbronnen"
         },
@@ -30,7 +30,7 @@
     "step": {
       "init": {
         "title": "AlarmMesh-bronnen aanpassen",
-        "description": "AlarmMesh volgt geselecteerde rookmeldertoestanden passief binnen Home Assistant. Resultaten blijven intern: deze versie heeft geen overzichtsentiteiten, alarmkoppeling, sireneactivering, meldingen of alarmtests.",
+        "description": "AlarmMesh biedt twee alleen-lezen overzichten: samengevoegde rookmeldingen en volledigheid van broninformatie. Geen rook gemeld is geen garantie op veiligheid. Deze versie koppelt geen alarmen, activeert geen sirenes, verstuurt geen meldingen en voert geen alarmtests uit.",
         "data": {
           "source_entity_ids": "Rookmelderbronnen"
         },
@@ -47,6 +47,23 @@
       "wrong_domain": "Alleen binary_sensor-entiteiten kunnen worden geselecteerd.",
       "wrong_device_class": "Elke geselecteerde entiteit moet de apparaatklasse smoke hebben.",
       "own_source": "Entiteiten die AlarmMesh zelf levert, kunnen niet als bron worden gebruikt."
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "smoke": {
+        "name": "AlarmMesh rookmelding"
+      }
+    },
+    "sensor": {
+      "source_availability": {
+        "name": "AlarmMesh bronbeschikbaarheid",
+        "state": {
+          "complete": "Alle bronnen melden een status",
+          "incomplete": "Broninformatie onvolledig",
+          "not_configured": "Geen bronnen ingesteld"
+        }
+      }
     }
   }
 }

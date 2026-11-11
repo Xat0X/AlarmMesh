@@ -12,8 +12,11 @@ tooling live outside it and are not runtime dependencies.
 | `manifest.json` | Identity, version, configuration support, and metadata |
 | `const.py` | Stable domain, display name and source-selection option key |
 | `config_flow.py` | Source selection, validation and options for one version-1 entry |
-| `__init__.py` | Initial local snapshot and entry-owned state-change subscription |
-| `runtime.py` | Typed runtime data and translation of local states to source statuses |
+| `__init__.py` | Initial snapshot, source subscription, platform setup and teardown |
+| `runtime.py` | Typed observations, shared calculation result and result subscriptions |
+| `entity.py` | Common push-only entity identity and subscription cleanup |
+| `binary_sensor.py` | Read-only combined smoke overview |
+| `sensor.py` | Read-only source availability enum overview |
 | `status.py` | Existing pure status interpretation used by the internal runtime |
 | `strings.json` | Source UI text |
 | `translations/en.json`, `translations/nl.json` | Shipped custom-integration translations |
@@ -81,22 +84,65 @@ subscribe and evaluate to `INDETERMINATE` and `NOT_CONFIGURED`.
 
 The typed, synchronous event callback updates the changed source from the event's
 `new_state` (including `None` on removal), then recalculates the result with the
-unchanged `evaluate_status` function. Only the explicitly selected IDs are
+unchanged `evaluate_status` function. `async_set_result` notifies entry-local
+listeners only when the combined result changes. Entities never calculate their
+own result. Only the explicitly selected IDs are
 subscribed. A removed source remains selected as `MISSING` and can reappear under
 the same ID. No automatic selection, registry subscription or rename tracking is
 introduced.
 
 The helper's unsubscribe callback is registered with `entry.async_on_unload`.
-`async_unload_entry` returns success; Home Assistant then invokes that callback
-and clears `runtime_data`. Entry removal follows the same unload path. Reload
-removes the old subscription before setup takes a new snapshot and installs one
-new subscription, including when options change. Old sources and old runtime
-objects receive no further updates.
+`async_unload_entry` first awaits `async_unload_platforms` for `binary_sensor` and
+`sensor`, returning its success status. Home Assistant then invokes the source
+unsubscribe callback, clears remaining result listeners and clears `runtime_data`.
+Entry removal follows the same unload path. Reload removes old subscriptions
+before setup takes a new snapshot and installs new subscriptions, including when
+options change. Old sources and old runtime objects receive no further updates.
 
-There are no exposed platforms, overview entities, devices or services. There
-are no device requests, network connections, polling, timers, background tasks,
-history or persisted observations. A loaded entry and an internal smoke result
-do not indicate fire protection or alarm readiness.
+## Read-only overview entities
+
+After the initial calculation, setup awaits `async_forward_entry_setups` for
+exactly `binary_sensor` and `sensor`. Both entities read the current shared result
+through properties, have `should_poll = False`, and use `async_added_to_hass` to
+subscribe before Home Assistant writes their initial state. Each entity registers
+its unsubscribe callback with `async_on_remove`. No earlier AlarmMesh state is
+restored, and no separate source subscription is created per entity.
+
+| Overview | Shared runtime result | HA state and availability |
+| --- | --- | --- |
+| Smoke (`BinarySensorDeviceClass.SMOKE`) | `SMOKE_REPORTED` | `on`, available |
+| Smoke | `NO_SMOKE_REPORTED` | `off`, available: no smoke reported, not guaranteed safety |
+| Smoke | `INDETERMINATE` | `unavailable`; `is_on` is `None`, never `False` |
+| Source availability (`SensorDeviceClass.ENUM`) | `COMPLETE` | `complete`, available |
+| Source availability | `INCOMPLETE` | `incomplete`, available |
+| Source availability | `NOT_CONFIGURED` | `not_configured`, available |
+
+Smoke availability depends only on the smoke result. Active smoke remains `on`
+and available beside missing/unreachable sources; the other overview still shows
+`incomplete`. The enum describes completeness of source information, not fire
+safety. It has no unit or state class. Neither entity adds custom attributes,
+counters, diagnostic data, services or actions, and neither creates a device.
+
+Unique IDs are `{entry.entry_id}_smoke` and
+`{entry.entry_id}_source_availability`. They do not depend on selected sources,
+user-editable names, or state values. Home Assistant generates the entity IDs and
+retains registry customizations across reloads/restarts. Names and enum states
+have English and Dutch translations. A disabled overview has no result listener;
+the remaining overview and the shared source subscription continue normally.
+
+The pinned Home Assistant version can log a platform setup failure without
+raising from forwarding. Each platform therefore marks its initialization in the
+runtime, independently of whether its entity is enabled. Missing initialization
+fails the whole entry setup. Setup exceptions unload any partial platforms;
+Home Assistant's setup-error cleanup then runs `async_on_unload`, stopping sources
+and clearing result listeners. Normal unload removes entity listeners before
+stopping sources. Failed platform unload is reported as failure rather than
+claiming a successful teardown.
+
+There are no device requests, network connections, polling, timers, background
+tasks or AlarmMesh storage of observations. Home Assistant's own Recorder may
+record the exposed states according to its configuration. These read-only
+overviews do not establish fire protection or alarm readiness.
 
 ## Configuration API references
 
@@ -111,9 +157,14 @@ and [typed runtime data and config-entry lifecycle](https://contributors.home-as
 guidance, reviewed on 2026-11-11. Reloading options uses the supported
 `OptionsFlowWithReload` API in the same pinned test environment.
 
+The overview platforms follow the official [binary sensor](https://contributors.home-assistant.io/core/entities/binary-sensor/),
+[enum sensor](https://contributors.home-assistant.io/core/entities/sensor/),
+[entity properties and availability](https://contributors.home-assistant.io/core/entities/entity-class/),
+[stable unique ID](https://contributors.home-assistant.io/core/quality-scale/entity-unique-id/)
+and config-entry platform lifecycle guidance, reviewed on 2026-11-11.
+
 ## Deliberately outside this change
 
-- Visible overview entities or exposing the internal smoke and availability results.
 - Alarm grouping, propagation and automatic entity selection or rename tracking.
 - Siren activation, silencing, reset, and device test actions.
 - Notifications, escalations, automations, and vendor adapters.
@@ -129,8 +180,8 @@ runtime defines unavailable handling, fresh startup snapshots and cleanup; futur
 work still needs its own decisions about stale reports, deduplication, explicit
 user intent and background work before adding behavior.
 
-Add tests for each new behavior and failure mode. Add platform forwarding and
-unloading only when there are real platforms, and use entry-owned runtime data
-when resources exist. Evolve persisted configuration through explicit migration
+Add tests for each new behavior and failure mode. Any future platform needs its
+own setup/unload lifecycle and entry-owned runtime data. Evolve persisted
+configuration through explicit migration
 when needed; do not change the stable domain or unique ID casually. Nothing in
 this foundation authorizes future device actuation.

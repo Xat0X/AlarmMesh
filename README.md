@@ -4,17 +4,28 @@ Vendor-independent smoke alarm linking, monitoring and testing for Home Assistan
 
 > AlarmMesh is not a certified fire alarm system and must not replace certified standalone smoke detectors.
 
-## Current status: internal passive source tracking
+## Current status: two read-only overviews
 
-The description above is the project direction, not functionality available today.
+The description above includes future project direction. The current version
+offers source selection, passive local tracking and two read-only overviews.
 AlarmMesh lets you select existing smoke detector entities during setup and
 replace that selection later through the integration options. Select at least
 one `binary_sensor` with device class `smoke`. AlarmMesh reads their current local
 Home Assistant states when loaded and follows changes to those selected IDs.
-Source statuses and the combined smoke/availability result are kept internally
-in memory. An already active smoke report is recognized immediately on loading.
-No overview entities or actions are exposed. AlarmMesh does not link alarms,
-activate sirens, send notifications, or perform device tests.
+An already active smoke report is recognized immediately on loading. The shared
+in-memory result is shown by exactly two entities, with no physical device entry:
+
+- A smoke binary sensor: `on` means smoke reported; `off` means **no smoke
+  reported** ("geen rook gemeld"). An indeterminate result is `unavailable`, never
+  `off`. A smoke report remains `on` even if another source is unreachable or
+  missing.
+- A source availability enum-sensor: `complete`, `incomplete` or `not_configured`.
+  This sensor remains available when sources are unreachable. It describes
+  completeness of source information, not fire safety.
+
+No smoke reported is not a guarantee of safety. AlarmMesh does not link alarms,
+activate sirens, send notifications, or perform device tests. There are no alarm
+actions or AlarmMesh services.
 
 ## Select sources
 
@@ -32,17 +43,23 @@ Temporarily `unknown` or `unavailable` detectors can remain selected when Home
 Assistant's entity metadata identifies them as smoke detectors. Duplicate,
 nonexistent, non-smoke and AlarmMesh-owned entities are rejected. Existing empty
 foundation configurations still load; open **Configure** to add sources. Without
-sources, the internal result is indeterminate and not configured. Selected IDs
-are fixed: renamed entities are not followed automatically.
+sources, the smoke overview is `unavailable` and source availability is
+`not_configured`. Selected IDs are fixed: renamed sources are not followed
+automatically. Home Assistant generates the overview entity IDs; users can
+customize their names and IDs. Their identities stay stable across restarts,
+reloads and source-selection changes. Either overview can be disabled without
+stopping the other.
 
 `on` means smoke reported, `off` explicitly means no smoke reported, `unknown`
 remains unknown, and `unavailable` means unreachable. An absent or removed entity
 is missing; unexpected state values are unknown. Any smoke report takes
-precedence, while incomplete source availability remains visible in the internal
-result. These observations are not stored or restored; every load starts from
-Home Assistant's current local states. Tracking stops on unload or removal.
+precedence, while incomplete source availability is shown separately. AlarmMesh
+does not store or restore observations as current truth; every load starts from
+Home Assistant's current local states. Home Assistant may record entity history
+according to its own configuration; AlarmMesh adds no history or storage.
+Tracking and overview subscriptions stop on unload or removal.
 AlarmMesh does not directly query devices, poll sources, or create network
-connections. Internal tracking does not establish alarm readiness.
+connections. The overviews do not establish alarm readiness.
 
 Do not add `alarmmesh:` to `configuration.yaml`; configuration is UI-only.
 HACS metadata is included, but this is not a published or approved HACS release.

@@ -1,10 +1,16 @@
 """Entry-owned, in-memory observations of selected Home Assistant sources."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import STATE_OFF, STATE_ON, STATE_UNAVAILABLE, STATE_UNKNOWN
-from homeassistant.core import State
+from homeassistant.const import (
+    STATE_OFF,
+    STATE_ON,
+    STATE_UNAVAILABLE,
+    STATE_UNKNOWN,
+    Platform,
+)
+from homeassistant.core import CALLBACK_TYPE, State, callback
 
 from .status import SourceStatus, StatusResult
 
@@ -16,6 +22,33 @@ class AlarmMeshRuntimeData:
     source_entity_ids: tuple[str, ...]
     source_statuses: dict[str, SourceStatus]
     result: StatusResult
+    initialized_platforms: set[Platform] = field(default_factory=set)
+    _listeners: set[CALLBACK_TYPE] = field(default_factory=set, init=False, repr=False)
+
+    @callback
+    def async_add_listener(self, listener: CALLBACK_TYPE) -> CALLBACK_TYPE:
+        """Subscribe to changed results for this runtime only."""
+        self._listeners.add(listener)
+
+        @callback
+        def unsubscribe() -> None:
+            self._listeners.discard(listener)
+
+        return unsubscribe
+
+    @callback
+    def async_set_result(self, result: StatusResult) -> None:
+        """Publish a changed calculation without recalculating in entities."""
+        if result == self.result:
+            return
+        self.result = result
+        for listener in tuple(self._listeners):
+            listener()
+
+    @callback
+    def async_clear_listeners(self) -> None:
+        """Release remaining result subscriptions on teardown or failed setup."""
+        self._listeners.clear()
 
 
 type AlarmMeshConfigEntry = ConfigEntry[AlarmMeshRuntimeData]

@@ -4,7 +4,7 @@
     "step": {
       "user": {
         "title": "Select AlarmMesh sources",
-        "description": "AlarmMesh passively follows selected smoke detector states inside Home Assistant. Results are internal only: this version has no overview entities, linked alarms, siren activation, notifications, or alarm tests.",
+        "description": "AlarmMesh offers two read-only overviews: combined smoke reports and source information completeness. No smoke reported is not a guarantee of safety. This version does not link alarms, activate sirens, send notifications, or run alarm tests.",
         "data": {
           "source_entity_ids": "Smoke detector sources"
         },
@@ -30,7 +30,7 @@
     "step": {
       "init": {
         "title": "Change AlarmMesh sources",
-        "description": "AlarmMesh passively follows selected smoke detector states inside Home Assistant. Results are internal only: this version has no overview entities, linked alarms, siren activation, notifications, or alarm tests.",
+        "description": "AlarmMesh offers two read-only overviews: combined smoke reports and source information completeness. No smoke reported is not a guarantee of safety. This version does not link alarms, activate sirens, send notifications, or run alarm tests.",
         "data": {
           "source_entity_ids": "Smoke detector sources"
         },
@@ -47,6 +47,23 @@
       "wrong_domain": "Only binary sensor entities can be selected.",
       "wrong_device_class": "Each selected entity must have the smoke device class.",
       "own_source": "Entities provided by AlarmMesh cannot be used as sources."
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "smoke": {
+        "name": "AlarmMesh smoke report"
+      }
+    },
+    "sensor": {
+      "source_availability": {
+        "name": "AlarmMesh source availability",
+        "state": {
+          "complete": "All sources reporting",
+          "incomplete": "Source information incomplete",
+          "not_configured": "No sources configured"
+        }
+      }
     }
   }
 }
