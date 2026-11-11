@@ -1,0 +1,35 @@
+name: alarmmesh-mvp-acceptance
+services:
+  homeassistant:
+    image: ghcr.io/home-assistant/home-assistant:2026.10.4
+    container_name: alarmmesh-mvp-acceptance
+    restart: "no"
+    labels:
+      org.alarmmesh.purpose: mvp-acceptance
+    environment:
+      TZ: Europe/Brussels
+      PYTHONDONTWRITEBYTECODE: "1"
+    ports:
+      - target: 8123
+        published: "8124"
+        host_ip: 127.0.0.1
+        protocol: tcp
+    volumes:
+      - type: bind
+        source: ../../config/mvp-acceptance
+        target: /config
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ../../custom_components/alarmmesh
+        target: /config/custom_components/alarmmesh
+        read_only: true
+        bind:
+          create_host_path: false
+    networks:
+      - acceptance
+    stop_grace_period: 30s
+networks:
+  acceptance:
+    name: alarmmesh-mvp-acceptance-web
+    external: true

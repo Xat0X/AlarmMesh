@@ -1,0 +1,42 @@
+# Isolated, simulated acceptance environment. No default_config/discovery/cloud.
+homeassistant:
+  name: AlarmMesh MVP - SIMULATED
+  latitude: 0
+  longitude: 0
+  elevation: 0
+  time_zone: Europe/Brussels
+  country: BE
+
+frontend:
+config:
+api:
+http:
+  server_port: 8123
+lovelace:
+  mode: yaml
+system_health:
+
+# No initial values: these helpers restore their last saved state after restart.
+# On their first start they are off (no smoke, not unreachable).
+input_boolean:
+  mvp_a_smoke:
+    name: SIMULATION A - smoke reported
+  mvp_a_unreachable:
+    name: SIMULATION A - unreachable
+  mvp_b_smoke:
+    name: SIMULATION B - smoke reported
+  mvp_b_unreachable:
+    name: SIMULATION B - unreachable
+
+template:
+  - binary_sensor:
+      - name: MVP Smoke A
+        unique_id: alarmmesh_mvp_source_a
+        device_class: smoke
+        state: "{{ is_state('input_boolean.mvp_a_smoke', 'on') }}"
+        availability: "{{ is_state('input_boolean.mvp_a_unreachable', 'off') }}"
+      - name: MVP Smoke B
+        unique_id: alarmmesh_mvp_source_b
+        device_class: smoke
+        state: "{{ is_state('input_boolean.mvp_b_smoke', 'on') }}"
+        availability: "{{ is_state('input_boolean.mvp_b_unreachable', 'off') }}"

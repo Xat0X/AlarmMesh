@@ -68,9 +68,15 @@ There is no need to install it through HACS to develop the project.
 ## Development and design
 
 - [Development setup and checks](docs/development.md)
+- [Isolated local MVP acceptance environment and results](docs/mvp-acceptance.md)
 - [Architecture and scope](docs/architecture.md)
 - [Guidelines and publication readiness](docs/guidelines.md)
 
 The repository includes tests, lint/format configuration, a Linux development
 container, and GitHub workflows for tests and hassfest. No hardware access or
 Home Assistant credentials are needed for the tests.
+
+The optional acceptance environment uses HA 2026.10.4 on localhost port 8124
+with simulated sources only. The twelve documented UI acceptance scenarios were
+executed on 2026-11-11, including a real container restart. Results and limitations
+are recorded in the acceptance guide; physical-device validation is outside scope.

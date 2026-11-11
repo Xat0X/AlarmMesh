@@ -82,6 +82,15 @@ texts and remove/re-add the integration; it is separate from automated tests.
 
 ## Local Home Assistant files
 
+For a reproducible isolated UI test, use the [MVP acceptance guide and result
+list](mvp-acceptance.md). Public examples and guarded start/stop commands are in
+`dev/mvp-acceptance/`. The web container publishes only `127.0.0.1:8124` and mounts
+the repository integration read-only. Runtime/account data stays under the
+already ignored `config/mvp-acceptance/`. Technical checks, a real container
+restart and manual UI acceptance are reported separately. Onboarding requires
+the user's account input. After user onboarding, the twelve UI scenarios were
+executed on 2026-11-11; the guide records observations and remaining scope limits.
+
 Keep any disposable Home Assistant instance configuration in the ignored `config/`
 directory. Never commit `.storage`, credentials, `secrets.yaml`, logs, databases,
 or real device/account data. The development container does not mount a live

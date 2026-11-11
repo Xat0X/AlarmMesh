@@ -1,0 +1,26 @@
+title: AlarmMesh MVP - SIMULATION ONLY
+views:
+  - title: Simulated sources
+    path: simulation
+    cards:
+      - type: markdown
+        content: >-
+          **SIMULATION ONLY.** These switches do not control real devices.
+          No smoke reported is not a safety guarantee. Add AlarmMesh through
+          Settings > Devices & services and select the two MVP Smoke sources.
+          Inspect its two generated overview entities on the integration page;
+          their names and entity IDs may be customized.
+      - type: entities
+        title: Simulated smoke and reachability
+        show_header_toggle: false
+        entities:
+          - input_boolean.mvp_a_smoke
+          - input_boolean.mvp_a_unreachable
+          - input_boolean.mvp_b_smoke
+          - input_boolean.mvp_b_unreachable
+      - type: entities
+        title: Simulated source reports
+        show_header_toggle: false
+        entities:
+          - binary_sensor.mvp_smoke_a
+          - binary_sensor.mvp_smoke_b
