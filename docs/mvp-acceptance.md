@@ -1,5 +1,9 @@
 # MVP acceptance: isolated local Home Assistant
 
+For the current release review, use the [acceptance matrix](acceptance-matrix.md).
+The dated results below retain the original step-6 simulation acceptance and are
+not rewritten as results for a later commit.
+
 **Status: UI-acceptatie met gesimuleerde bronnen geslaagd op 2026-11-11.**
 
 Prepared on 2026-11-11 for Home Assistant **2026.10.4** and AlarmMesh commit

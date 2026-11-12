@@ -53,7 +53,10 @@ matrix is described in [development](development.md#complete-local-validation).
 and [artifact handling](https://github.com/actions/upload-artifact) were checked
 on 2026-11-12: read-only contents permission, bounded job timeouts, matrix
 `fail-fast: false` and failure-time upload of only sanitized summaries. The
-workflow has not run on GitHub for these local changes.
+workflow passed on GitHub for exact a300d39 on 2026-11-12; both compatibility
+artifacts were independently checked. The [current acceptance matrix](acceptance-matrix.md)
+distinguishes that hosted result from this preparation's new local changes,
+which have no new hosted run.
 
 No license was selected on behalf of the owner. Choose a project license before
 inviting reuse or publishing a distributable release.

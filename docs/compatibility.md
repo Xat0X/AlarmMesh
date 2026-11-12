@@ -6,8 +6,8 @@ parameter also permits **exactly 2026.11.1**; other versions are rejected. This
 does not change dependencies, minimum metadata or product code. CI adds a
 separate compatibility job while retaining the pinned baseline tests.
 
-Current review results and the new independent CI matrix are in
-[review results](review-results.md) and [development](development.md#complete-local-validation).
+Current local and hosted outcomes are in the [acceptance matrix](acceptance-matrix.md);
+the independent CI matrix uses the [complete validation route](development.md#complete-local-validation).
 The historical results below are retained as dated evidence; base `0e7ba38`
 already includes those changes and the supplied branding.
 

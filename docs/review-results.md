@@ -1,5 +1,12 @@
 # Read-only MVP review — 2026-11-12
 
+**Historical review of 0e7ba38 plus the then-local review changes.** The tables,
+blocked browser/onboarding observations and pending hosted-run statements below
+describe that earlier review only. On 2026-11-12, a separate follow-up verified
+hosted a300d39 and its artifacts and completed the fresh simulation UI checklist.
+Use the [central current acceptance matrix](acceptance-matrix.md) for those new
+results and remaining boundaries; the original record is retained intact below.
+
 Base: **0e7ba380de2cc1a267580de8973ab3b9515f21a3** on `main`, initially clean.
 The working changes are for review; there is no new committed revision. No
 production Python, status semantics, schema, domain, entry version, unique IDs,

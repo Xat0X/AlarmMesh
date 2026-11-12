@@ -16,12 +16,21 @@
 
 ### Review and release preparation
 
+- Verify hosted CI and both compatibility artifacts for a300d39; complete a new
+  English/Dutch simulation UI pass and consolidate current evidence in the
+  [acceptance matrix](docs/acceptance-matrix.md), preserving historical reports.
+- Add deterministic local test packaging with an explicit 18-file inventory,
+  SHA-256 and five regression cases; package no accounts or runtime data.
+- Add isolated file-replacement, process-restart, removal/re-add and stopped-file
+  snapshot-recovery checks on both exact HA versions. Compared integration
+  payloads are identical; this is neither installer end-to-end nor HA backup
+  feature acceptance. Prepare a concrete 0.1.0 proposal without changing 0.0.1.
 - Add the README logo header, practical troubleshooting, passive pilot evidence,
   release checklist, draft release text and a scoped roadmap.
 - Provide one local validation command and a separate CI compatibility matrix
   for exact HA 2026.10.4 and 2026.11.1, retaining the pinned 2026.10.4 test suite.
 - Reject stale reports, preserve local failure tracebacks and report cleanup
-  failures as failures. Upload only sanitized summaries in the proposed CI job.
+  failures as failures. Upload only sanitized summaries in the compatibility CI job.
 - Add image/HA-serving tests and focused tooling failure regressions; existing
   status rules and tests are unchanged. See [review results](docs/review-results.md).
 

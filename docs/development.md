@@ -48,8 +48,9 @@ matrix now calls that same compatibility runner with exact versions. The matrix
 uses read-only source/tool mounts, fresh configuration, no published port and
 per-run internal networking. Only an explicitly new summary file in runner temp
 is uploaded, even after failure; storage, accounts, databases and raw logs are
-excluded. The workflow itself must still be observed on GitHub after a separately
-authorized push; local validation cannot establish that hosted execution passed.
+excluded. Hosted execution for exact a300d39 was verified on 2026-11-12, including
+both downloaded compatibility artifacts. See the [current acceptance matrix](acceptance-matrix.md).
+New local changes still require their own separately authorized hosted run.
 
 The baseline/hassfest containers receive a read-only export of Git-visible files,
 including local review changes, rather than the entire working directory. Ignored
@@ -83,14 +84,21 @@ services. Packaging and translation tests supplement these.
 Network sockets are disabled during tests except Unix sockets required by the
 local test runtime. No test controls hardware.
 
-The established baseline has 235 tests. The review adds seven packaged-image/HA
-serving tests and two failure/privacy tests, for **244 tests**. All 235 existing
-tests and their assertions, including the 79 pure status tests, remain unchanged.
+The earlier baseline had 235 tests. Seven packaged-image/HA serving tests and
+two failure/privacy tests brought a300d39 to **244 tests**, confirmed on GitHub.
+This preparation adds five package-integrity cases, for **249 tests**. All 244
+existing tests and assertions, including the 79 pure status tests, remain unchanged.
 Wrapper fault checks
 add configuration failure, stale-report rejection, cleanup failure and an
 existing output path without requiring Docker or another testing dependency.
 Passing pytest on 2026.10.4 is not evidence for another HA version; the complete
 route runs both image-based checks separately.
+
+For release preparation, [package/file-update checks](release-package.md) reuse
+the same simulation YAML and real HA APIs in additional disposable process runs.
+They supplement the single standard validation route with package, replacement
+and stopped-file recovery evidence; they are not an alternate pytest system or
+installer/HA-backup acceptance. Current outcomes are recorded only in the matrix.
 
 ## Restart and failure regression coverage
 

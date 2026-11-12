@@ -84,6 +84,8 @@ installer; use the isolated environment described below.
 
 ## Development and design
 
+- [Current acceptance matrix: hosted CI, fresh UI and open checks](docs/acceptance-matrix.md)
+- [Local package, file-update and snapshot-recovery checks](docs/release-package.md)
 - [Development setup and checks](docs/development.md)
 - [Installation, updates and removal](docs/installation.md)
 - [Reproducible compatibility checks: 2026.10.4 and 2026.11.1](docs/compatibility.md)

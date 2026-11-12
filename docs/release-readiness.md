@@ -1,78 +1,119 @@
-# Read-only MVP release readiness
+# Read-only MVP release proposal
 
-Prepared **2026-11-12**, base **0e7ba380de2cc1a267580de8973ab3b9515f21a3** plus
-the local review changes. This is release preparation, not publication approval.
-The current manifest is `0.0.1`; no version, minimum, dependency or schema changes
-are proposed merely to publish. [Review evidence](review-results.md) records the
-actual checks and limits. [Changelog](../CHANGELOG.md) is intentionally Unreleased.
+Prepared **2026-11-12** against **a300d39b7eac4ef80ebb971e859b9866f2145c15**,
+plus the local release-preparation changes. The [current acceptance matrix](acceptance-matrix.md)
+is the authoritative results list; earlier dated reports remain historical.
+No release, manifest bump or publication is performed here.
 
-## Ready for code/document review
+## Concrete candidate
 
-- Two read-only overviews, fixed source selection and shared status calculation.
-- English/Dutch forms and state labels; supplied branding and local serving tests.
-- One reproducible [validation route](development.md#complete-local-validation)
-  and exact-version [compatibility matrix](compatibility.md).
-- [Installation/update/removal](installation.md), [troubleshooting](troubleshooting.md)
-  and [passive pilot record](read-only-pilot.md), without production identifiers.
-- No alarm actions, physical commands, automatic source selection or stale-report
-  threshold. No smoke reported is not a guarantee of safety.
+Propose **0.1.0**, titled **AlarmMesh 0.1.0 — Read-only MVP**: the first explicitly
+packaged pre-1.0 read-only MVP, rather than continuing the foundation's `0.0.1`
+identifier. This is a proposal for the owner, not a version change. The current
+manifest and generated local test ZIP still say **0.0.1**.
 
-## Still open
+Product candidate: exact a300d39, whose integration payload is unchanged by this
+review. Release source should be the **reviewed successor of a300d39 containing
+this preparation**, with a deliberately approved manifest/tag version and a fresh
+hosted validation result. No successor SHA can be named before those changes are
+authorized and committed. Hosted success for a300d39 does not cover new local
+tooling. A read-only GitHub check on 2026-11-12 found no existing releases or tags;
+the proposed name/tag was unused at that time.
 
-| Item | Required next action / owner |
+The candidate delivers source selection and backend validation, passive tracking,
+smoke priority during partial information loss, two read-only overviews, stable
+identity on reload, English/Dutch texts and the supplied artwork. There is no
+schema migration or new product functionality in this preparation.
+
+## Evidence and remaining technical boundaries
+
+- Hosted a300d39: 244 tests, Ruff, hassfest and exact-version compatibility
+  artifacts independently inspected; fresh simulation UI now observed on 2026.10.4.
+- Reproducible [local package and file-update checks](release-package.md) pass
+  on exact **2026.10.4** and **2026.11.1**, retaining the 2026.10.4 test baseline.
+  Package inventory/hashes, separate process restarts, options/identity retention,
+  removal/re-add and stopped-file recovery are recorded centrally.
+- Previous 0e7ba38 and current a300d39 integration payloads are identical.
+  File replacement is tested; migration between different product versions is not.
+- Marketplace/HACS installation/update/uninstall **end to end remains untested
+  in the disposable instance**. No installer authorization was configured.
+  User-reported production installation is a separate evidence category.
+- The recovered copy of stopped test files is **not HA backup-feature acceptance**.
+  A supported HA backup/restore exercise remains separate.
+- The icon is visually readable on light/dark UI backgrounds. The inspected
+  screens do not display the wide logo; its theme selection in a live screen is
+  unobserved. Exact six-file serving is technical evidence only.
+- Real smoke transitions, physical loss/recovery, production restart and
+  separately observed physical self-test behavior remain open. No safety
+  certification, catalog approval or physical reliability is claimed.
+
+## Installation, update and recovery
+
+Use [the installation guide](installation.md): built-in Marketplace on HA
+2026.11+, older HACS route on tested baseline 2026.10.4, repository
+`https://github.com/Xat0X/AlarmMesh`. Review the offered revision, install, follow
+restart prompts, then configure at least one smoke source and inspect both
+overviews. Only **2026.10.4 and 2026.11.1** are technically checked; this does not
+promise every future version. Adding a link is not catalog admission.
+
+Before an owner-authorized update, retain a known-good HA backup including
+integration/configuration and record the installed revision. Use one installer,
+review update notes and follow its restart repair. Rollback should restore the
+known-good backup using [Home Assistant's supported procedure](https://www.home-assistant.io/integrations/backup/).
+This task did not test that backup feature or any production recovery. Do not
+promise that choosing an older version preserves arbitrary future schemas.
+Deleting the integration entry stops tracking; uninstall files separately through
+the installer. Source integrations remain independent.
+
+## Owner decisions before publication
+
+| Decision | Concrete proposal / required confirmation |
 | --- | --- |
-| License and artwork distribution rights | Owner chooses a license and confirms rights to distribute the supplied artwork. No license is selected here. |
-| Release revision/version | Owner chooses whether/when to release, the reviewed revision and version/tag policy. A future tag must agree with the manifest version. |
-| New UI smoke test | Complete onboarding in the fresh disposable instance, then execute the pending checklist in review results. Browser controls were blocked in this task. Historical UI acceptance is retained separately. |
-| GitHub workflow execution | After a separately authorized commit/push, observe the workflow on GitHub. Local commands/static validation do not prove hosted execution. |
-| Physical pilot | Real smoke transitions, physical connection failure/recovery and production restart remain unvalidated. Plan any future physical acceptance separately under manufacturer instructions. |
-| Public catalog | Separate owner decision and future submission; no listing or approval claimed. No repository settings changed. |
+| Project license | Owner chooses the license; none is assumed or added. |
+| Supplied artwork | Owner confirms redistribution rights for all packaged artwork, including derivative packaged PNGs. Technical checks do not establish rights. |
+| Version, revision and timing | Approve or replace 0.1.0; choose publication timing and the reviewed successor revision. Then separately authorize matching manifest/tag changes and hosted CI. |
+| Installer acceptance | Arrange a disposable installer/GitHub session for end-to-end install/update/uninstall and a supported HA backup/restore check before claiming that coverage. No production credentials. |
+| Catalog participation | Decide later whether to seek admission; no application or remote settings change is included. |
 
-## Installation and rollback notes
+Physical acceptance is a separate pilot activity under the
+[passive observation protocol](read-only-pilot.md), not a request to force smoke,
+remove batteries, interrupt radio/MQTT or run a self-test now.
 
-Use the built-in Marketplace on HA 2026.11+, or the documented HACS route on the
-older 2026.10.4 baseline. Review the installed revision, update through that
-installer and follow its restart repair/prompt. Back up HA before any future
-owner-authorized update. No automatic production update occurs here.
+## Catalog preflight, rechecked 2026-11-12
 
-Rollback should restore the owner's known-good HA backup including integration
-files and saved configuration, following Home Assistant's supported restore
-procedure. Do not promise a downgrade will preserve arbitrary future schemas or
-use the install-another-version dialog as a backup substitute. To stop using this
-MVP, remove the AlarmMesh configuration and uninstall its files through the
-installer; selected source integrations remain separate. No storage edits or
-live commands are part of this document.
-([Official Marketplace version/update guidance](https://www.home-assistant.io/integrations/marketplace/))
-
-## Catalog preflight, checked 2026-11-12
-
-The official catalog requires the supported repository layout/metadata, README,
-description/topics/issues, branding, successful HACS validation and hassfest, and
-a full GitHub release. Owner/major-contributor eligibility and a separate catalog
-PR also apply. Locally present files and a passing hassfest are not proof that
-remote settings, HACS validation or catalog review have passed. No catalog PR,
-GitHub settings change, release or branding submission is performed here.
-([Official catalog rules](https://contributors.home-assistant.io/marketplace/guides/catalog/),
-[repository requirements](https://contributors.home-assistant.io/marketplace/reference/repository-structure/))
+Official rules distinguish a custom repository from catalog admission: supported
+layout/metadata, README, description/topics/issues, branding, validation and a
+published release are required for the catalog. Owner/contributor eligibility and
+a separate catalog PR also apply. No license choice, settings change, HACS
+catalog validation/submission or approval is inferred from passing hassfest.
+([Catalog rules](https://contributors.home-assistant.io/marketplace/guides/catalog/),
+[repository structure](https://contributors.home-assistant.io/marketplace/reference/repository-structure/),
+[release/version rules](https://contributors.home-assistant.io/marketplace/guides/releases/))
 
 ## Draft release text — not published
 
-> AlarmMesh read-only MVP — version and revision pending owner decision.
+> **AlarmMesh 0.1.0 — Read-only MVP** (proposed; revision pending approval)
 >
-> Select existing smoke detector entities in Home Assistant and view combined
-> smoke reports plus source-information completeness. Configure sources later
-> through options. Active smoke takes priority during partial source loss;
-> insufficient information becomes unavailable, never silently no smoke reported.
-> The integration rebuilds from current local HA states and offers English/Dutch
-> texts and light/dark branding.
+> Select existing Home Assistant smoke detector entities and view combined smoke
+> reports plus source-information completeness. Change sources through options.
+> Active smoke takes priority during partial source loss; insufficient information
+> is unavailable, never silently no smoke reported. Each load rebuilds from current
+> local HA states. Exactly two overviews, stable reload identity and English/Dutch
+> texts are included.
 >
-> Technically checked with simulated sources on exact HA 2026.10.4 and 2026.11.1.
-> Development baseline remains 2026.10.4. Follow the installation/update guide and
-> back up before updating. A branch installation revision can differ from the
-> manifest version. Real-device evidence is limited to the user-reported pilot;
-> physical transitions, connection loss and production restart remain unverified.
+> Technical simulation checks cover exact HA 2026.10.4 and 2026.11.1; development
+> baseline remains 2026.10.4. A fresh UI check covers 2026.10.4. Read the installation
+> guide and back up before updating. File replacement/restart and stopped-file
+> recovery were tested with identical old/new integration payloads; installer
+> end-to-end and HA backup-feature acceptance remain separate. A default-branch
+> installer revision can differ from the manifest version.
 >
-> This version does not operate sirens, notify, link alarms, mute/reset or test
+> The physical pilot confirms installation/current display/reload by user report
+> only. Physical smoke transitions, real connection failure and production restart
+> remain unverified. Complete means usable selected HA state values, not heartbeat
+> freshness or detector health; a self-test does not prove smoke detection.
+>
+> AlarmMesh does not operate sirens, notify, propagate alarms, mute/reset or test
 > devices. It is not a certified fire alarm system and does not replace certified
-> standalone detectors. No smoke reported is not a safety guarantee. See known
-> limits, troubleshooting and rollback guidance before use.
+> standalone detectors. No smoke reported is not a safety guarantee. See the
+> acceptance matrix, known limits and recovery guidance before use.
