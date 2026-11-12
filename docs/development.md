@@ -16,7 +16,48 @@ the harness and minimum deliberately and rerun checks.
 Direct developer tools are pinned; their transitive dependencies are not a full
 lockfile. The devcontainer Python image follows the 3.14 tag.
 
-Open the repo in the supplied development container, or run on Linux:
+## Complete local validation
+
+From a clean checkout, run **PowerShell 7** with Git and Docker Desktop (Linux
+containers), or PowerShell 7 on a Linux Docker host:
+
+```powershell
+pwsh -NoProfile -File ./dev/validate.ps1
+```
+
+This is the single complete validation route. It parses the PowerShell scripts,
+runs focused wrapper-failure tests and Compose validation, installs the unchanged
+requirements in Linux Python 3.14, runs Ruff lint/format and the full pytest
+suite, runs official hassfest, then invokes the existing compatibility runner for
+**2026.10.4** and **2026.11.1**. Independent checks continue after a failure, but
+any failed check or cleanup makes the overall result FAIL and the process exit
+nonzero. No execution-policy change is needed or made; use the supported shell
+and do not bypass an organization policy.
+
+The first run needs network access for container images and Python dependencies.
+Generated `validation-result.json`, per-version sanitized summaries, JUnit XML and
+private logs remain in ignored `config/validation/<run-id>/`. Compatibility runs
+have their own fresh ignored configuration and internal network. Only exact
+run-owned containers/networks are removed. Neither the existing web acceptance
+instance nor other projects are used. Review logs locally; only sanitized
+compatibility summaries are suitable for CI artifacts. A run's JSON identifies
+its HEAD commit and individual checks; it is not a published release.
+
+The existing CI test/hassfest jobs remain; an independent `fail-fast: false`
+matrix now calls that same compatibility runner with exact versions. The matrix
+uses read-only source/tool mounts, fresh configuration, no published port and
+per-run internal networking. Only an explicitly new summary file in runner temp
+is uploaded, even after failure; storage, accounts, databases and raw logs are
+excluded. The workflow itself must still be observed on GitHub after a separately
+authorized push; local validation cannot establish that hosted execution passed.
+
+The baseline/hassfest containers receive a read-only export of Git-visible files,
+including local review changes, rather than the entire working directory. Ignored
+web accounts/configuration and `.git` are not mounted. The export stays under the
+ignored validation run for local reproduction; it is never a CI upload target.
+
+For a quick subset while editing, open the supplied development container or run
+on Linux:
 
 ```sh
 python3.14 -m venv .venv
@@ -28,11 +69,8 @@ python3.14 -m venv .venv
 
 In the supplied container, the environment and dependencies are created by
 `postCreateCommand`; run the last three checks from a terminal. No Home Assistant
-server starts automatically. To reproduce via Docker from PowerShell:
-
-```powershell
-docker run --rm --mount "type=bind,source=$($PWD.Path),target=/workspace,readonly" -w /workspace -e PYTHONDONTWRITEBYTECODE=1 python:3.14-bookworm sh -c 'python -m pip install -r requirements-dev.txt && python -m ruff check --no-cache . && python -m ruff format --check --no-cache . && python -m pytest -p no:cacheprovider'
-```
+server starts automatically. For the complete Docker route, use `dev/validate.ps1`
+above rather than mounting a working directory containing ignored account data.
 
 ## What the checks establish
 
@@ -45,11 +83,14 @@ services. Packaging and translation tests supplement these.
 Network sockets are disabled during tests except Unix sockets required by the
 local test runtime. No test controls hardware.
 
-The original suite contains 233 tests. Two additional tooling tests reject an
-unsupported version and an actual/requested HA-version mismatch before setup;
-the complete suite now contains 235 tests. Existing tests and status rules remain
-unchanged. Run the two image-based compatibility checks separately; passing
-pytest on 2026.10.4 is not evidence for another HA version.
+The established baseline has 235 tests. The review adds seven packaged-image/HA
+serving tests and two failure/privacy tests, for **244 tests**. All 235 existing
+tests and their assertions, including the 79 pure status tests, remain unchanged.
+Wrapper fault checks
+add configuration failure, stale-report rejection, cleanup failure and an
+existing output path without requiring Docker or another testing dependency.
+Passing pytest on 2026.10.4 is not evidence for another HA version; the complete
+route runs both image-based checks separately.
 
 ## Restart and failure regression coverage
 

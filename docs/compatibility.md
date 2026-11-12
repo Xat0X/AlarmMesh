@@ -3,7 +3,13 @@
 **Technical checks with simulated sources, not physical-device validation.**
 The development harness and default remain **HA 2026.10.4**. An explicit version
 parameter also permits **exactly 2026.11.1**; other versions are rejected. This
-does not change dependencies, minimum metadata, CI or product code.
+does not change dependencies, minimum metadata or product code. CI adds a
+separate compatibility job while retaining the pinned baseline tests.
+
+Current review results and the new independent CI matrix are in
+[review results](review-results.md) and [development](development.md#complete-local-validation).
+The historical results below are retained as dated evidence; base `0e7ba38`
+already includes those changes and the supplied branding.
 
 ## Run from a fresh checkout or reviewed working tree
 
@@ -50,6 +56,14 @@ Per-phase logs stay locally ignored. Summaries contain no account/configuration
 contents or exception text. Do not publish raw local logs without review.
 Failure identifies the phase/scenario and exception type; a fresh rerun is used
 after correction, not reuse of the failed configuration.
+
+For CI or an orchestrator, `-ReportPath <new-json-file>` exports just the overall
+sanitized summary; its parent must exist and the file must not already exist.
+The result must match this run's ID, version and commit, with all scenarios PASS.
+Cleanup failure also makes the overall result FAIL and the process exit nonzero.
+Original runtime tracebacks and host/cleanup failures stay in private local logs,
+which are never uploaded by the matrix job. Each matrix version runs independently
+with read-only repository permissions and a bounded timeout.
 
 | Scenario | Required observation |
 | --- | --- |

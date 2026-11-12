@@ -1,13 +1,21 @@
 # AlarmMesh
 
-Vendor-independent smoke alarm linking, monitoring and testing for Home Assistant.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="custom_components/alarmmesh/brand/dark_logo@2x.png">
+  <source media="(prefers-color-scheme: light)" srcset="custom_components/alarmmesh/brand/logo@2x.png">
+  <img src="custom_components/alarmmesh/brand/logo.png" alt="AlarmMesh — read-only smoke reports and source availability for Home Assistant" width="560">
+</picture>
+
+Read-only smoke reports and source availability from your existing Home Assistant
+smoke detector entities.
 
 > AlarmMesh is not a certified fire alarm system and must not replace certified standalone smoke detectors.
 
 ## Current status: two read-only overviews
 
-The description above includes future project direction. The current version
-offers source selection, passive local tracking and two read-only overviews.
+The current version offers source selection, passive local tracking and two
+read-only overviews. The supplied artwork's tagline describes a future ambition;
+alarm linking is not implemented.
 AlarmMesh lets you select existing smoke detector entities during setup and
 replace that selection later through the integration options. Select at least
 one `binary_sensor` with device class `smoke`. AlarmMesh reads their current local
@@ -83,6 +91,9 @@ installer; use the isolated environment described below.
 - [Read-only pilot and passive observation protocol](docs/read-only-pilot.md)
 - [Architecture and scope](docs/architecture.md)
 - [Guidelines and publication readiness](docs/guidelines.md)
+- [Troubleshooting](docs/troubleshooting.md)
+- [Release readiness and draft release text](docs/release-readiness.md)
+- [Changelog](CHANGELOG.md) and [roadmap](docs/roadmap.md)
 
 The repository includes tests, lint/format configuration, a Linux development
 container, and GitHub workflows for tests and hassfest. No hardware access or

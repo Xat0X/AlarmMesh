@@ -2,12 +2,21 @@ param(
     [ValidateSet('Prepare', 'Check', 'Start', 'Stop', 'Restart', 'Status')]
     [string]$Action = 'Status',
     [ValidateSet('2026.10.4', '2026.11.1')]
-    [string]$HaVersion = '2026.10.4'
+    [string]$HaVersion = '2026.10.4',
+    [string]$ReportPath
 )
 
 $ErrorActionPreference = 'Stop'
 if ($Action -ne 'Check' -and $HaVersion -ne '2026.10.4') {
     throw 'HaVersion applies only to Check. The web environment stays on 2026.10.4.'
+}
+if ($ReportPath) {
+    if ($Action -ne 'Check') { throw 'ReportPath applies only to Check.' }
+    if (Test-Path -LiteralPath $ReportPath) { throw 'ReportPath already exists; refusing stale output.' }
+    $ReportPath = [System.IO.Path]::GetFullPath($ReportPath)
+    if (-not (Test-Path -LiteralPath (Split-Path -Parent $ReportPath))) {
+        throw 'ReportPath parent directory does not exist.'
+    }
 }
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 $runtimePath = Join-Path $repoRoot 'config/mvp-acceptance'
@@ -119,10 +128,12 @@ function Check-Config {
     }
     $commit = & git -C $repoRoot rev-parse HEAD
     if ($LASTEXITCODE -ne 0) { throw 'Cannot identify tested Git commit.' }
-    $changes = @(& git -C $repoRoot status --porcelain --untracked-files=all -- custom_components/alarmmesh dev/mvp-acceptance)
+    $changes = @(& git -C $repoRoot status --porcelain --untracked-files=all -- custom_components/alarmmesh dev tests .github)
     if ($LASTEXITCODE -ne 0) { throw 'Cannot identify relevant local changes.' }
     $dirty = @(& git -C $repoRoot status --porcelain --untracked-files=all).Count -gt 0
+    if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect working tree.' }
     $context = [ordered]@{
+        run_id = $runId
         requested_ha_version = $HaVersion
         git_commit = $commit
         worktree_dirty = $dirty
@@ -131,6 +142,7 @@ function Check-Config {
     $utf8 = [System.Text.UTF8Encoding]::new($false)
     [System.IO.File]::WriteAllText((Join-Path $checkPath 'run-context.json'), ($context | ConvertTo-Json -Depth 5), $utf8)
     $report = [ordered]@{
+        run_id = $runId
         scope = 'technische controle met simulatiebronnen, geen fysieke apparaatvalidatie'
         requested_ha_version = $HaVersion
         actual_ha_version = $null
@@ -140,6 +152,7 @@ function Check-Config {
         configuration_check = 'NIET UITGEVOERD'
         result = 'FAIL'
         scenarios = @{}
+        cleanup = 'NIET UITGEVOERD'
     }
     $mounts = @(
         '--mount', "type=bind,source=$checkPath,target=/config",
@@ -147,6 +160,8 @@ function Check-Config {
         '--mount', "type=bind,source=$PSScriptRoot,target=/acceptance,readonly"
     )
     $networkCreated = $false
+    $failure = $null
+    $cleanupFailures = @()
     $stage = 'network'
     function Invoke-CheckContainer {
         param([string]$Phase, [string[]]$Command)
@@ -171,34 +186,61 @@ function Check-Config {
         Invoke-CheckContainer -Phase 'runtime' -Command @('/acceptance/check_runtime.py', '--ha-version', $HaVersion)
         $technical = Get-Content -Raw -LiteralPath (Join-Path $checkPath 'technical-result.json') | ConvertFrom-Json
         $report.scenarios = $technical.scenarios
-        if ($technical.result -ne 'PASS' -or $technical.actual_ha_version -ne $HaVersion) {
-            throw 'Technical report did not confirm the requested version and PASS.'
+        if ($technical.result -ne 'PASS' -or $technical.actual_ha_version -ne $HaVersion -or
+            $technical.requested_ha_version -ne $HaVersion -or $technical.run_id -ne $runId -or
+            $technical.git_commit -ne $commit -or @($technical.scenarios.PSObject.Properties).Count -ne 12 -or
+            @($technical.scenarios.PSObject.Properties | Where-Object { $_.Value -ne 'PASS' }).Count -gt 0) {
+            throw 'Technical report did not confirm this run, version, commit and all scenarios.'
         }
         $report.result = 'PASS'
     } catch {
+        $failure = $_
         $report.failed_phase = $stage
+        $report.result = 'FAIL'
+        [System.IO.File]::WriteAllText((Join-Path $checkPath 'failure.log'), ($_ | Out-String) + $_.ScriptStackTrace, $utf8)
         if ($stage -eq 'configuration') { $report.configuration_check = 'FAIL' }
         $technicalPath = Join-Path $checkPath 'technical-result.json'
         if (Test-Path -LiteralPath $technicalPath) {
             $report.scenarios = (Get-Content -Raw -LiteralPath $technicalPath | ConvertFrom-Json).scenarios
         }
-        throw
     } finally {
         # Exact run-owned names only; never touch web containers or shared networks.
         foreach ($phase in @('version', 'configuration', 'runtime')) {
+            try {
             $ownedName = "$runName-$phase"
             $nameFilter = 'name=^/' + $ownedName + '$'
             $leftover = & docker container ls -a --filter $nameFilter --format '{{.Names}}'
+            if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect run containers during cleanup.' }
             if ($leftover) {
                 $label = & docker inspect $ownedName --format '{{index .Config.Labels "org.alarmmesh.run"}}'
-                if ($label -eq $runId) { Invoke-Docker -DockerArgs @('rm', '-f', $ownedName) }
+                if ($LASTEXITCODE -ne 0 -or $label -ne $runId) { throw 'Cannot verify run container ownership.' }
+                Invoke-Docker -DockerArgs @('rm', '-f', $ownedName)
             }
+            } catch { $cleanupFailures += ($_ | Out-String) }
         }
-        if ($networkCreated) { Invoke-Docker -DockerArgs @('network', 'rm', $runNetwork) }
+        if ($networkCreated) {
+            try {
+                $label = & docker network inspect $runNetwork --format '{{index .Labels "org.alarmmesh.run"}}'
+                if ($LASTEXITCODE -ne 0 -or $label -ne $runId) { throw 'Cannot verify run network ownership.' }
+                Invoke-Docker -DockerArgs @('network', 'rm', $runNetwork)
+            } catch { $cleanupFailures += ($_ | Out-String) }
+        }
+        $report.cleanup = if ($cleanupFailures.Count) { 'FAIL' } else { 'PASS' }
+        if ($cleanupFailures.Count) {
+            $report.result = 'FAIL'
+            [System.IO.File]::WriteAllText((Join-Path $checkPath 'cleanup-failure.log'), ($cleanupFailures -join [Environment]::NewLine), $utf8)
+        }
         [System.IO.File]::WriteAllText((Join-Path $checkPath 'compatibility-result.json'), ($report | ConvertTo-Json -Depth 8), $utf8)
+        if ($ReportPath) {
+            # An explicit, new summary only; CI never uploads configuration/logs.
+            [System.IO.File]::WriteAllText($ReportPath, ($report | ConvertTo-Json -Depth 8), $utf8)
+        }
         Write-Output "$($report.result): requested=$HaVersion actual=$($report.actual_ha_version) commit=$commit local_changes=$dirty"
         Write-Output $report.scope
         Write-Output "Results: $checkPath"
+    }
+    if ($failure -or $cleanupFailures.Count) {
+        throw "Compatibility failed; phase=$stage; cleanup=$($report.cleanup). See local logs under $checkPath."
     }
 }
 

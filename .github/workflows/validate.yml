@@ -1,4 +1,4 @@
-name: Validate foundation
+name: Validate AlarmMesh
 
 on:
   push:
@@ -11,6 +11,7 @@ permissions:
 jobs:
   tests:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -24,6 +25,48 @@ jobs:
 
   hassfest:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: home-assistant/actions/hassfest@master
+
+  compatibility:
+    name: Compatibility HA ${{ matrix.ha-version }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        ha-version: ["2026.10.4", "2026.11.1"]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Check PowerShell tooling and Compose
+        shell: pwsh
+        run: |
+          $errors = $null
+          Get-ChildItem dev -Recurse -Filter '*.ps1' | ForEach-Object {
+            [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$null, [ref]$errors) | Out-Null
+            if ($errors) { throw ($errors | Out-String) }
+          }
+          & ./dev/tests/test-compatibility.ps1
+          docker compose -f dev/mvp-acceptance/compose.yaml config --quiet
+          if ($LASTEXITCODE -ne 0) { throw 'Compose validation failed.' }
+      - name: Check actual HA runtime with simulated sources
+        id: check
+        shell: pwsh
+        run: |
+          $directory = Join-Path $env:RUNNER_TEMP ('alarmmesh-compat-' + [guid]::NewGuid().ToString('N'))
+          New-Item -ItemType Directory -Path $directory | Out-Null
+          $report = Join-Path $directory 'compatibility.json'
+          "report=$report" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          & ./dev/mvp-acceptance/mvp-acceptance.ps1 -Action Check -HaVersion '${{ matrix.ha-version }}' -ReportPath $report
+      - name: Retain sanitized report only
+        if: always() && steps.check.outputs.report != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: compatibility-${{ matrix.ha-version }}-${{ github.run_attempt }}
+          path: ${{ steps.check.outputs.report }}
+          if-no-files-found: warn
+          retention-days: 14

@@ -12,6 +12,9 @@ The subsequent documentation/compatibility package does not rerun or extend
 these UI observations. Current technical commands/results are in
 [compatibility](compatibility.md); the separate user-reported real-device pilot
 and its open physical observations are in [the pilot register](read-only-pilot.md).
+The **2026-11-12** review adds [a separate, still pending UI checklist](review-results.md#separate-ui-smoke-test)
+in a new disposable instance. Browser controls were blocked; those items are not
+covered by the historical PASS rows below.
 
 This is simulated-source acceptance only. No smoke detection, hardware, sirens,
 notifications, physical tests or fire-safety certification is being validated.

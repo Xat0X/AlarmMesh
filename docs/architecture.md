@@ -234,3 +234,8 @@ own setup/unload lifecycle and entry-owned runtime data. Evolve persisted
 configuration through explicit migration
 when needed; do not change the stable domain or unique ID casually. Nothing in
 this foundation authorizes future device actuation.
+
+The [roadmap](roadmap.md) keeps any next capability behind its own assignment.
+The [review record](review-results.md) maps current source/lifecycle coverage and
+the tooling corrections. This review preserves all production Python modules,
+status semantics, configuration schema and stable unique IDs.

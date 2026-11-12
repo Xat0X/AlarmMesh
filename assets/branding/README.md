@@ -33,3 +33,39 @@ do not add alarm interconnection, siren control, or notifications.
 
 Adding these files locally does not update an existing Home Assistant install.
 Delivery through an integration update and verification in its UI remain separate.
+
+## Reproduction and review (2026-11-12)
+
+No original SVG/PNG or packaged image was changed for this review. The two icons
+are byte-identical copies of `alarmmesh-icon-256.png` and `alarmmesh-icon-512.png`.
+Both original logo PNGs are 2080 x 520 RGBA. Their alpha bounding box is
+`(40, 40, 1771, 480)`. For each theme, crop to that box, resize the crop with
+Lanczos to height 256 or 512, and round the proportional width. This yields
+1007 x 256 and 2014 x 512. An in-memory Pillow reproduction matched every
+packaged logo pixel; the originals remain the source of truth.
+
+Equivalent recipe, using Pillow already present in the existing HA development
+environment (illustration only; no generation is needed for a normal checkout):
+
+```python
+from PIL import Image
+
+with Image.open("assets/branding/alarmmesh-logo-light.png") as source:
+    cropped = source.crop(source.getchannel("A").getbbox())
+    height = 256  # 512 for @2x; use the dark source for dark_logo variants
+    width = round(cropped.width * height / cropped.height)
+    packaged = cropped.resize((width, height), Image.Resampling.LANCZOS)
+```
+
+The current [official image rules](https://contributors.home-assistant.io/core/integrations/brands/)
+were checked on 2026-11-12. The six filenames, dimensions, landscape proportions,
+transparency and trimmed bounds pass the packaging tests. The single icon is
+used on both backgrounds. README uses relative `<picture>` sources for the
+supplied light/dark logos and descriptive fallback alt text; no remote image,
+font or script is added.
+
+`tests/test_branding.py` checks actual authenticated HA fixture responses against
+the local PNG bytes with placeholders disabled. This proves technical serving on
+the pinned baseline, not visually correct rendering in a signed-in UI. The new
+light/dark HA UI inspection is **NOT PERFORMED**, because browser controls were
+blocked; see [review results](../../docs/review-results.md).

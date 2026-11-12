@@ -1,6 +1,6 @@
 # Install and remove AlarmMesh
 
-Reviewed against the linked official documentation on **2026-11-11**. These are
+Rechecked against the linked official documentation on **2026-11-12**. These are
 instructions for the owner; this documentation task performed no live installation,
 update, restart or removal. AlarmMesh is a community integration, not a certified
 fire alarm system. No smoke reported is not a safety guarantee.
@@ -88,4 +88,6 @@ identifies a release. No release or catalog submission is made by this work.
 
 The minimum remains 2026.10.4; tests separately verify exact 2026.11.1. This is no
 claim about every newer version. Licensing, branding and catalog readiness remain
-separate owner decisions; see [guidelines](guidelines.md).
+separate owner decisions; see [release readiness](release-readiness.md). The
+existing artwork is packaged, but does not imply catalog admission. For common
+selection, state or logo questions, see [troubleshooting](troubleshooting.md).

@@ -4,6 +4,7 @@ import argparse
 import asyncio
 import json
 import sys
+import traceback
 from pathlib import Path
 
 from homeassistant import bootstrap
@@ -44,6 +45,7 @@ async def main(requested: str, config_dir: Path) -> int:
         "requested_ha_version": requested,
         "actual_ha_version": __version__,
         "git_commit": None,
+        "run_id": None,
         "worktree_dirty": None,
         "relevant_local_changes": [],
         "result": "FAIL",
@@ -60,7 +62,8 @@ async def main(requested: str, config_dir: Path) -> int:
         require(not (config_dir / ".storage").exists(), "Configuration is not fresh")
         context = json.loads((config_dir / "run-context.json").read_text("utf-8-sig"))
         require(context["requested_ha_version"] == requested, "Run context mismatch")
-        for key in ("git_commit", "worktree_dirty", "relevant_local_changes"):
+        require(bool(context["run_id"]), "Missing run identity")
+        for key in ("run_id", "git_commit", "worktree_dirty", "relevant_local_changes"):
             report[key] = context[key]
         passed(current)
 
@@ -223,7 +226,12 @@ async def main(requested: str, config_dir: Path) -> int:
     except Exception as exc:
         report["scenarios"][current] = "FAIL"
         report["error_type"] = type(exc).__name__
-        # No exception/config contents, accounts or tokens in the summary.
+        # Keep the original failure locally; never include it in CI artifacts.
+        await asyncio.to_thread(
+            (config_dir / "failure-traceback.log").write_text,
+            traceback.format_exc(),
+            encoding="utf-8",
+        )
     finally:
         if hass is not None:
             try:
@@ -231,6 +239,11 @@ async def main(requested: str, config_dir: Path) -> int:
             except Exception as exc:
                 report["result"] = "FAIL"
                 report["shutdown_error_type"] = type(exc).__name__
+                await asyncio.to_thread(
+                    (config_dir / "shutdown-traceback.log").write_text,
+                    traceback.format_exc(),
+                    encoding="utf-8",
+                )
         await asyncio.to_thread(
             (config_dir / "technical-result.json").write_text,
             json.dumps(report, indent=2) + "\n",

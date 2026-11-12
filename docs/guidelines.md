@@ -1,7 +1,7 @@
 # Guideline review and publication readiness
 
 Core guideline review: 2026-11-10. Marketplace/HACS repository, installation and
-publication guidance rechecked against official sources on **2026-11-11**.
+publication guidance rechecked against official sources on **2026-11-12**.
 
 ## Applied guidelines
 
@@ -36,15 +36,24 @@ Before any catalog request, review current rules, repository description/topics,
 issue access, releases, branding and official HACS validation against the intended
 remote revision. Current custom-integration guidance places images in the
 integration's `brand/` folder; the old blanket instruction to submit custom
-branding to `home-assistant/brands` is superseded. No branding is created here.
+branding to `home-assistant/brands` is superseded. The owner's supplied images
+are already packaged; this review adds no design. Their provenance and technical
+checks are recorded in [branding](../assets/branding/README.md).
 Default-branch installation without a release can identify a commit hash; catalog
 admission requires releases. No release, metadata or catalog change is part of
 this package.
 ([Official release requirements](https://contributors.home-assistant.io/marketplace/guides/releases/))
 
 The included CI uses hassfest for Home Assistant structure. Successful tests,
-compatibility checks or hassfest do not establish store approval. No extra CI
-workflow or catalog validation/submission is introduced.
+compatibility checks or hassfest do not establish store approval. No catalog
+validation/submission is introduced. The new independent compatibility
+matrix is described in [development](development.md#complete-local-validation).
+
+[GitHub workflow syntax](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax)
+and [artifact handling](https://github.com/actions/upload-artifact) were checked
+on 2026-11-12: read-only contents permission, bounded job timeouts, matrix
+`fail-fast: false` and failure-time upload of only sanitized summaries. The
+workflow has not run on GitHub for these local changes.
 
 No license was selected on behalf of the owner. Choose a project license before
 inviting reuse or publishing a distributable release.
