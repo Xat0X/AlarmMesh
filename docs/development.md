@@ -54,8 +54,11 @@ phone/tablet layout, contrast or native keyboard focus. Use the separate
 The Python fixture substitutes only the missing upstream UI-wheel filesystem
 root in the pip HA harness; real HTTP routes, panel registration, WebSocket auth,
 HA registries and group storage remain in use. Official image runs use their
-real bundled frontend and now check **14** scenarios, including authenticated
-panel subscription/group mutations, asset serving, persistent groups and cleanup.
+real bundled frontend and now check **17** scenarios, including authenticated
+panel subscription/group mutations, asset serving, persistent groups, verified
+mock control profiles, mixed-provider failure isolation and linking cleanup.
+The [linking simulation](linked-sounding.md#reproduce-the-simulation) uses mock
+HA action handlers and registry metadata, never an MQTT/ZHA driver or radio.
 
 The first run needs network access for container images and Python dependencies.
 Generated `validation-result.json`, per-version sanitized summaries, JUnit XML and

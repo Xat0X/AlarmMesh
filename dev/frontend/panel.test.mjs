@@ -157,3 +157,73 @@ test("every product label has Dutch and English text; no remote runtime imports"
   const js = await readFile(new URL("../../custom_components/alarmmesh/frontend/panel.js", import.meta.url), "utf8");
   assert.ok(!/innerHTML|window\.openai|Tweak|https?:\/\//.test(js));
 });
+
+function linkedData() {
+  const data = normal();
+  const other = { ...source, entity_id: "binary_sensor.simulation_b", name: "Detector B", capability: { origin: "zha", status: "linkable", reason: "no_safe_stop", controls: [{ source: "binary_sensor.simulation_b", target: "siren.simulation_b", profile: "smszb_zha", identity: "a".repeat(64), safe_stop: false }] } };
+  data.sources.push(other);
+  data.sources[0].capability = { origin: "mqtt", status: "not_confirmed", reason: "control_missing", controls: [] };
+  return data;
+}
+
+test("linked sounding is off by default and requires an exact preview plus acknowledgement", async () => {
+  const { panel, root, calls, transport } = setup();
+  transport.callbacks.at(-1)(linkedData());
+  panel.openDialog({ kind: "edit", group: null });
+  const form = root.querySelector("form");
+  root.querySelector("#group-name").value = "Mixed group";
+  assert.equal(Boolean(form.querySelector('[name="link-enabled"]').checked), false);
+  for (const input of form.querySelectorAll('[name="member"]')) input.checked = true;
+  form.querySelector('[name="link-enabled"]').checked = true;
+  const select = [...form.querySelectorAll("select")][1];
+  select.querySelector('option[value="siren.simulation_b"]').selected = true;
+  form.dispatchEvent(new Event("submit", { cancelable: true })); await tick();
+  assert.deepEqual(calls, []);
+  assert.ok(root.querySelector(".link-confirmation").textContent.includes("Detector A → Detector B"));
+  assert.ok(root.querySelector(".link-confirmation").textContent.includes("safe automatic stopping is not proven"));
+  root.querySelector(".confirm-linking").click(); await tick();
+  assert.deepEqual(calls, []);
+  root.querySelector(".confirm-ack").checked = true;
+  root.querySelector(".confirm-linking").click(); await tick();
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].confirmed, true);
+  assert.deepEqual(calls[0].linking, { enabled: true, bindings: [{ source: "binary_sensor.simulation_b", target: "siren.simulation_b", profile: "smszb_zha", identity: "a".repeat(64) }] });
+  panel.remove();
+});
+
+test("missing sounder cannot enable; cancelled confirmation writes nothing", async () => {
+  const { panel, root, calls, transport } = setup("nl");
+  transport.callbacks.at(-1)(linkedData());
+  panel.openDialog({ kind: "edit", group: null });
+  root.querySelector("#group-name").value = "Niet opslaan";
+  for (const input of root.querySelectorAll('[name="member"]')) input.checked = true;
+  root.querySelector('[name="link-enabled"]').checked = true;
+  root.querySelector("form").dispatchEvent(new Event("submit", { cancelable: true })); await tick();
+  assert.ok(root.querySelector("#group-error").textContent.includes("minstens twee"));
+  assert.deepEqual(calls, []);
+  panel.closeDialog(); assert.deepEqual(calls, []); panel.remove();
+});
+
+test("incident UI distinguishes smoke, failed requests and physical uncertainty", () => {
+  const { panel, root, transport } = setup();
+  const data = linkedData();
+  data.result = { smoke: "SMOKE_REPORTED", availability: "INCOMPLETE" };
+  data.incident = { active_sources: [source.entity_id], targets: [{ source: "binary_sensor.simulation_b", target: "siren.simulation_b", status: "failed" }] };
+  transport.callbacks.at(-1)(data);
+  assert.ok(root.querySelector(".hero.alarm").textContent.includes("Smoke reported"));
+  assert.ok(root.querySelector(".incident").textContent.includes("Activation request failed"));
+  assert.ok(root.querySelector(".incident").textContent.includes("not that sound was heard"));
+  transport.event("disconnected");
+  assert.equal(root.querySelector(".incident"), null);
+  panel.remove();
+});
+
+test("opening another dialog starts at its heading instead of the old scroll position", () => {
+  const { panel, root, transport } = setup();
+  transport.callbacks.at(-1)(linkedData());
+  panel.openDialog({ kind: "source", id: source.entity_id });
+  root.querySelector("dialog").scrollTop = 800;
+  panel.openDialog({ kind: "edit", group: null });
+  assert.equal(root.querySelector("dialog").scrollTop, 0);
+  panel.remove();
+});

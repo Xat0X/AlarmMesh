@@ -1,0 +1,28 @@
+title: SIMULATION ONLY
+views:
+  - title: Simulated linking
+    path: simulation
+    cards:
+      - type: markdown
+        content: >-
+          **SIMULATION ONLY.** Registry metadata and select/siren actions are
+          test doubles. No broker, radio or physical sound. Configure AlarmMesh
+          with SIMULATED A/B/C/D, then explicitly assign targets in a group.
+          B needs the simulated prerequisite switch. Finish with all smoke,
+          unavailable and failure helpers off. This is not hardware validation.
+      - type: entities
+        title: Simulated smoke reports
+        entities:
+          - input_boolean.link_a_smoke
+          - input_boolean.link_b_smoke
+          - input_boolean.link_c_smoke
+          - input_boolean.link_d_smoke
+          - input_boolean.link_a_unreachable
+          - input_boolean.link_a_test
+      - type: entities
+        title: Simulated prerequisites and errors
+        entities:
+          - input_boolean.link_b_linkage
+          - input_boolean.link_b_control_unreachable
+          - input_boolean.link_c_failure
+          - sensor.link_sim_requests

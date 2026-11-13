@@ -1,0 +1,8 @@
+{
+  "domain": "alarmmesh_simulation",
+  "name": "AlarmMesh simulated providers (no radios or broker)",
+  "config_flow": true,
+  "dependencies": ["input_boolean"],
+  "requirements": [],
+  "version": "0.0.0"
+}

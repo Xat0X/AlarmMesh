@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- Add optional, administrator-confirmed group sounder mappings, default off, with
+  registry-bound MQTT/ZHA capability profiles and independent incident/action results.
+- Deduplicate bounded HA action requests; preserve independent smoke origins through
+  missing information, prevent old runtime dispatch and restrict automatic stopping
+  to owned Heiman automation-only activations. Aqara/SMSZB-120 are activation-only.
+- Migrate old group payloads in memory without enabling linking or rewriting on load.
+  Preserve source options, overview identities, status calculation and original tests.
+- Add mocked profile/lifecycle/storage/authorization tests, confirmation DOM tests
+  and mixed-provider scenarios to both existing compatibility runs. Add a separate
+  simulated UI environment. See [scope, support and evidence](docs/linked-sounding.md).
+
+No physical sounder/detection validation or production installation was performed.
+Manifest version and dependencies remain unchanged; this work is not published.
+
 ## 0.1.0-beta.1 — 2026-11-13
 
 First opt-in interface test release. See [release notes](docs/releases/0.1.0-beta.1.md)

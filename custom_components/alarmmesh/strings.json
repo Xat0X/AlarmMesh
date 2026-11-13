@@ -4,7 +4,7 @@
     "step": {
       "user": {
         "title": "Select AlarmMesh sources",
-        "description": "AlarmMesh offers two read-only overviews: combined smoke reports and source information completeness. No smoke reported is not a guarantee of safety. This version does not link alarms, activate sirens, send notifications, or run alarm tests.",
+        "description": "AlarmMesh offers two read-only overviews: combined smoke reports and source information completeness. No smoke reported is not a guarantee of safety. Linked sounding is optional, off by default, and configured separately in the AlarmMesh panel. No notifications or device tests are performed.",
         "data": {
           "source_entity_ids": "Smoke detector sources"
         },
@@ -30,7 +30,7 @@
     "step": {
       "init": {
         "title": "Change AlarmMesh sources",
-        "description": "AlarmMesh offers two read-only overviews: combined smoke reports and source information completeness. No smoke reported is not a guarantee of safety. This version does not link alarms, activate sirens, send notifications, or run alarm tests.",
+        "description": "AlarmMesh offers two read-only overviews: combined smoke reports and source information completeness. No smoke reported is not a guarantee of safety. Linked sounding is optional, off by default, and configured separately in the AlarmMesh panel. No notifications or device tests are performed.",
         "data": {
           "source_entity_ids": "Smoke detector sources"
         },

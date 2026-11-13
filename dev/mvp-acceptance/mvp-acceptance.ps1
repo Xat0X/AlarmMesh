@@ -157,6 +157,7 @@ function Check-Config {
     $mounts = @(
         '--mount', "type=bind,source=$checkPath,target=/config",
         '--mount', "type=bind,source=$(Join-Path $repoRoot 'custom_components/alarmmesh'),target=/config/custom_components/alarmmesh,readonly",
+        '--mount', "type=bind,source=$(Join-Path $repoRoot 'dev/linking-simulation/alarmmesh_simulation'),target=/config/custom_components/alarmmesh_simulation,readonly",
         '--mount', "type=bind,source=$PSScriptRoot,target=/acceptance,readonly"
     )
     $networkCreated = $false
@@ -188,7 +189,7 @@ function Check-Config {
         $report.scenarios = $technical.scenarios
         if ($technical.result -ne 'PASS' -or $technical.actual_ha_version -ne $HaVersion -or
             $technical.requested_ha_version -ne $HaVersion -or $technical.run_id -ne $runId -or
-            $technical.git_commit -ne $commit -or @($technical.scenarios.PSObject.Properties).Count -ne 14 -or
+            $technical.git_commit -ne $commit -or @($technical.scenarios.PSObject.Properties).Count -ne 17 -or
             @($technical.scenarios.PSObject.Properties | Where-Object { $_.Value -ne 'PASS' }).Count -gt 0) {
             throw 'Technical report did not confirm this run, version, commit and all scenarios.'
         }

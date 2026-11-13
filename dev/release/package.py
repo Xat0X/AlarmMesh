@@ -31,6 +31,9 @@ FOUNDATION_FILES = frozenset(
     }
 )
 REQUIRED_FILES = FOUNDATION_FILES | {
+    "capabilities.py",
+    "linking.py",
+    "linking_runtime.py",
     "groups.py",
     "panel.py",
     "frontend/panel.js",

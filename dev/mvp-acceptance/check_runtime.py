@@ -33,6 +33,9 @@ SCENARIOS = (
     "unload_and_subscription_cleanup",
     "panel_assets_and_group_storage",
     "panel_reload_cleanup",
+    "verified_linking_profiles",
+    "mixed_linking_and_failed_target",
+    "linking_stop_and_reload_cleanup",
 )
 SCOPE = "technische controle met simulatiebronnen, geen fysieke apparaatvalidatie"
 
@@ -357,6 +360,152 @@ async def main(requested: str, config_dir: Path) -> int:
             not current_panel.unsubscribers and not current_panel.runtime._observers,
             "Final panel listener leak",
         )
+        passed(current)
+        # Test doubles only: no MQTT integration, broker, coordinator or radios.
+        current = "verified_linking_profiles"
+        simulation = await hass.config_entries.flow.async_init(
+            "alarmmesh_simulation", context={"source": "import"}, data={}
+        )
+        require(simulation["type"] is FlowResultType.CREATE_ENTRY, "Simulation setup")
+        await hass.async_block_till_done()
+        fixtures = hass.data["alarmmesh_simulation"]["fixtures"]
+        requests = hass.data["alarmmesh_simulation"]["calls"]
+        selected = [fixtures[name]["source"] for name in "abcd"]
+        hass.config_entries.async_update_entry(
+            entry, options={CONF_SOURCE_ENTITY_IDS: selected}
+        )
+        require(await hass.config_entries.async_setup(entry.entry_id), "Linking setup")
+
+        async def settle():
+            for _ in range(8):
+                await hass.async_block_till_done()
+                task = entry.runtime_data.panel.linking._task
+                if task is None:
+                    return
+                await task
+            raise AssertionError("Linking did not settle")
+
+        await settle()
+        panel = entry.runtime_data.panel
+        caps = panel.linking.capabilities
+        require(
+            caps.describe(fixtures["a"]["source"])["status"] == "linkable",
+            "Heiman profile",
+        )
+        require(
+            caps.describe(fixtures["b"]["source"])["status"] == "setting_needed",
+            "Aqara prerequisite",
+        )
+        require(
+            caps.describe(fixtures["c"]["source"])["controls"][0]["profile"]
+            == "smszb_zha",
+            "ZHA profile",
+        )
+        require(
+            caps.describe(fixtures["d"]["source"])["status"] == "detection_only",
+            "Unknown model",
+        )
+        require(not requests, "Default configuration dispatched a command")
+        passed(current)
+
+        current = "mixed_linking_and_failed_target"
+        hass.states.async_set("input_boolean.link_b_linkage", "on")
+        hass.states.async_set("input_boolean.link_c_failure", "on")
+        await settle()
+
+        def binding_for(name):
+            control = caps.describe(fixtures[name]["source"])["controls"][0]
+            return {
+                key: control[key] for key in ("source", "target", "profile", "identity")
+            }
+
+        await ws_request(
+            {
+                "id": 5,
+                "type": "alarmmesh/group",
+                "operation": "create",
+                "revision": panel.groups.revision,
+                "name": "Mixed simulated providers",
+                "members": selected,
+                "linking": {
+                    "enabled": True,
+                    "bindings": [binding_for("b"), binding_for("c")],
+                },
+                "confirmed": True,
+            }
+        )
+        linked_id = panel.groups.groups[0]["id"]
+        hass.states.async_set("input_boolean.link_a_smoke", "on")
+        await settle()
+        require(len(requests) == 2, "Expected two deduplicated requests")
+        require(
+            {r["status"] for r in panel.linking.records.values()}
+            == {"failed", "sent_no_auto_stop"},
+            "Failures did not remain independent",
+        )
+        for counter in range(3):
+            hass.states.async_set(
+                selected[0],
+                "on",
+                {"device_class": "smoke", "simulation_counter": counter},
+            )
+            await settle()
+        require(len(requests) == 2, "Repeated report caused a command storm")
+        passed(current)
+
+        current = "linking_stop_and_reload_cleanup"
+        hass.states.async_set("input_boolean.link_a_smoke", "off")
+        hass.states.async_set("input_boolean.link_c_failure", "off")
+        await settle()
+        require(len(requests) == 2, "Unsafe stop sent to activation-only profile")
+        await ws_request(
+            {
+                "id": 6,
+                "type": "alarmmesh/group",
+                "operation": "update",
+                "group_id": linked_id,
+                "revision": panel.groups.revision,
+                "name": "Automation-only Heiman",
+                "members": selected,
+                "linking": {"enabled": True, "bindings": [binding_for("a")]},
+                "confirmed": True,
+            }
+        )
+        hass.states.async_set("input_boolean.link_d_smoke", "on")
+        await settle()
+        require(
+            len(requests) == 3 and requests[-1]["option"] == "smoke_siren",
+            "Heiman activation",
+        )
+        hass.states.async_set("input_boolean.link_d_unreachable", "on")
+        await settle()
+        require(len(requests) == 3, "Source loss wrongly ended smoke incident")
+        hass.states.async_set("input_boolean.link_d_smoke", "off")
+        hass.states.async_set("input_boolean.link_d_unreachable", "off")
+        await settle()
+        require(
+            len(requests) == 4 and requests[-1]["option"] == "stop",
+            "Automation-only stop",
+        )
+        old_engine = panel.linking
+        require(
+            await hass.config_entries.async_reload(entry.entry_id),
+            "Linked entry reload",
+        )
+        await settle()
+        old_engine.changed()
+        require(
+            old_engine._closed
+            and len(requests) == 4
+            and identity() == original_identity,
+            "Old executor or identity leaked",
+        )
+        require(
+            await hass.config_entries.async_unload(entry.entry_id),
+            "Linked entry unload",
+        )
+        old_engine.changed()
+        require(len(requests) == 4, "Closed executor dispatched")
         passed(current)
         report["result"] = "PASS"
     except Exception as exc:

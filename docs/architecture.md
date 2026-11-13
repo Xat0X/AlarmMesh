@@ -1,5 +1,37 @@
 # Architecture and scope
 
+## Optional linked sounding — local extension
+
+The [linking contract and reviewed profiles](linked-sounding.md) extend the panel
+without changing `status.py`, selected-source options, overview entities or their
+identities. `capabilities.py` reads cached entity/device registry metadata and
+validates exact same-device HA controls. `linking.py` is the pure incident/action
+decision layer. Entry-owned `linking_runtime.py` alone executes bounded existing
+HA select/siren actions; there is no direct MQTT, ZHA cluster or device transport.
+Registry-bound fingerprints are checked on save and again immediately before
+dispatch. No arbitrary action name/data can be configured.
+
+Group storage keeps outer HA Store version 1 and its existing key. Explicit
+payload schema 2 adds default-off `linking` with exact source/target/profile/identity
+bindings. Schema-1 groups normalize in memory, retaining names, IDs, members and
+revision; load never writes or enables them. Unknown payload schemas fail closed.
+Atomic disk-first writes and admin/revision checks cover the entire change.
+
+An independent in-memory incident set retains each smoke origin until explicit
+off, without changing the current-state result. Test flags cannot create origins.
+Targets are deduplicated across groups. Calls use an eight-slot semaphore and
+ten-second timeout, with no automatic retry of dispatched failures. Heiman's
+documented automation-only stop is restricted to current-runtime ownership;
+Aqara and SMSZB-120 have no automatic stop. Successful action completion is not
+physical confirmation. Incidents, requests and ownership are never persisted.
+
+The executor starts after panel/group setup, including current already-on sources.
+Unload pauses and cancels/drains work before platform teardown. Success closes all
+executor subscriptions; failure retains read-only monitoring but leaves actions
+paused with an explicit UI warning. Closed runtimes cannot dispatch. Reload builds
+fresh observations/ownership; it never adopts an already active sounder. The
+linking guide specifies disable/remap/source-removal and restart limits.
+
 ## Integrated panel and organizational groups — local interface package
 
 The new [panel](panel.md) is a packaged native ES-module Web Component, registered
@@ -159,7 +191,7 @@ the same ID. No automatic selection, registry subscription or rename tracking is
 introduced.
 
 The helper's unsubscribe callback is registered with `entry.async_on_unload`.
-`async_unload_entry` first awaits `async_unload_platforms` for `binary_sensor` and
+`async_unload_entry` pauses linked execution, then awaits `async_unload_platforms` for `binary_sensor` and
 `sensor`, returning its success status. Home Assistant then invokes the source
 unsubscribe callback, clears remaining result listeners and clears `runtime_data`.
 Entry removal follows the same unload path. Reload removes old subscriptions
@@ -238,8 +270,9 @@ appearance, preserved custom overview identities/names and recovery after failed
 unload. This is a storage-based restart simulation, not a real process restart
 or a renamed entry-reload test. No AlarmMesh observations are persisted.
 
-There are no device requests, network connections, polling, timers, background
-tasks or AlarmMesh storage of observations. Home Assistant's own Recorder may
+The passive source/overview layer makes no device requests, network connections,
+polling, timers or background tasks and stores no observations. The optional
+executor above adds only bounded HA action tasks. Home Assistant's own Recorder may
 record the exposed states according to its configuration. These read-only
 overviews do not establish fire protection or alarm readiness.
 
@@ -264,12 +297,13 @@ and config-entry platform lifecycle guidance, reviewed on 2026-11-11.
 
 ## Verification and pilot evidence
 
-The [compatibility runner](compatibility.md) uses this unchanged runtime in fresh
+The [compatibility runner](compatibility.md) verifies the retained runtime in fresh
 official HA 2026.10.4 and 2026.11.1 containers. It drives HA's actual config/options
 flows and simulated local sources, then checks the two entities, current-state
 rebuild, stable identities and detached old subscriptions. It is development
 tooling, never loaded by the installed integration. The default harness remains
-2026.10.4; this package changes no product code, persisted schema or dependencies.
+2026.10.4. New linking checks use local mock HA actions/registry metadata, without
+loading MQTT/ZHA drivers. No dependencies are added.
 
 [UI simulation acceptance](mvp-acceptance.md), technical compatibility and the
 [user-reported pilot](read-only-pilot.md) are different evidence categories.
@@ -280,9 +314,9 @@ property is interpreted. Installation and publication boundaries follow the
 
 ## Deliberately outside this change
 
-- Alarm-action grouping, propagation and automatic entity selection or rename tracking.
-- Siren activation, silencing, reset, and device test actions.
-- Notifications, escalations, automations, and vendor adapters.
+- Automatic entity selection or rename tracking.
+- Generic siren controls, silencing, reset, and device test actions.
+- Notifications, escalations, user-supplied commands and direct vendor adapters.
 - Device discovery, direct device access, polling, timers and coordinators.
 - Claims of reliability, certification, or production readiness.
 
@@ -302,6 +336,7 @@ when needed; do not change the stable domain or unique ID casually. Nothing in
 this foundation authorizes future device actuation.
 
 The [roadmap](roadmap.md) keeps any next capability behind its own assignment.
-The [review record](review-results.md) maps current source/lifecycle coverage and
-the tooling corrections. This review preserves all production Python modules,
-status semantics, configuration schema and stable unique IDs.
+The historical [review record](review-results.md) maps source/lifecycle coverage
+and earlier tooling corrections. Current linked-sounding evidence is separate in
+the [linking guide](linked-sounding.md); status semantics, source-option schema and
+stable overview unique IDs remain unchanged.

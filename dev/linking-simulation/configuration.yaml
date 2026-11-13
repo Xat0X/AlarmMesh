@@ -1,0 +1,41 @@
+# TEST DOUBLES ONLY. No MQTT broker, ZHA coordinator, devices or cloud.
+homeassistant:
+  name: AlarmMesh LINKING - SIMULATION ONLY
+  latitude: 0
+  longitude: 0
+  elevation: 0
+  time_zone: Europe/Brussels
+  country: BE
+frontend:
+config:
+api:
+http:
+  server_port: 8123
+lovelace:
+  mode: yaml
+alarmmesh_simulation:
+input_boolean:
+  link_a_smoke:
+    name: SIMULATION A smoke
+  link_b_smoke:
+    name: SIMULATION B smoke
+  link_c_smoke:
+    name: SIMULATION C smoke
+  link_d_smoke:
+    name: SIMULATION D smoke (detection only)
+  link_a_unreachable:
+    name: SIMULATION A source unavailable
+  link_b_unreachable:
+    name: SIMULATION B source unavailable
+  link_c_unreachable:
+    name: SIMULATION C source unavailable
+  link_d_unreachable:
+    name: SIMULATION D source unavailable
+  link_a_test:
+    name: SIMULATION A self-test flag only
+  link_b_linkage:
+    name: SIMULATION B prerequisite enabled
+  link_b_control_unreachable:
+    name: SIMULATION B control unavailable
+  link_c_failure:
+    name: SIMULATION C action handler fails

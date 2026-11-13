@@ -13,6 +13,7 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 
 from .groups import GroupError, GroupStore
+from .linking_runtime import LinkingRuntime
 from .runtime import AlarmMeshConfigEntry
 from .status import SourceStatus, StatusResult, evaluate_status
 
@@ -53,6 +54,7 @@ class PanelController:
         self.hass, self.entry, self.hub = hass, entry, hub
         self.runtime = entry.runtime_data
         self.groups = GroupStore(hass, entry.entry_id)
+        self.linking = LinkingRuntime(hass, entry, self.groups, hub.publish)
         self.unsubscribers: list[Callable] = []
 
     async def async_start(self) -> None:
@@ -64,7 +66,7 @@ class PanelController:
             ar.EVENT_AREA_REGISTRY_UPDATED,
         ):
             self.unsubscribers.append(
-                self.hass.bus.async_listen(event, self.hub.publish)
+                self.hass.bus.async_listen(event, self._registry_changed)
             )
         await panel_custom.async_register_panel(
             self.hass,
@@ -72,13 +74,20 @@ class PanelController:
             "alarmmesh-panel",
             sidebar_title="AlarmMesh",
             sidebar_icon="mdi:smoke-detector",
-            module_url=f"{ASSET_URL}/panel.js?v=20261113-copy",
+            module_url=f"{ASSET_URL}/panel.js?v=20261113-linking-2",
             require_admin=True,
         )
         self.hub.controller = self
+        self.linking.start()
+        self.hub.publish()
+
+    @callback
+    def _registry_changed(self, *_args):
+        self.linking.refresh_watch()
         self.hub.publish()
 
     async def async_close(self) -> None:
+        await self.linking.close()
         await self.groups.async_close()
         for unsubscribe in self.unsubscribers:
             unsubscribe()
@@ -132,6 +141,7 @@ class PanelController:
                 "groups": [
                     g["id"] for g in self.groups.groups if entity_id in g["members"]
                 ],
+                "capability": self.linking.capabilities.describe(entity_id),
             }
             sources.append(source)
             room = rooms.setdefault(
@@ -160,6 +170,15 @@ class PanelController:
                     for member in group["members"]
                     if member not in self.runtime.source_entity_ids
                 ],
+                "linking_status": "disabled"
+                if not group["linking"]["enabled"]
+                else "review_needed"
+                if not set(group["members"]) <= set(self.runtime.source_entity_ids)
+                or any(
+                    self.linking.capabilities.resolve(b) is None
+                    for b in group["linking"]["bindings"]
+                )
+                else "enabled",
             }
             for group in self.groups.groups
         ]
@@ -175,6 +194,7 @@ class PanelController:
             "rooms": list(rooms.values()),
             "groups": groups,
             "revision": self.groups.revision,
+            "incident": self.linking.snapshot(),
         }
 
 
@@ -227,6 +247,8 @@ def ws_subscribe(hass, connection, msg):
         vol.Optional("members"): vol.All(
             [vol.All(str, vol.Length(max=255))], vol.Length(max=256)
         ),
+        vol.Optional("linking"): dict,
+        vol.Optional("confirmed"): bool,
     }
 )
 @websocket_api.require_admin
@@ -243,4 +265,5 @@ async def ws_group(hass, connection, msg):
         connection.send_error(msg["id"], str(err), str(err))
         return
     connection.send_result(msg["id"], {"revision": controller.groups.revision})
+    controller.linking.changed()
     hub.publish()

@@ -8,6 +8,9 @@ separate compatibility job while retaining the pinned baseline tests.
 
 Current local and hosted outcomes are in the [acceptance matrix](acceptance-matrix.md);
 the independent CI matrix uses the [complete validation route](development.md#complete-local-validation).
+The new local [linked-sounding extension](linked-sounding.md) adds three checks
+to the existing runner (17 total), using mock HA controls and registry metadata.
+Its evidence is recorded separately from the historical read-only results below.
 The historical results below are retained as dated evidence; base `0e7ba38`
 already includes those changes and the supplied branding.
 
@@ -35,7 +38,7 @@ Every run copies the tracked YAML examples to a newly allocated
 `config/compatibility/<version>/<run-id>/` (ignored by Git), without accounts,
 old helper states or `.storage`. It does not read or alter the existing
 `config/mvp-acceptance/` web configuration. It mounts only the new configuration,
-the integration read-only, and check tooling read-only. No published port, host
+the integration, check tooling and mock fixture read-only. No published port, host
 networking, privileged mode, hardware or Docker socket is used. The uniquely
 named `alarmmesh-compat-…` containers and their labelled **internal Docker
 network** are removed after the run; generated evidence remains. Networkless HA
@@ -44,7 +47,7 @@ can fail in its own network components, so `--network none` is not used.
 The selected official image and both in-container version checks use the same
 parameter. Compose validation, HA `check_config`, actual bootstrap and config/
 options flows run before PASS. The runtime refuses a pre-existing `.storage`.
-The examples contain only local input booleans and template smoke sensors; no
+The examples contain only local helpers, template smoke sensors and mock controls; no
 onboarding, account, real HA or direct device connection is needed.
 
 ## Scenarios and result files
@@ -79,6 +82,9 @@ with read-only repository permissions and a bounded timeout.
 | Old source ignored | Old source changes cannot alter the new result or old runtime |
 | Reload identity | Registry ID, unique ID and entity ID remain stable; current state retained |
 | Unload and cleanup | Successful unload; old source/result subscriptions no longer update |
+| Verified linking profiles | Exact mock MQTT/ZHA identities, controls and prerequisites |
+| Mixed linking and failed target | Real group API confirmation, independent bounded mock actions, no mute |
+| Linking stop and reload cleanup | Ownership-limited Heiman stop, stable identities and closed old executor |
 
 The check observes AlarmMesh's existing shared calculation and entity states;
 it introduces no substitute status calculation or product API. It does not

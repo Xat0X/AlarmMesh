@@ -6,8 +6,9 @@
   <img src="custom_components/alarmmesh/brand/logo.png" alt="AlarmMesh — read-only smoke reports and source availability for Home Assistant" width="560">
 </picture>
 
-Passive smoke reports and source availability from your existing Home Assistant
-smoke detector entities, with a local panel for detectors, rooms and groups.
+Smoke reports and source availability from existing Home Assistant smoke detector
+entities, with a local panel for detectors, rooms and groups. The local review
+build adds [optional linked sounding](docs/linked-sounding.md), off by default.
 
 > AlarmMesh is not a certified fire alarm system and must not replace certified standalone smoke detectors.
 
@@ -19,6 +20,11 @@ Read the [release notes](docs/releases/0.1.0-beta.1.md) before installing.
 
 ## Current status: local panel and two read-only overviews
 
+**Unreleased local extension:** explicit, administrator-confirmed sounder mappings
+in groups, with conservative model/provider profiles and separate action results.
+This is not part of the published beta below. See [support, lifecycle and simulation
+evidence](docs/linked-sounding.md). All physical acceptance remains unperformed.
+
 The interface adds **AlarmMesh** to the Home Assistant sidebar for
 administrators: overview, detectors and details, HA rooms, and persistent
 organizational groups. It uses the signed-in HA session and needs no YAML,
@@ -27,8 +33,7 @@ resource installation, Node on the HA host or separate server. See the
 CI or installer acceptance; those dated results remain in the acceptance matrix.
 
 Source selection, passive local tracking and the two read-only overview entities
-remain available. The supplied artwork's tagline describes a future ambition;
-alarm linking is not implemented.
+remain available with linking off. The supplied artwork is unchanged.
 AlarmMesh lets you select existing smoke detector entities during setup and
 replace that selection later through the integration options. Select at least
 one `binary_sensor` with device class `smoke`. AlarmMesh reads their current local
@@ -44,9 +49,10 @@ in-memory result is shown by exactly two entities, with no physical device entry
   This sensor remains available when sources are unreachable. It describes
   completeness of source information, not fire safety.
 
-No smoke reported is not a guarantee of safety. AlarmMesh does not link alarms,
-activate sirens, send notifications, or perform device tests. There are no alarm
-actions or AlarmMesh services.
+No smoke reported is not a guarantee of safety. Optional linking calls only
+explicitly mapped, verified existing HA controls. It does not add AlarmMesh
+services, notifications or device tests. Activation-only profiles have no automatic
+stop; a completed HA action is not audible confirmation.
 
 ## Install and select sources
 
@@ -86,15 +92,15 @@ precedence, while incomplete source availability is shown separately. AlarmMesh
 does not store or restore observations as current truth; every load starts from
 Home Assistant's current local states. Home Assistant may record entity history
 according to its own configuration; AlarmMesh adds no observation history.
-Only organizational group names, stable IDs, member references and an edit
-revision are persisted in HA storage, separately from the source selection.
+Group names, stable IDs, member references, optional explicit linking settings
+and an edit revision are persisted in HA storage, separately from source selection.
 Tracking and overview subscriptions stop on unload or removal.
 AlarmMesh does not directly query devices, poll sources, or create network
 connections. The overviews do not establish alarm readiness.
 
 Do not add `alarmmesh:` to `configuration.yaml`; configuration is UI-only.
 Repository metadata supports custom-repository installation. No catalog
-approval or published release is claimed. Development does not require an
+approval is claimed. Development does not require an
 installer; use the isolated environment described below.
 
 ## Development and design

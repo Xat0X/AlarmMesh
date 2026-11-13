@@ -1,4 +1,4 @@
-"""Passively observe selected local source states without alarm actions."""
+"""Observe local smoke states and optionally dispatch explicitly configured actions."""
 
 from homeassistant.const import Platform
 from homeassistant.core import Event, EventStateChangedData, HomeAssistant, callback
@@ -66,9 +66,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: AlarmMeshConfigEntry) ->
 
 async def async_unload_entry(hass: HomeAssistant, entry: AlarmMeshConfigEntry) -> bool:
     """Remove entities before HA stops sources and clears entry runtime data."""
-    unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    panel = entry.runtime_data.panel
+    if panel is not None:
+        await panel.linking.pause()
+    try:
+        unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    except Exception:
+        if panel is not None:
+            panel.hub.publish()
+        raise
     if unloaded and entry.runtime_data.panel is not None:
         await entry.runtime_data.panel.async_close()
+    elif panel is not None:
+        panel.hub.publish()  # Keep actions paused after a failed teardown.
     return unloaded
 
 

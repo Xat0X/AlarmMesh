@@ -1,7 +1,8 @@
 # AlarmMesh panel
 
-The local interface organizes existing Home Assistant smoke reports. It does not
-operate alarms or devices. No smoke reported is not a safety guarantee.
+The local interface organizes existing Home Assistant smoke reports. The local
+review build also offers explicitly confirmed, default-off [linked sounding](linked-sounding.md)
+through supported existing HA controls. No smoke reported is not a safety guarantee.
 
 ## Open and choose sources
 
@@ -30,6 +31,9 @@ input leaves the saved selection unchanged. No second source selection is stored
 - **Groups** lets administrators create, rename, edit memberships and delete an
   organizational group. A detector can belong to several groups. Deleting asks
   for confirmation and does not delete any source. Empty groups are allowed.
+  **Sound together** is optional and off by default. Choose exact controls, review
+  the source-to-target preview and acknowledge its limits before saving. The
+  [linking guide](linked-sounding.md) lists profiles and stopping restrictions.
 
 Names are trimmed, nonempty and at most 64 characters. A group can contain at
 most 256 distinct references; at most 100 groups are stored. If another browser
@@ -62,6 +66,10 @@ Connection loss or unloaded integration hides the current status; reconnect
 loads fresh backend data. It does not reuse an old green result as current truth.
 
 ## Local simulation and evidence
+
+For the new linked-sounding controls use the separate **Linking** mode on port
+**8129**, documented in the [linking guide](linked-sounding.md#reproduce-the-simulation).
+The existing 8128 environment and the historical observations below are separate.
 
 With PowerShell 7 and Docker, from the repository root:
 
