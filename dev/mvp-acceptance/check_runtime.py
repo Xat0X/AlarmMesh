@@ -6,6 +6,7 @@ import json
 import sys
 import traceback
 from pathlib import Path
+from urllib.parse import parse_qs, urlsplit
 
 from aiohttp import ClientSession
 
@@ -132,15 +133,21 @@ async def main(requested: str, config_dir: Path) -> int:
 
         registration = hass.data[frontend.DATA_PANELS][DOMAIN]
         require(registration.require_admin, "Panel must use HA admin authorization")
+        module_url = registration.config["_panel_custom"]["module_url"]
+        parsed = urlsplit(module_url)
+        version = parse_qs(parsed.query)
         require(
-            registration.config["_panel_custom"]["module_url"]
-            == "/alarmmesh-assets/panel.js",
-            "Panel module missing",
+            not parsed.scheme
+            and not parsed.netloc
+            and not parsed.fragment
+            and parsed.path == "/alarmmesh-assets/panel.js"
+            and set(version) == {"v"}
+            and len(version["v"]) == 1
+            and bool(version["v"][0]),
+            "Panel module URL must be local and versioned",
         )
         client = ClientSession()
-        async with client.get(
-            "http://127.0.0.1:8123/alarmmesh-assets/panel.js"
-        ) as response:
+        async with client.get(f"http://127.0.0.1:8123{module_url}") as response:
             require(
                 response.status == 200 and "alarmmesh-panel" in await response.text(),
                 "Panel asset not served",
