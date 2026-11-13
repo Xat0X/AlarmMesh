@@ -1,12 +1,12 @@
-# Optional linked sounding — local review build
+# Optional linked sounding — 0.1.0-beta.2
 
-This uncommitted extension is separate from published **0.1.0-beta.1**. The two
+This extension is included in the opt-in **0.1.0-beta.2** test release. The two
 read-only overviews and their status rules remain unchanged. Existing and new
-groups default to **linking off**. Nothing was installed on a real system and no
+groups default to **linking off**, including groups upgraded from beta.1. Nothing was installed on a real system and no
 physical detector was commanded or tested.
 
-Review new group storage only in the simulator. Before any separately authorized
-installation/update, preserve a suitable HA backup. An older build cannot read
+Before installing/updating, preserve a suitable HA backup. Leave linking off
+during the installation review; physical activation requires a separate test. An older build cannot read
 the new group payload; rollback requires the matching pre-update configuration
 backup, not merely replacing Python files. No rollback/installer acceptance for
 this new feature is claimed.
@@ -135,7 +135,7 @@ are not touched. Its own bridge permits outbound traffic, not a LAN firewall.
 Physical activation, stopping, local-alarm separation and real-device recovery
 remain **NOT EXECUTED** for every profile. No physical test instruction is given here.
 
-## Current review evidence — 2026-11-13
+## Historical implementation review evidence — 2026-11-13
 
 Base **9ff6df277c2f4ec411b374cfff8c1be7dfb6ff7c**, with the local changes in this
 working tree. No hosted CI or released-version result is claimed for these changes.
@@ -175,3 +175,18 @@ and request records. The observed final panel reports no smoke, **4/4** usable
 sources, one group and no old incident results. The other 8124–8128 environments
 were left untouched. Stop only this environment with the Linking-mode command
 above; its account/configuration is retained.
+
+## Incident correction and beta.2
+
+The later incident correction tracks suppression per target and relevant active
+origins. A new incident in one group rearms independently of an unrelated active
+group; overlapping origins retain suppression without retries. Seven permanent
+regressions increased the backend suite to 323 cases. Frontend coverage remains
+15 cases and compatibility remains 17 scenarios on each tested HA version.
+The correction's base commit is c3f02ea05e504ce2caec6d84759e31100419c36f;
+release metadata does not alter this behavior. The dated 316-case evidence above
+is retained as historical evidence, not the final beta.2 result.
+
+See [beta.2 notes](releases/0.1.0-beta.2.md) for installation, rollback and support
+limits. Actual MQTT/ZHA drivers, physical activation and existing-installation
+upgrade acceptance for this beta remain unperformed.

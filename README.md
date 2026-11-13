@@ -7,22 +7,23 @@
 </picture>
 
 Smoke reports and source availability from existing Home Assistant smoke detector
-entities, with a local panel for detectors, rooms and groups. The local review
-build adds [optional linked sounding](docs/linked-sounding.md), off by default.
+entities, with a local panel for detectors, rooms and groups. This test release adds [optional linked sounding](docs/linked-sounding.md), off by default.
 
 > AlarmMesh is not a certified fire alarm system and must not replace certified standalone smoke detectors.
 
-## Test release: 0.1.0-beta.1
+## Test release: 0.1.0-beta.2
 
 For opt-in testing, enable **Pre-release** in the AlarmMesh Marketplace page and
-choose **0.1.0-beta.1**. Back up before updating and follow the restart prompt.
-Read the [release notes](docs/releases/0.1.0-beta.1.md) before installing.
+choose **0.1.0-beta.2**. Back up before updating and follow the restart prompt.
+Read the [release notes](docs/releases/0.1.0-beta.2.md) before installing.
 
 ## Current status: local panel and two read-only overviews
 
-**Unreleased local extension:** explicit, administrator-confirmed sounder mappings
+**Optional linked sounding:** explicit, administrator-confirmed sounder mappings
 in groups, with conservative model/provider profiles and separate action results.
-This is not part of the published beta below. See [support, lifecycle and simulation
+Upgrading from beta.1 leaves existing groups unlinked; new groups also default off.
+For this installation review, leave linking off and do not change device prerequisites.
+Back up before updating: the new group format requires the pre-update backup for rollback. See [support, lifecycle and simulation
 evidence](docs/linked-sounding.md). All physical acceptance remains unperformed.
 
 The interface adds **AlarmMesh** to the Home Assistant sidebar for

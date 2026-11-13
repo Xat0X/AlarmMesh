@@ -1,34 +1,27 @@
-# Interface test release — 0.1.0-beta.1
+# Linked-sounding test release — 0.1.0-beta.2
 
-Prepared 2026-11-13 at the owner's request for testing on an existing HA install.
-The baseline is 82c9844 plus release metadata/documentation only. No product
-behavior, dependencies, minimum HA version or stored config-entry schema changes.
+Prepared 2026-11-14 at the owner's request. Product baseline:
+`c3f02ea05e504ce2caec6d84759e31100419c36f`, including the independently reviewed
+incident correction. This release changes metadata/documentation only.
 
-The manifest and proposed tag both use **0.1.0-beta.1**. Publish as a GitHub
-pre-release, not the latest stable release, only after the release commit's full
-GitHub Actions workflow succeeds. The source-folder installer route is unchanged.
+Manifest and release tag use **0.1.0-beta.2**. Publish only as a GitHub
+pre-release, without marking it latest stable, after the exact release commit's
+hosted tests, hassfest and both compatibility jobs succeed. Source-folder
+installation, dependencies and minimum HA version remain unchanged.
 
-User-facing instructions and known limitations are in the
-[release notes](releases/0.1.0-beta.1.md). The
-[acceptance matrix](acceptance-matrix.md) retains dated test and UI observations.
-Earlier installer/backup evidence validates its recorded payload and does not
-claim an existing-installation upgrade test for this beta.
+Existing beta.1 groups migrate in memory with linking false; new groups also
+default false. Only explicit administrator-confirmed configuration can enable
+sounder targets. No production installation or physical activation is performed.
 
-The interface baseline passed 277 backend tests, 11 frontend tests, hassfest and
-14 compatibility scenarios on each exact HA 2026.10.4 / 2026.11.1. The metadata
-release commit still requires its own hosted run before publication.
+The product baseline passed hosted CI with 323 backend tests, 15 frontend tests
+and 17 simulated scenarios on each tested HA version (2026.10.4 and 2026.11.1).
+The exact release metadata commit requires its own hosted run before publication.
 
-## Remaining after beta publication
+See [release notes](releases/0.1.0-beta.2.md) for install, default-off review,
+model/provider restrictions and backup-based rollback. The older beta.1 cannot
+read the new persisted group payload; replacing files alone is not rollback.
 
-- Owner pilot: update from the installed revision, inspect preserved source
-  selection and identities, use all four screens, create a group and verify
-  persistence after an owner-planned restart. Retain a known-good backup.
-- Marketplace uninstall/re-add and differing-product upgrade coverage remain
-  separate from the recorded identical-payload install/reinstall checks.
-- Physical smoke transitions, actual device loss/recovery and production recovery
-  are not established by simulation or by this release.
-- The wide README logo's dark-renderer contrast finding remains documented.
-- License selection, artwork redistribution confirmation and catalog admission
-  remain owner decisions; no license or catalog approval is added by this work.
-
-No automatic production installation, alarm action or stable release is performed.
+Remaining: actual MQTT/ZHA driver and physical acceptance, owner-observed upgrade
+and recovery on the existing installation, and previously recorded artwork,
+license/catalog and wide-logo limitations. No stable-release or certification
+claim is made. Earlier dated acceptance evidence remains historical.

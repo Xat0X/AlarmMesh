@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.0-beta.2 — 2026-11-14
 
 - Add optional, administrator-confirmed group sounder mappings, default off, with
   registry-bound MQTT/ZHA capability profiles and independent incident/action results.
@@ -13,8 +13,13 @@
   and mixed-provider scenarios to both existing compatibility runs. Add a separate
   simulated UI environment. See [scope, support and evidence](docs/linked-sounding.md).
 
+- Fix per-target incident deduplication: a new incident can reactivate its target
+  while an unrelated group remains active; retain overlap and retry suppression.
+- Publish an opt-in linked-sounding test release; existing beta.1 and new groups
+  keep linking off. See [update and rollback instructions](docs/releases/0.1.0-beta.2.md).
+
 No physical sounder/detection validation or production installation was performed.
-Manifest version and dependencies remain unchanged; this work is not published.
+Dependencies and minimum HA version remain unchanged.
 
 ## 0.1.0-beta.1 — 2026-11-13
 
