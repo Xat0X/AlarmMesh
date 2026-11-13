@@ -1,4 +1,4 @@
-import { TEXT } from "./translations.js";
+import { TEXT } from "./translations.js?v=20261113-copy";
 
 // Safe DOM construction: names, labels and registry data are always text nodes.
 const el = (tag, text, cls) => {
@@ -92,7 +92,7 @@ export class AlarmMeshPanel extends HTMLElement {
   render() {
     if (!this.shadowRoot) return;
     const t = this.t;
-    const link = el("link"); link.rel = "stylesheet"; link.href = "/alarmmesh-assets/panel.css";
+    const link = el("link"); link.rel = "stylesheet"; link.href = "/alarmmesh-assets/panel.css?v=20261113-copy";
     const shell = el("div", undefined, "shell");
     shell.classList.toggle("dark", Boolean(this._hass?.themes?.darkMode));
     const side = el("aside");
@@ -113,7 +113,7 @@ export class AlarmMeshPanel extends HTMLElement {
     menu.setAttribute("aria-label", "Home Assistant menu");
     header.append(menu, icon("home-outline"), el("span", this.data?.title || "AlarmMesh"), el("span", ` / ${t[this.page]}`, "muted"));
     const main = el("main");
-    main.append(el("div", "ALARMMESH", "eyebrow"), el("h1", this.page === "overview" ? t.title : t[this.page]), el("p", t.subtitle, "subtitle"));
+    main.append(el("div", "ALARMMESH", "eyebrow"), el("h1", this.page === "overview" ? t.title : t[this.page]), el("p", this.page === "groups" ? t.groupIntro : t.subtitle, "subtitle"));
     if (!this._hass?.user?.is_admin) main.append(el("p", t.restricted, "notice"));
     else if (!this.data) {
       const message = el("div", undefined, "notice"); message.setAttribute("role", "status");
@@ -129,12 +129,12 @@ export class AlarmMeshPanel extends HTMLElement {
       }
       if (this.page === "rooms") this.roomCards(main, data.rooms);
       if (this.page === "groups") {
-        main.append(this.section(t.groups, button(t.newGroup, () => this.openDialog({ kind: "edit", group: null }), "button primary")), el("p", t.groupNote, "muted"));
+        main.append(this.section(null, button(t.newGroup, () => this.openDialog({ kind: "edit", group: null }), "button primary")));
         if (!data.groups.length) main.append(el("p", t.noGroups, "notice"));
         const cards = el("div", undefined, "cards");
         for (const group of data.groups) {
           const card = button("", () => this.openDialog({ kind: "group", id: group.id }), "card room-card");
-          card.append(icon("select-group"), el("h3", group.name), this.badge(group.result), el("p", t[group.result.availability]), el("p", `${group.members.length} ${t.devices.toLowerCase()}`));
+          card.append(icon("select-group"), el("h3", group.name), this.badge(group.result), el("p", t[group.result.availability]), el("p", `${group.members.length} ${group.members.length === 1 ? t.detector : t.devices.toLowerCase()}`));
           if (group.unselected.length) card.append(el("p", `${group.unselected.length} · ${t.stale}`, "warning-text"));
           cards.append(card);
         }
@@ -148,7 +148,7 @@ export class AlarmMeshPanel extends HTMLElement {
     if (previous) previous.replaceWith(shell);
     else this.shadowRoot.append(link, shell);
   }
-  section(title, action) { const node = el("div", undefined, "section-head"); node.append(el("h2", title)); if (action) node.append(action); return node; }
+  section(title, action) { const node = el("div", undefined, "section-head"); if (title) node.append(el("h2", title)); if (action) node.append(action); return node; }
   renderOverview(main) {
     const t = this.t, data = this.data, smoke = data.result.smoke;
     const hero = el("section", undefined, `hero ${smoke === "SMOKE_REPORTED" ? "alarm" : smoke === "INDETERMINATE" ? "uncertain" : ""}`);
@@ -159,7 +159,7 @@ export class AlarmMeshPanel extends HTMLElement {
     for (const source of active) hero.append(button(`${t.alarmFrom}: ${source.name} · ${source.area_name || t.noRoom}`, () => this.openDialog({ kind: "source", id: source.entity_id }), "alarm-source"));
     main.append(hero);
     const stats = el("div", undefined, "stats");
-    for (const [label, value, note] of [[t.sources, `${data.usable} / ${data.sources.length}`, t.usable], [t.rooms, data.rooms.filter(r => r.id).length, "Home Assistant"], [t.groups, data.groups.length, t.groupNote]]) {
+    for (const [label, value, note] of [[t.sources, `${data.usable} / ${data.sources.length}`, t.usable], [t.rooms, data.rooms.filter(r => r.id).length, "Home Assistant"], [t.groups, data.groups.length, t.organized]]) {
       const stat = el("div", undefined, "stat"); stat.append(el("span", label), el("strong", value), el("small", note)); stats.append(stat);
     }
     main.append(stats);
@@ -182,7 +182,7 @@ export class AlarmMeshPanel extends HTMLElement {
     const cards = el("div", undefined, "cards");
     for (const room of rooms) {
       const card = button("", () => this.openDialog({ kind: "room", id: room.id }), "card room-card");
-      card.append(icon("floor-plan"), this.badge(room.result), el("h3", room.name || this.t.noRoom), el("p", this.t[room.result.availability]), el("p", `${room.members.length} ${this.t.devices.toLowerCase()}`)); cards.append(card);
+      card.append(icon("floor-plan"), this.badge(room.result), el("h3", room.name || this.t.noRoom), el("p", this.t[room.result.availability]), el("p", `${room.members.length} ${room.members.length === 1 ? this.t.detector : this.t.devices.toLowerCase()}`)); cards.append(card);
     }
     parent.append(cards);
   }

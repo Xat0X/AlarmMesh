@@ -1,6 +1,8 @@
 // Product UI text follows the current Home Assistant profile language.
 export const TEXT = {
   en: {
+    groupIntro: "Organize detectors by floor or zone. This arrangement does not operate devices.",
+    organized: "Your organization", detector: "detector",
     overview: "Overview", devices: "Detectors", rooms: "Rooms", groups: "Groups",
     title: "Everything in view.", subtitle: "Your detectors, rooms and groups in one place.",
     sources: "Source information", usable: "usable sources", room: "Room", noRoom: "No area",
@@ -19,7 +21,7 @@ export const TEXT = {
     membership: "Member of", noGroups: "No groups yet", explanation: "What does this mean?",
     reportNote: "This is the current local HA report. Unknown, unavailable and missing information never means no smoke. AlarmMesh performs no alarm actions.",
     groupNote: "Groups only organize detectors. They do not link alarms or operate devices.",
-    newGroup: "Create group", edit: "Edit group", name: "Group name", members: "Group members",
+    newGroup: "New group", edit: "Edit group", name: "Group name", members: "Group members",
     save: "Save group", cancel: "Cancel", remove: "Delete group", confirmDelete: "Delete this group?",
     deleteNote: "Only this organizational group is deleted. Sources are unchanged.",
     stale: "No longer selected", emptyGroup: "This group has no members. Its smoke status is indeterminate.",
@@ -33,6 +35,8 @@ export const TEXT = {
     alarmFrom: "Reported by", noEvents: "Current reports only · no alarm actions",
   },
   nl: {
+    groupIntro: "Bundel melders per verdieping of zone. Deze indeling stuurt geen apparaten aan.",
+    organized: "Zelf ingedeeld", detector: "melder",
     overview: "Overzicht", devices: "Melders", rooms: "Ruimtes", groups: "Groepen",
     title: "Alles in beeld.", subtitle: "Je melders, ruimtes en groepen op één plek.",
     sources: "Broninformatie", usable: "bruikbare bronnen", room: "Ruimte", noRoom: "Geen ruimte",
@@ -51,7 +55,7 @@ export const TEXT = {
     membership: "Onderdeel van", noGroups: "Nog geen groepen", explanation: "Wat betekent dit?",
     reportNote: "Dit is de actuele lokale HA-melding. Onbekende, onbeschikbare of ontbrekende informatie betekent nooit geen rook. AlarmMesh voert geen alarmacties uit.",
     groupNote: "Groepen organiseren alleen melders. Ze koppelen geen alarmen en bedienen geen apparaten.",
-    newGroup: "Groep maken", edit: "Groep wijzigen", name: "Groepsnaam", members: "Melders in deze groep",
+    newGroup: "Nieuwe groep", edit: "Groep wijzigen", name: "Groepsnaam", members: "Melders in deze groep",
     save: "Groep bewaren", cancel: "Annuleren", remove: "Groep verwijderen", confirmDelete: "Deze groep verwijderen?",
     deleteNote: "Alleen deze indeling wordt verwijderd. De bronnen blijven ongewijzigd.",
     stale: "Niet meer geselecteerd", emptyGroup: "Deze groep heeft geen leden. De rookstatus is onbepaald.",
