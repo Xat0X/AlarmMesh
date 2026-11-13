@@ -11,13 +11,19 @@ smoke detector entities, with a local panel for detectors, rooms and groups.
 
 > AlarmMesh is not a certified fire alarm system and must not replace certified standalone smoke detectors.
 
+## Test release: 0.1.0-beta.1
+
+For opt-in testing, enable **Pre-release** in the AlarmMesh Marketplace page and
+choose **0.1.0-beta.1**. Back up before updating and follow the restart prompt.
+Read the [release notes](docs/releases/0.1.0-beta.1.md) before installing.
+
 ## Current status: local panel and two read-only overviews
 
-The current local interface adds **AlarmMesh** to the Home Assistant sidebar for
+The interface adds **AlarmMesh** to the Home Assistant sidebar for
 administrators: overview, detectors and details, HA rooms, and persistent
 organizational groups. It uses the signed-in HA session and needs no YAML,
 resource installation, Node on the HA host or separate server. See the
-[panel user guide](docs/panel.md). New local code is not covered by earlier hosted
+[panel user guide](docs/panel.md). Release validation is separate from earlier hosted
 CI or installer acceptance; those dated results remain in the acceptance matrix.
 
 Source selection, passive local tracking and the two read-only overview entities
