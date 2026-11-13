@@ -6,6 +6,8 @@ from homeassistant.exceptions import ConfigEntryError
 from homeassistant.helpers.event import async_track_state_change_event
 
 from .const import CONF_SOURCE_ENTITY_IDS
+from .groups import GroupStore
+from .panel import PanelController, async_prepare
 from .runtime import (
     AlarmMeshConfigEntry,
     AlarmMeshRuntimeData,
@@ -30,6 +32,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: AlarmMeshConfigEntry) ->
             event.data["new_state"]
         )
         runtime.async_set_result(evaluate_status(runtime.source_statuses.values()))
+        runtime.async_notify_observers()
 
     if sources:
         entry.async_on_unload(
@@ -50,7 +53,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: AlarmMeshConfigEntry) ->
         # their platform, so readiness is independent of entity subscriptions.
         if runtime.initialized_platforms != set(PLATFORMS):
             raise ConfigEntryError("Could not set up both AlarmMesh overview platforms")
+        runtime.panel = PanelController(hass, entry, await async_prepare(hass))
+        await runtime.panel.async_start()
     except Exception:
+        if runtime.panel is not None:
+            await runtime.panel.async_close()
         await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
         # HA runs async_on_unload callbacks when entry setup fails as well.
         raise
@@ -59,4 +66,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: AlarmMeshConfigEntry) ->
 
 async def async_unload_entry(hass: HomeAssistant, entry: AlarmMeshConfigEntry) -> bool:
     """Remove entities before HA stops sources and clears entry runtime data."""
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if unloaded and entry.runtime_data.panel is not None:
+        await entry.runtime_data.panel.async_close()
+    return unloaded
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: AlarmMeshConfigEntry) -> None:
+    """Remove only this entry's organizational groups on explicit entry deletion."""
+    await GroupStore(hass, entry.entry_id).store.async_remove()

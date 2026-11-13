@@ -75,6 +75,13 @@ Invoke-Step 'hassfest' {
         '--label', 'org.alarmmesh.purpose=validation', '--label', "org.alarmmesh.run=$runId",
         '--mount', "type=bind,source=$sourceRoot,target=/github/workspace,readonly", 'ghcr.io/home-assistant/hassfest:latest')
 }
+Invoke-Step 'frontend' {
+    $command = 'mkdir -p /tmp/workspace/dev /tmp/workspace/custom_components/alarmmesh && cp -r /workspace/dev/frontend /tmp/workspace/dev/frontend && cp -r /workspace/custom_components/alarmmesh/frontend /tmp/workspace/custom_components/alarmmesh/frontend && cd /tmp/workspace/dev/frontend && npm ci --ignore-scripts --no-audit --no-fund && npm test'
+    Invoke-NativeCheck 'frontend' @('run', '--rm', '--name', "$runName-frontend",
+        '--label', 'org.alarmmesh.purpose=validation', '--label', "org.alarmmesh.run=$runId",
+        '--mount', "type=bind,source=$sourceRoot,target=/workspace,readonly",
+        'node:24.22.1-bookworm-slim', 'sh', '-c', $command)
+}
 foreach ($version in @('2026.10.4', '2026.11.1')) {
     Invoke-Step "compatibility-$version" {
         & (Join-Path $PSScriptRoot 'mvp-acceptance/mvp-acceptance.ps1') -Action Check -HaVersion $version -ReportPath (Join-Path $resultRoot "compatibility-$version.json")
@@ -83,7 +90,7 @@ foreach ($version in @('2026.10.4', '2026.11.1')) {
 
 # Inspect exact names AND ownership; never prune or remove another project's work.
 Invoke-Step 'cleanup' {
-    foreach ($phase in @('baseline', 'hassfest')) {
+    foreach ($phase in @('baseline', 'hassfest', 'frontend')) {
         $name = "$runName-$phase"
         $leftover = & docker container ls -a --filter ('name=^/' + $name + '$') --format '{{.Names}}'
         if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect validation cleanup.' }

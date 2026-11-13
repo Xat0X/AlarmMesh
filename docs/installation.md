@@ -1,8 +1,9 @@
 # Install and remove AlarmMesh
 
-Rechecked against the linked official documentation on **2026-11-12**. These are
-instructions for the owner; this documentation task performed no live installation,
-update, restart or removal. AlarmMesh is a community integration, not a certified
+Rechecked against the linked official documentation on **2026-11-13**. These are
+instructions for the owner. Actual disposable-instance installer/backup results
+are in the [acceptance matrix](acceptance-matrix.md); no operation was performed
+on a real installation. AlarmMesh is a community integration, not a certified
 fire alarm system. No smoke reported is not a safety guarantee.
 
 ## Home Assistant 2026.11 and later: built-in Marketplace
@@ -25,6 +26,13 @@ The Marketplace also offers **Delete and uninstall** when configuration remains.
 Follow any restart repair. Removing a repository from **Add from link > Added from
 links** only removes that link; it is not an uninstall.
 ([Official Marketplace instructions](https://www.home-assistant.io/integrations/marketplace/))
+
+On the actual 2026.11.1 test instance the repository menu offers **Reinstall**
+(Dutch **Opnieuw installeren**) and **Install another version**. Reinstalling the
+same offered commit requires an HA restart; its manifest can still say `0.0.1`.
+That test preserved the saved selection and customized overviews. It does not
+prove an upgrade between distinct versions. Current uninstall/re-add acceptance
+is explicitly open in the matrix after a browser-policy stop.
 
 Adding a custom repository is separate from admission to the public catalog and
 does not imply Home Assistant review or approval. Starting in 2026.11 the built-in
@@ -70,6 +78,25 @@ keeps the current selection; saved changes reload AlarmMesh. IDs are fixed:
 renaming a source requires selecting its new ID yourself. Overview names/IDs
 can be customized without changing their identity. See the
 [simulated acceptance guide](mvp-acceptance.md) and [passive pilot](read-only-pilot.md).
+
+## Back up and recover
+
+Before an owner-authorized update, create a known-good backup in **Settings >
+System > Backups** and keep the emergency kit privately. Container's local
+backups are under its own configuration's `backups/` directory. They include HA
+settings and installed custom integrations, optionally history; they do not
+preserve the Docker image or host. Use the supported backup upload/restore flow
+on a separate suitable destination, then sign in with the restored account.
+Never post archives, keys, account data or `.storage` in an issue.
+
+The [actual disposable exercise](installer-acceptance.md) used an encrypted
+HA-created archive and onboarding restore on exact **2026.11.1**, checking saved
+selection, customized names/IDs and current simulation-source processing. It did
+not test production recovery, a differing-version migration or HA OS/Supervisor.
+Record the installed revision before updating and retain the backup until the
+replacement is checked. Selecting an older installer revision is not a promise
+that arbitrary later schemas can be downgraded.
+([Official backup and restore procedure](https://www.home-assistant.io/common-tasks/general/backups/))
 
 ## Repository metadata and publication boundaries
 

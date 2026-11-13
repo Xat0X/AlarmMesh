@@ -1,6 +1,8 @@
 # Local package and file-update/recovery checks
 
-Reviewed **2026-11-12**, base **a300d39b7eac4ef80ebb971e859b9866f2145c15**.
+Original review **2026-11-12**, base **a300d39b7eac4ef80ebb971e859b9866f2145c15**.
+Follow-up checkout: **bbd767aa2766f55a2a2a62c10e9df18390d1270f**, unchanged
+integration payload, independently repeated package/update/recovery checks.
 See the [current acceptance matrix](acceptance-matrix.md) for actual outcomes.
 This tooling never publishes, tags, changes metadata or accesses a live instance.
 
@@ -24,7 +26,8 @@ change paths, manifest version, each file's size/hash and archive SHA-256.
 altering that revision. Failures exit nonzero; existing output is never replaced.
 
 The ZIP has integration-root contents. Extract **only into a separate test
-installation's `custom_components/alarmmesh/`**. It contains these 18 files:
+installation's `custom_components/alarmmesh/`**. The historical foundation
+packages contain these 18 files; current panel builds require 23 as listed below:
 
 | Group | Exact paths inside ZIP |
 | --- | --- |
@@ -37,18 +40,42 @@ databases, logs, `.git` or runtime data enter the ZIP. Root `README.md` and
 `hacs.json` remain repository/installer metadata, outside the integration payload.
 Original artwork provenance is in [branding](../assets/branding/README.md).
 
-Current tested package (manifest **0.0.1**, local test only):
+Historical foundation follow-up package (manifest **0.0.1**, local test only):
 
 ```text
-config/release-packages/044f9c0c5cbf4c09aa14e8fd6e27aa38/current/alarmmesh.zip
+config/release-packages/review-bbd767a-final/alarmmesh.zip
 SHA-256: 456534877ab1646ba84c6753057b3cb7f2ef46698074044388b592dd8dbfea19
 ```
 
-The adjacent inventory records the working changes present when built. Those
-changes are tooling only; integration bytes match a300d39 and 0e7ba38 exactly.
-Independent package builds for both HA runs produced the same hash. Final review
-inventory is `config/release-packages/review-a300d39-final/inventory.json`.
+The adjacent `inventory.json` records full bbd767a and the local documentation
+changes present when built. Integration bytes match bbd767a, a300d39 and 0e7ba38
+exactly. Independent package builds for both fresh follow-up HA runs produced
+the same hash. The earlier `config/release-packages/review-a300d39-final/`
+package and inventory remain retained as original evidence.
 No file is a published or legally cleared release artifact.
+
+### New local interface inventory
+
+The historical 18-file packages above are retained. Current working-tree builds
+require **23** files: that original inventory plus `groups.py`, `panel.py`,
+`frontend/panel.js`, `frontend/panel.css` and `frontend/translations.js`.
+They enforce exactly the reviewed built-in HA dependencies, with unchanged
+manifest version and empty pip requirements. No npm test dependencies enter the
+package. An explicit historical Git-revision build can still use the closed
+18-file foundation inventory; a working-tree build missing panel assets fails.
+Build/test outcomes for the new payload are separate from the old package hashes.
+
+Current UI-accepted local package (2026-11-13, manifest **0.0.1**):
+
+```text
+config/release-packages/panel-20261113-ui-accepted/alarmmesh.zip
+SHA-256: 8837a72e161dca107e11a3536612eac7faa01bb2f41ec712881be4d4aa4fc16d
+```
+
+The adjacent inventory records the base bbd767a plus local changes. A second
+fresh build produced the same hash. This is a local test ZIP of the new panel,
+not a published, installer-accepted or legally cleared release. The actual
+new-panel browser and final complete-route evidence is in the central matrix.
 
 ## Relationship to the supported installers
 
@@ -98,8 +125,10 @@ upgrade between differing product versions. No stored HA files are edited to
 force a result. The snapshot is not created/restored through Home Assistant's
 backup feature, so it cannot prove that feature or a production recovery.
 The owner's eventual recovery route should use
-[Home Assistant backups](https://www.home-assistant.io/integrations/backup/)
-and needs separate acceptance.
+[Home Assistant backups](https://www.home-assistant.io/integrations/backup/).
+The separate [actual installer/backup exercise](installer-acceptance.md) records
+that route's current evidence in the central matrix; it does not change what
+these older stopped-file checks prove.
 
 No web port is published. Each run has an owned internal Docker network and
 read-only installation/tool mounts, with no host networking, privileged mode,

@@ -1,6 +1,7 @@
 """Entry-owned, in-memory observations of selected Home Assistant sources."""
 
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
@@ -14,6 +15,9 @@ from homeassistant.core import CALLBACK_TYPE, State, callback
 
 from .status import SourceStatus, StatusResult
 
+if TYPE_CHECKING:
+    from .panel import PanelController
+
 
 @dataclass(slots=True)
 class AlarmMeshRuntimeData:
@@ -24,6 +28,19 @@ class AlarmMeshRuntimeData:
     result: StatusResult
     initialized_platforms: set[Platform] = field(default_factory=set)
     _listeners: set[CALLBACK_TYPE] = field(default_factory=set, init=False, repr=False)
+    _observers: set[CALLBACK_TYPE] = field(default_factory=set, init=False, repr=False)
+    panel: PanelController | None = field(default=None, init=False, repr=False)
+
+    @callback
+    def async_add_observer(self, listener: CALLBACK_TYPE) -> CALLBACK_TYPE:
+        """Observe each source change, including unchanged aggregate results."""
+        self._observers.add(listener)
+        return lambda: self._observers.discard(listener)
+
+    @callback
+    def async_notify_observers(self) -> None:
+        for listener in tuple(self._observers):
+            listener()
 
     @callback
     def async_add_listener(self, listener: CALLBACK_TYPE) -> CALLBACK_TYPE:
@@ -49,6 +66,7 @@ class AlarmMeshRuntimeData:
     def async_clear_listeners(self) -> None:
         """Release remaining result subscriptions on teardown or failed setup."""
         self._listeners.clear()
+        self._observers.clear()
 
 
 type AlarmMeshConfigEntry = ConfigEntry[AlarmMeshRuntimeData]

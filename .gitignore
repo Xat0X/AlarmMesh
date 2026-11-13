@@ -29,6 +29,7 @@ home-assistant_v2.db*
 !.env.example
 
 # Editor and operating system files
+node_modules/
 .idea/
 .vscode/
 .DS_Store

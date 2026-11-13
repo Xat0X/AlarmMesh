@@ -1,5 +1,71 @@
 # Architecture and scope
 
+## Integrated panel and organizational groups — local interface package
+
+The new [panel](panel.md) is a packaged native ES-module Web Component, registered
+through `panel_custom.async_register_panel` by [panel.py](../custom_components/alarmmesh/panel.py).
+HA supplies the authenticated `hass` object; there is no product server, token in
+JavaScript, CDN, build step or second login. `frontend`, `http` and `websocket_api`
+are built-in HA dependencies, not new pip requirements. Manifest version, config
+entry version, options schema and overview unique IDs are unchanged.
+
+The panel and both `alarmmesh/*` WebSocket commands are **admin-only**, using HA's
+own authorization decorator. This deliberately avoids exposing an unfiltered
+whole-home result to a user lacking source-entity permissions. Existing overview
+entities retain HA's normal entity access. Mutations always recheck admin rights;
+subscriptions also recheck before each push. Static code and supplied images
+contain no private data; their supported HTTP routes and command registrations
+last for the HA process. They are not duplicated on entry reload.
+
+One entry-owned `PanelController` presents the existing runtime. Home results use
+the exact shared `StatusResult`; room/group subsets call unchanged `evaluate_status`
+in that backend only. A separate observer set reports every selected-source
+transition, even if the aggregate result did not change, without changing the two
+entities' existing result subscriptions. Entity/device/area registry events update
+metadata. Entity area takes precedence over device area; absent assignment remains
+"No area". Model/manufacturer are registry values. No battery inference, floor
+invention, last-contact claim, polling or extra source entity is added.
+
+A process transport hub holds subscribers and the current controller reference,
+not a second copy of source observations. Successful unload detaches registry and
+runtime observers, removes navigation and publishes unavailable. Reload attaches a
+new controller and publishes its current snapshot to still-connected browsers.
+Failed platform unload keeps the active controller, matching HA's existing lifecycle.
+Setup failure closes a partial controller. Socket disconnect/navigation cancels the
+browser subscription; reconnect subscribes again. The UI discards cached status on
+disconnect/unload rather than presenting it as current truth.
+
+[groups.py](../custom_components/alarmmesh/groups.py) uses one HA `Store` per entry:
+key `alarmmesh.groups.<entry_id>`, storage version **1**, atomic writes. Groups have
+stable UUIDs, trimmed 1–64-character names, up to 256 distinct source references
+and at most 100 groups. Empty groups are allowed and evaluate to indeterminate /
+not configured. An async lock serializes writes; a persisted global edit revision
+rejects stale forms with `conflict`. Disk save completes before in-memory state is
+committed and pushed. Reload drains an in-flight write before loading the next
+controller. Invalid/unreadable storage fails setup without overwriting it.
+
+New member references must be currently selected. Existing references may be
+retained or explicitly removed when editing their original group. Removing a
+source from options, renaming it, or losing metadata never silently deletes a
+group or follows the new ID. An unselected reference contributes `MISSING` to
+that group; a selected but absent source uses the runtime's `MISSING`. No current
+selected members therefore cannot become an off result. Explicit entry deletion
+removes only that entry's group store; re-add creates a new configuration identity.
+
+The browser renders registry/user strings with text nodes. Native modal dialogs,
+semantic buttons, visible focus, labels, reduced-motion rules and phone/tablet
+breakpoints support interaction. Dutch/English dictionaries are packaged with
+the module and follow HA's profile language. DOM tests are not layout or native
+focus proof; real-browser observations remain separately recorded.
+
+Official APIs checked **2026-11-13**:
+[custom panels](https://contributors.home-assistant.io/frontend/custom-ui/panel/),
+[WebSocket commands](https://contributors.home-assistant.io/frontend/extending/websocket-api/),
+[authorization](https://contributors.home-assistant.io/core/internals/websocket-api/),
+[HA client subscriptions](https://github.com/home-assistant/home-assistant-js-websocket/blob/master/lib/connection.ts).
+Exact pinned Core APIs were also inspected in the official 2026.10.4 image.
+The sections below document the retained source/overview contract.
+
 ## Foundation contract
 
 AlarmMesh uses domain `alarmmesh`. Home Assistant loads it from
@@ -63,8 +129,8 @@ saving unchanged options also leaves the current runtime intact.
 `entry.options[CONF_SOURCE_ENTITY_IDS]`, defaulting to no sources for foundation
 entries. It copies the IDs into a tuple and puts an `AlarmMeshRuntimeData` object
 in `entry.runtime_data`, with a `dict[str, SourceStatus]` of latest observations
-and the current immutable `StatusResult`. There is no runtime state in
-`entry.data`, `entry.options` or `hass.data`, and no outcome is restored from
+and the current immutable `StatusResult`. There are no source observations in
+`entry.data`, `entry.options` or the process transport hub, and no outcome is restored from
 storage. Each setup builds fresh runtime data from the current local states.
 
 | Home Assistant local state | Source status |
@@ -214,7 +280,7 @@ property is interpreted. Installation and publication boundaries follow the
 
 ## Deliberately outside this change
 
-- Alarm grouping, propagation and automatic entity selection or rename tracking.
+- Alarm-action grouping, propagation and automatic entity selection or rename tracking.
 - Siren activation, silencing, reset, and device test actions.
 - Notifications, escalations, automations, and vendor adapters.
 - Device discovery, direct device access, polling, timers and coordinators.

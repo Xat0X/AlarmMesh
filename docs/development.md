@@ -34,6 +34,29 @@ any failed check or cleanup makes the overall result FAIL and the process exit
 nonzero. No execution-policy change is needed or made; use the supported shell
 and do not bypass an organization policy.
 
+The same route now also runs the packaged panel's DOM tests with exact
+**Node 24.22.1**, `npm ci --ignore-scripts` and the committed
+`dev/frontend/package-lock.json`. The sole direct frontend test dependency is
+Linkedom 0.18.15. It is development-only; no Node/npm dependency, build output
+generation or CDN belongs on the HA host. The product ships native ES modules
+and CSS under `custom_components/alarmmesh/frontend/`. For a quick local pass:
+
+```sh
+npm ci --prefix dev/frontend --ignore-scripts --no-audit --no-fund
+npm test --prefix dev/frontend
+```
+
+These tests exercise the actual component's navigation, safe text rendering,
+push/disconnect lifecycle, group forms/conflicts and Dutch/English context.
+Linkedom has no layout engine/native modal implementation: it is not proof of
+phone/tablet layout, contrast or native keyboard focus. Use the separate
+[panel simulation](panel.md#local-simulation-and-evidence) for those observations.
+The Python fixture substitutes only the missing upstream UI-wheel filesystem
+root in the pip HA harness; real HTTP routes, panel registration, WebSocket auth,
+HA registries and group storage remain in use. Official image runs use their
+real bundled frontend and now check **14** scenarios, including authenticated
+panel subscription/group mutations, asset serving, persistent groups and cleanup.
+
 The first run needs network access for container images and Python dependencies.
 Generated `validation-result.json`, per-version sanitized summaries, JUnit XML and
 private logs remain in ignored `config/validation/<run-id>/`. Compatibility runs
@@ -48,8 +71,9 @@ matrix now calls that same compatibility runner with exact versions. The matrix
 uses read-only source/tool mounts, fresh configuration, no published port and
 per-run internal networking. Only an explicitly new summary file in runner temp
 is uploaded, even after failure; storage, accounts, databases and raw logs are
-excluded. Hosted execution for exact a300d39 was verified on 2026-11-12, including
-both downloaded compatibility artifacts. See the [current acceptance matrix](acceptance-matrix.md).
+excluded. Hosted execution for exact a300d39 (244 tests) and bbd767a (249 tests)
+was verified on 2026-11-12, including both downloaded compatibility artifacts for
+each commit. See the [current acceptance matrix](acceptance-matrix.md).
 New local changes still require their own separately authorized hosted run.
 
 The baseline/hassfest containers receive a read-only export of Git-visible files,
@@ -86,8 +110,11 @@ local test runtime. No test controls hardware.
 
 The earlier baseline had 235 tests. Seven packaged-image/HA serving tests and
 two failure/privacy tests brought a300d39 to **244 tests**, confirmed on GitHub.
-This preparation adds five package-integrity cases, for **249 tests**. All 244
+bbd767a adds five package-integrity cases, for **249 tests**. All 244
 existing tests and assertions, including the 79 pure status tests, remain unchanged.
+The new local interface adds backend and packaging regressions after that dated
+249-test baseline; its actual final count and results are recorded separately in
+the [acceptance matrix](acceptance-matrix.md). Old hosted CI does not cover this code.
 Wrapper fault checks
 add configuration failure, stale-report rejection, cleanup failure and an
 existing output path without requiring Docker or another testing dependency.

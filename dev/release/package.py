@@ -8,7 +8,7 @@ import zipfile
 from pathlib import Path
 
 INTEGRATION = "custom_components/alarmmesh"
-REQUIRED_FILES = frozenset(
+FOUNDATION_FILES = frozenset(
     {
         "__init__.py",
         "binary_sensor.py",
@@ -30,6 +30,13 @@ REQUIRED_FILES = frozenset(
         "brand/dark_logo@2x.png",
     }
 )
+REQUIRED_FILES = FOUNDATION_FILES | {
+    "groups.py",
+    "panel.py",
+    "frontend/panel.js",
+    "frontend/panel.css",
+    "frontend/translations.js",
+}
 
 
 def git(repo: Path, *arguments: str) -> bytes:
@@ -39,9 +46,9 @@ def git(repo: Path, *arguments: str) -> bytes:
     ).stdout
 
 
-def validate_files(files: dict[str, bytes]) -> dict:
+def validate_files(files: dict[str, bytes], *, legacy: bool = False) -> dict:
     """Fail closed on missing/unreviewed files and wrong installation metadata."""
-    if set(files) != REQUIRED_FILES:
+    if set(files) != (FOUNDATION_FILES if legacy else REQUIRED_FILES):
         raise ValueError(
             "Integration file inventory differs from the reviewed allowlist"
         )
@@ -51,6 +58,8 @@ def validate_files(files: dict[str, bytes]) -> dict:
         or manifest.get("config_flow") is not True
         or manifest.get("single_config_entry") is not True
         or manifest.get("requirements") != []
+        or manifest.get("dependencies", [])
+        != ([] if legacy else ["frontend", "http", "websocket_api"])
         or not all(
             manifest.get(key)
             for key in (
@@ -69,9 +78,9 @@ def validate_files(files: dict[str, bytes]) -> dict:
     return manifest
 
 
-def write_zip(files: dict[str, bytes], path: Path) -> str:
+def write_zip(files: dict[str, bytes], path: Path, *, legacy: bool = False) -> str:
     """Use fixed metadata/order and stored bytes for cross-platform repeatability."""
-    validate_files(files)
+    validate_files(files, legacy=legacy)
     with zipfile.ZipFile(path, "x", compression=zipfile.ZIP_STORED) as archive:
         for name, content in sorted(files.items()):
             info = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
@@ -79,7 +88,7 @@ def write_zip(files: dict[str, bytes], path: Path) -> str:
             info.external_attr = 0o100644 << 16
             archive.writestr(info, content)
     with zipfile.ZipFile(path) as archive:
-        if archive.testzip() is not None or set(archive.namelist()) != REQUIRED_FILES:
+        if archive.testzip() is not None or set(archive.namelist()) != set(files):
             raise ValueError("Written package failed archive validation")
         if any(archive.read(name) != content for name, content in files.items()):
             raise ValueError("Written package differs from source")
@@ -135,10 +144,13 @@ def build(repo: Path, output: Path, revision: str | None = None) -> dict:
             ):
                 raise ValueError("Symlink or escaped integration source")
             files[name] = source.read_bytes()
-    manifest = validate_files(files)
+    # Explicit old inventory is allowed only for an exact historical Git build.
+    # Working-tree builds must always contain the complete reviewed panel payload.
+    legacy = bool(revision and set(files) == FOUNDATION_FILES)
+    manifest = validate_files(files, legacy=legacy)
     output.mkdir(parents=True, exist_ok=False)
     archive = output / "alarmmesh.zip"
-    digest = write_zip(files, archive)
+    digest = write_zip(files, archive, legacy=legacy)
     changes = (
         []
         if revision

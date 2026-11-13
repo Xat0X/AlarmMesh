@@ -6,15 +6,22 @@
   <img src="custom_components/alarmmesh/brand/logo.png" alt="AlarmMesh — read-only smoke reports and source availability for Home Assistant" width="560">
 </picture>
 
-Read-only smoke reports and source availability from your existing Home Assistant
-smoke detector entities.
+Passive smoke reports and source availability from your existing Home Assistant
+smoke detector entities, with a local panel for detectors, rooms and groups.
 
 > AlarmMesh is not a certified fire alarm system and must not replace certified standalone smoke detectors.
 
-## Current status: two read-only overviews
+## Current status: local panel and two read-only overviews
 
-The current version offers source selection, passive local tracking and two
-read-only overviews. The supplied artwork's tagline describes a future ambition;
+The current local interface adds **AlarmMesh** to the Home Assistant sidebar for
+administrators: overview, detectors and details, HA rooms, and persistent
+organizational groups. It uses the signed-in HA session and needs no YAML,
+resource installation, Node on the HA host or separate server. See the
+[panel user guide](docs/panel.md). New local code is not covered by earlier hosted
+CI or installer acceptance; those dated results remain in the acceptance matrix.
+
+Source selection, passive local tracking and the two read-only overview entities
+remain available. The supplied artwork's tagline describes a future ambition;
 alarm linking is not implemented.
 AlarmMesh lets you select existing smoke detector entities during setup and
 replace that selection later through the integration options. Select at least
@@ -72,7 +79,9 @@ is missing; unexpected state values are unknown. Any smoke report takes
 precedence, while incomplete source availability is shown separately. AlarmMesh
 does not store or restore observations as current truth; every load starts from
 Home Assistant's current local states. Home Assistant may record entity history
-according to its own configuration; AlarmMesh adds no history or storage.
+according to its own configuration; AlarmMesh adds no observation history.
+Only organizational group names, stable IDs, member references and an edit
+revision are persisted in HA storage, separately from the source selection.
 Tracking and overview subscriptions stop on unload or removal.
 AlarmMesh does not directly query devices, poll sources, or create network
 connections. The overviews do not establish alarm readiness.
@@ -86,6 +95,7 @@ installer; use the isolated environment described below.
 
 - [Current acceptance matrix: hosted CI, fresh UI and open checks](docs/acceptance-matrix.md)
 - [Local package, file-update and snapshot-recovery checks](docs/release-package.md)
+- [Disposable Marketplace and HA backup acceptance](docs/installer-acceptance.md)
 - [Development setup and checks](docs/development.md)
 - [Installation, updates and removal](docs/installation.md)
 - [Reproducible compatibility checks: 2026.10.4 and 2026.11.1](docs/compatibility.md)

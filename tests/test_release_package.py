@@ -1,5 +1,6 @@
 """Closed package inventory and deterministic output; no HA or devices."""
 
+import json
 import zipfile
 from pathlib import Path
 
@@ -27,6 +28,14 @@ def test_package_rejects_unreviewed_files(files: dict[str, bytes], extra: str) -
 def test_package_rejects_missing_runtime_file(files: dict[str, bytes]) -> None:
     del files["runtime.py"]
     with pytest.raises(ValueError, match="inventory"):
+        validate_files(files)
+
+
+def test_package_rejects_unreviewed_builtin_dependency(files: dict[str, bytes]) -> None:
+    manifest = json.loads(files["manifest.json"])
+    manifest["dependencies"].append("shell_command")
+    files["manifest.json"] = json.dumps(manifest).encode()
+    with pytest.raises(ValueError, match="manifest"):
         validate_files(files)
 
 

@@ -3,6 +3,7 @@
   "name": "AlarmMesh",
   "codeowners": ["@Xat0X"],
   "config_flow": true,
+  "dependencies": ["frontend", "http", "websocket_api"],
   "documentation": "https://github.com/Xat0X/AlarmMesh",
   "integration_type": "service",
   "iot_class": "calculated",

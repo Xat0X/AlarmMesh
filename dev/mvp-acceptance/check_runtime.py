@@ -7,6 +7,8 @@ import sys
 import traceback
 from pathlib import Path
 
+from aiohttp import ClientSession
+
 from homeassistant import bootstrap
 from homeassistant.config_entries import SOURCE_USER, ConfigEntryState
 from homeassistant.const import __version__
@@ -28,6 +30,8 @@ SCENARIOS = (
     "old_source_ignored",
     "reload_stable_identity",
     "unload_and_subscription_cleanup",
+    "panel_assets_and_group_storage",
+    "panel_reload_cleanup",
 )
 SCOPE = "technische controle met simulatiebronnen, geen fysieke apparaatvalidatie"
 
@@ -52,6 +56,8 @@ async def main(requested: str, config_dir: Path) -> int:
         "scenarios": dict.fromkeys(SCENARIOS, "NIET UITGEVOERD"),
     }
     hass = None
+    client = None
+    websocket = None
     current = SCENARIOS[0]
 
     def passed(name: str) -> None:
@@ -116,6 +122,84 @@ async def main(requested: str, config_dir: Path) -> int:
             "sensor", DOMAIN, f"{entry.entry_id}_source_availability"
         )
         require(smoke_id is not None and availability_id is not None, "Overview IDs")
+        passed(current)
+
+        current = "panel_assets_and_group_storage"
+        from homeassistant.auth.const import GROUP_ID_ADMIN
+        from homeassistant.components import frontend
+
+        from custom_components.alarmmesh.panel import DATA_HUB
+
+        registration = hass.data[frontend.DATA_PANELS][DOMAIN]
+        require(registration.require_admin, "Panel must use HA admin authorization")
+        require(
+            registration.config["_panel_custom"]["module_url"]
+            == "/alarmmesh-assets/panel.js",
+            "Panel module missing",
+        )
+        client = ClientSession()
+        async with client.get(
+            "http://127.0.0.1:8123/alarmmesh-assets/panel.js"
+        ) as response:
+            require(
+                response.status == 200 and "alarmmesh-panel" in await response.text(),
+                "Panel asset not served",
+            )
+        # Supported HA auth APIs create an isolated test-only principal. No
+        # onboarding/storage edits, borrowed account, printed token or live HA.
+        user = await hass.auth.async_create_user(
+            "Compatibility simulation", group_ids=[GROUP_ID_ADMIN]
+        )
+        refresh = await hass.auth.async_create_refresh_token(
+            user, client_id="http://localhost"
+        )
+        token = hass.auth.async_create_access_token(refresh)
+        websocket = await client.ws_connect("http://127.0.0.1:8123/api/websocket")
+        require(
+            (await websocket.receive_json())["type"] == "auth_required",
+            "Expected authenticated transport",
+        )
+        await websocket.send_json({"type": "auth", "access_token": token})
+        require(
+            (await websocket.receive_json())["type"] == "auth_ok",
+            "Simulation auth failed",
+        )
+
+        async def ws_request(message):
+            await websocket.send_json(message)
+            async with asyncio.timeout(10):
+                while True:
+                    answer = await websocket.receive_json()
+                    if (
+                        answer.get("type") == "result"
+                        and answer.get("id") == message["id"]
+                    ):
+                        require(answer["success"], "Panel WebSocket command failed")
+                        return answer["result"]
+
+        await ws_request({"id": 1, "type": "alarmmesh/subscribe"})
+        initial = (await websocket.receive_json())["event"]
+        require(
+            initial["available"] and len(initial["sources"]) == 2,
+            "Panel runtime data missing",
+        )
+        await ws_request(
+            {
+                "id": 2,
+                "type": "alarmmesh/group",
+                "operation": "create",
+                "revision": 0,
+                "name": "Simulation group",
+                "members": sources,
+            }
+        )
+        original_panel = entry.runtime_data.panel
+        group_id = original_panel.groups.groups[0]["id"]
+        require(
+            original_panel.snapshot()["groups"][0]["result"]
+            == original_panel.snapshot()["result"],
+            "Group calculation differs",
+        )
         passed(current)
 
         def expect(smoke: str, availability: str) -> None:
@@ -222,6 +306,51 @@ async def main(requested: str, config_dir: Path) -> int:
                 state is None or state.state == "unavailable", "Overview still active"
             )
         passed(current)
+        current = "panel_reload_cleanup"
+        require(
+            not original_panel.unsubscribers and not original_panel.runtime._observers,
+            "Old panel subscriptions survived",
+        )
+        require(
+            hass.data[DATA_HUB].controller is None
+            and DOMAIN not in hass.data[frontend.DATA_PANELS],
+            "Unloaded panel still registered",
+        )
+        require(
+            await hass.config_entries.async_setup(entry.entry_id),
+            "Panel re-setup failed",
+        )
+        await hass.async_block_till_done()
+        current_panel = entry.runtime_data.panel
+        require(
+            current_panel.groups.groups[0]["id"] == group_id,
+            "Group storage/identity not retained",
+        )
+        require(
+            current_panel.snapshot()["groups"][0]["unselected"] == [sources[0]],
+            "Stale member was silently removed",
+        )
+        await ws_request(
+            {
+                "id": 3,
+                "type": "alarmmesh/group",
+                "operation": "delete",
+                "revision": 1,
+                "group_id": group_id,
+            }
+        )
+        require(not current_panel.groups.groups, "Group deletion failed")
+        await ws_request({"id": 4, "type": "unsubscribe_events", "subscription": 1})
+        require(not hass.data[DATA_HUB].listeners, "WebSocket subscription leaked")
+        require(
+            await hass.config_entries.async_unload(entry.entry_id),
+            "Final panel unload failed",
+        )
+        require(
+            not current_panel.unsubscribers and not current_panel.runtime._observers,
+            "Final panel listener leak",
+        )
+        passed(current)
         report["result"] = "PASS"
     except Exception as exc:
         report["scenarios"][current] = "FAIL"
@@ -233,6 +362,10 @@ async def main(requested: str, config_dir: Path) -> int:
             encoding="utf-8",
         )
     finally:
+        if websocket is not None:
+            await websocket.close()
+        if client is not None:
+            await client.close()
         if hass is not None:
             try:
                 await hass.async_stop(force=True)

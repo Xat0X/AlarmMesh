@@ -1,7 +1,23 @@
 # Read-only MVP release proposal
 
-Prepared **2026-11-12** against **a300d39b7eac4ef80ebb971e859b9866f2145c15**,
-plus the local release-preparation changes. The [current acceptance matrix](acceptance-matrix.md)
+**New local interface work:** the separate [panel package](panel.md) adds new
+product code and organizational group storage after the committed bbd767a MVP.
+The proposal/evidence below remains historical for that committed payload, not
+a hosted or installer approval of the new local code. Review the current panel
+results in the [matrix](acceptance-matrix.md) before choosing any release source.
+No version/tag change is made by the interface work.
+
+The new panel now has its own completed simulation UI pass: four screens,
+group CRUD/persistence, real test-container restart, live connection loss/recovery,
+source changes, Dutch/English and phone/tablet/light/dark. A narrow phone-card
+layout was corrected and inspected again. The final full route passes 277 Linux
+tests, eleven DOM tests and fourteen technical scenarios on each exact HA version.
+See the matrix for hashes, paths and evidence limits. These local checks do not
+close the historical installer/physical-release gaps or create a new hosted run.
+
+Updated **2026-11-13** against actual checkout
+**bbd767aa2766f55a2a2a62c10e9df18390d1270f**, which already contains the
+earlier a300d39-based preparation. The [current acceptance matrix](acceptance-matrix.md)
 is the authoritative results list; earlier dated reports remain historical.
 No release, manifest bump or publication is performed here.
 
@@ -12,13 +28,14 @@ packaged pre-1.0 read-only MVP, rather than continuing the foundation's `0.0.1`
 identifier. This is a proposal for the owner, not a version change. The current
 manifest and generated local test ZIP still say **0.0.1**.
 
-Product candidate: exact a300d39, whose integration payload is unchanged by this
-review. Release source should be the **reviewed successor of a300d39 containing
-this preparation**, with a deliberately approved manifest/tag version and a fresh
-hosted validation result. No successor SHA can be named before those changes are
-authorized and committed. Hosted success for a300d39 does not cover new local
-tooling. A read-only GitHub check on 2026-11-12 found no existing releases or tags;
-the proposed name/tag was unused at that time.
+Product/review candidate: exact **bbd767aa2766f55a2a2a62c10e9df18390d1270f**,
+now verified with 249 hosted tests and both compatibility artifacts. Its product
+payload is identical to a300d39. Release source should include these reviewed
+documentation corrections and a deliberately approved matching manifest/tag
+version, followed by fresh hosted validation. No final release SHA can be named
+before those future authorized changes are committed. Hosted success for bbd767a
+does not cover new local edits. A read-only GitHub check on 2026-11-12 again found
+no existing releases or tags; the proposed name/tag was unused at that time.
 
 The candidate delivers source selection and backend validation, passive tracking,
 smoke priority during partial information loss, two read-only overviews, stable
@@ -27,22 +44,38 @@ schema migration or new product functionality in this preparation.
 
 ## Evidence and remaining technical boundaries
 
-- Hosted a300d39: 244 tests, Ruff, hassfest and exact-version compatibility
-  artifacts independently inspected; fresh simulation UI now observed on 2026.10.4.
+- Hosted a300d39: 244 tests, and hosted bbd767a: 249 tests; Ruff, hassfest and
+  both exact-version compatibility artifacts independently inspected. The full
+  simulation UI sequence is observed on the unchanged a300d39 payload in 2026.10.4;
+  bbd767a's normal test UI state was separately rechecked.
 - Reproducible [local package and file-update checks](release-package.md) pass
   on exact **2026.10.4** and **2026.11.1**, retaining the 2026.10.4 test baseline.
   Package inventory/hashes, separate process restarts, options/identity retention,
   removal/re-add and stopped-file recovery are recorded centrally.
-- Previous 0e7ba38 and current a300d39 integration payloads are identical.
+- Previous 0e7ba38, a300d39 and current bbd767a integration payloads are identical.
   File replacement is tested; migration between different product versions is not.
-- Marketplace/HACS installation/update/uninstall **end to end remains untested
-  in the disposable instance**. No installer authorization was configured.
-  User-reported production installation is a separate evidence category.
-- The recovered copy of stopped test files is **not HA backup-feature acceptance**.
-  A supported HA backup/restore exercise remains separate.
-- The icon is visually readable on light/dark UI backgrounds. The inspected
-  screens do not display the wide logo; its theme selection in a live screen is
-  unobserved. Exact six-file serving is technical evidence only.
+- Actual Marketplace link installation and identical-`bbd767a` reinstall on
+  **2026.11.1** are now observed in a new disposable instance, with the owner's
+  own test onboarding/GitHub authorization. Downloaded files match the exact
+  commit; customized entity IDs/names and the on/incomplete checkpoint survive
+  the required HA restart. HACS and a differing-product-version upgrade remain
+  separate; see the [current matrix](acceptance-matrix.md).
+- The recovered copy of stopped test files remains **different evidence** from
+  the new actual HA backup exercise. HA 2026.11.1 has now created an encrypted
+  local manual checkpoint archive through its supported UI. Supported onboarding
+  restore into another fresh 2026.11.1 Container succeeded: the owner entered the
+  key and signed in; restored files, selection, customized identities, checkpoint
+  and live source processing were then independently checked. This is not a
+  manual extraction, production recovery or HA OS/Supervisor test.
+- Actual Marketplace uninstall/fresh reinstall remains **NIET UITGEVOERD**:
+  Computer Use's URL-confidence policy stopped browser control before deletion.
+  No workaround was used. The [remaining UI-only steps](installer-acceptance.md#remaining-ui-only-steps)
+  retain the source and successful backup. A future differing-version upgrade
+  still needs its own acceptance.
+- The icon is visually readable on light/dark integration UI backgrounds and
+  appears correctly in Marketplace after restart. The actual Marketplace README
+  renderer shows the light wide logo on a dark background with low contrast.
+  This new visual finding remains open; it is not a status-processing defect.
 - Real smoke transitions, physical loss/recovery, production restart and
   separately observed physical self-test behavior remain open. No safety
   certification, catalog approval or physical reliability is claimed.
@@ -60,8 +93,10 @@ Before an owner-authorized update, retain a known-good HA backup including
 integration/configuration and record the installed revision. Use one installer,
 review update notes and follow its restart repair. Rollback should restore the
 known-good backup using [Home Assistant's supported procedure](https://www.home-assistant.io/integrations/backup/).
-This task did not test that backup feature or any production recovery. Do not
-promise that choosing an older version preserves arbitrary future schemas.
+The backup feature was actually exercised in a disposable Container instance;
+the [matrix](acceptance-matrix.md) records exact scope and evidence. No production
+recovery was tested. Do not promise that choosing an older version preserves
+arbitrary future schemas.
 Deleting the integration entry stops tracking; uninstall files separately through
 the installer. Source integrations remain independent.
 
@@ -72,7 +107,6 @@ the installer. Source integrations remain independent.
 | Project license | Owner chooses the license; none is assumed or added. |
 | Supplied artwork | Owner confirms redistribution rights for all packaged artwork, including derivative packaged PNGs. Technical checks do not establish rights. |
 | Version, revision and timing | Approve or replace 0.1.0; choose publication timing and the reviewed successor revision. Then separately authorize matching manifest/tag changes and hosted CI. |
-| Installer acceptance | Arrange a disposable installer/GitHub session for end-to-end install/update/uninstall and a supported HA backup/restore check before claiming that coverage. No production credentials. |
 | Catalog participation | Decide later whether to seek admission; no application or remote settings change is included. |
 
 Physical acceptance is a separate pilot activity under the
@@ -103,10 +137,12 @@ catalog validation/submission or approval is inferred from passing hassfest.
 >
 > Technical simulation checks cover exact HA 2026.10.4 and 2026.11.1; development
 > baseline remains 2026.10.4. A fresh UI check covers 2026.10.4. Read the installation
-> guide and back up before updating. File replacement/restart and stopped-file
-> recovery were tested with identical old/new integration payloads; installer
-> end-to-end and HA backup-feature acceptance remain separate. A default-branch
-> installer revision can differ from the manifest version.
+> guide and back up before updating. Actual Marketplace installation/reinstall
+> and supported HA backup/restore were checked on 2026.11.1 with simulations.
+> Marketplace uninstall/fresh reinstall remains open after a browser-policy stop;
+> no differing-product-version upgrade is claimed. File-copy checks are separate.
+> The Marketplace-rendered wide logo has a known dark-background contrast issue.
+> A default-branch installer revision can differ from the manifest version.
 >
 > The physical pilot confirms installation/current display/reload by user report
 > only. Physical smoke transitions, real connection failure and production restart

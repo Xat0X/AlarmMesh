@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+### Integrated local interface
+
+- Add the packaged AlarmMesh sidebar panel: overview, selected detectors and
+  details, HA areas and organizational groups, with Dutch/English text and
+  phone/tablet/light/dark styling based on the supplied design and artwork.
+- Push existing runtime status through HA-authenticated admin WebSocket commands;
+  reuse the shared home result and the unchanged status evaluator for subsets.
+- Persist entry-owned groups with stable IDs, atomic version-1 HA storage,
+  bounded input and revision conflicts. Keep stale source references visible.
+  No alarm/device actions, observations history or second source selection.
+- Add real HA backend/auth/storage tests, light locked DOM tests, packaged-asset
+  allowlisting and expanded exact-version compatibility checks. Earlier hosted
+  and installer evidence remains dated and does not validate this local code.
+- Complete a separate actual simulation UI pass, including group persistence
+  after a real container restart, connection loss/recovery, source changes and
+  Dutch/English light/dark phone/tablet layouts. Correct narrow phone cards to
+  use the available width; retain dated before/after evidence in the matrix.
+
 ### Current read-only MVP
 
 - Select existing smoke binary sensors through configuration and options, with
@@ -16,6 +34,15 @@
 
 ### Review and release preparation
 
+- Exercise actual Marketplace installation and identical-revision reinstall on
+  HA 2026.11.1, plus encrypted HA backup and supported restore into a separate
+  disposable Container. Record preserved selection/identity and live simulation
+  processing. Marketplace uninstall/re-add remains open after a browser-policy
+  stop; retain the precise remaining steps and the dark-background README-logo
+  contrast finding, without changing product code or artwork.
+- Reconcile the actual bbd767a checkout with the earlier a300d39-based review;
+  verify its 249-test hosted run and both compatibility artifacts, retain dated
+  prior evidence, and name the concrete reviewed candidate without publishing.
 - Verify hosted CI and both compatibility artifacts for a300d39; complete a new
   English/Dutch simulation UI pass and consolidate current evidence in the
   [acceptance matrix](docs/acceptance-matrix.md), preserving historical reports.
