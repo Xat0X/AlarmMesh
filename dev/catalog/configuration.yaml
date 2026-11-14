@@ -1,0 +1,264 @@
+# TEST DOUBLES ONLY. No MQTT broker, ZHA coordinator, devices or cloud.
+homeassistant:
+  name: AlarmMesh LINKING - SIMULATION ONLY
+  latitude: 0
+  longitude: 0
+  elevation: 0
+  time_zone: Europe/Brussels
+  country: BE
+frontend:
+config:
+api:
+http:
+  server_port: 8123
+lovelace:
+  mode: yaml
+alarmmesh_simulation:
+  catalog: true
+input_boolean:
+  catalog_a_smoke:
+    name: SIMULATION A smoke
+    initial: false
+  catalog_a_unreachable:
+    name: SIMULATION A unreachable
+    initial: false
+  catalog_a_permission:
+    name: SIMULATION A permission
+    initial: false
+  catalog_a_control_unreachable:
+    name: SIMULATION A control_unreachable
+    initial: false
+  catalog_a_failure:
+    name: SIMULATION A failure
+    initial: false
+  catalog_b_smoke:
+    name: SIMULATION B smoke
+    initial: false
+  catalog_b_unreachable:
+    name: SIMULATION B unreachable
+    initial: false
+  catalog_b_permission:
+    name: SIMULATION B permission
+    initial: false
+  catalog_b_control_unreachable:
+    name: SIMULATION B control_unreachable
+    initial: false
+  catalog_b_failure:
+    name: SIMULATION B failure
+    initial: false
+  catalog_c_smoke:
+    name: SIMULATION C smoke
+    initial: false
+  catalog_c_unreachable:
+    name: SIMULATION C unreachable
+    initial: false
+  catalog_c_permission:
+    name: SIMULATION C permission
+    initial: false
+  catalog_c_control_unreachable:
+    name: SIMULATION C control_unreachable
+    initial: false
+  catalog_c_failure:
+    name: SIMULATION C failure
+    initial: false
+  catalog_d_smoke:
+    name: SIMULATION D smoke
+    initial: false
+  catalog_d_unreachable:
+    name: SIMULATION D unreachable
+    initial: false
+  catalog_d_permission:
+    name: SIMULATION D permission
+    initial: false
+  catalog_d_control_unreachable:
+    name: SIMULATION D control_unreachable
+    initial: false
+  catalog_d_failure:
+    name: SIMULATION D failure
+    initial: false
+  catalog_e_smoke:
+    name: SIMULATION E smoke
+    initial: false
+  catalog_e_unreachable:
+    name: SIMULATION E unreachable
+    initial: false
+  catalog_e_permission:
+    name: SIMULATION E permission
+    initial: false
+  catalog_e_control_unreachable:
+    name: SIMULATION E control_unreachable
+    initial: false
+  catalog_e_failure:
+    name: SIMULATION E failure
+    initial: false
+  catalog_f_smoke:
+    name: SIMULATION F smoke
+    initial: false
+  catalog_f_unreachable:
+    name: SIMULATION F unreachable
+    initial: false
+  catalog_f_permission:
+    name: SIMULATION F permission
+    initial: false
+  catalog_f_control_unreachable:
+    name: SIMULATION F control_unreachable
+    initial: false
+  catalog_f_failure:
+    name: SIMULATION F failure
+    initial: false
+  catalog_g_smoke:
+    name: SIMULATION G smoke
+    initial: false
+  catalog_g_unreachable:
+    name: SIMULATION G unreachable
+    initial: false
+  catalog_g_permission:
+    name: SIMULATION G permission
+    initial: false
+  catalog_g_control_unreachable:
+    name: SIMULATION G control_unreachable
+    initial: false
+  catalog_g_failure:
+    name: SIMULATION G failure
+    initial: false
+  catalog_h_smoke:
+    name: SIMULATION H smoke
+    initial: false
+  catalog_h_unreachable:
+    name: SIMULATION H unreachable
+    initial: false
+  catalog_h_permission:
+    name: SIMULATION H permission
+    initial: false
+  catalog_h_control_unreachable:
+    name: SIMULATION H control_unreachable
+    initial: false
+  catalog_h_failure:
+    name: SIMULATION H failure
+    initial: false
+  catalog_i_smoke:
+    name: SIMULATION I smoke
+    initial: false
+  catalog_i_unreachable:
+    name: SIMULATION I unreachable
+    initial: false
+  catalog_i_permission:
+    name: SIMULATION I permission
+    initial: false
+  catalog_i_control_unreachable:
+    name: SIMULATION I control_unreachable
+    initial: false
+  catalog_i_failure:
+    name: SIMULATION I failure
+    initial: false
+  catalog_j_smoke:
+    name: SIMULATION J smoke
+    initial: false
+  catalog_j_unreachable:
+    name: SIMULATION J unreachable
+    initial: false
+  catalog_j_permission:
+    name: SIMULATION J permission
+    initial: false
+  catalog_j_control_unreachable:
+    name: SIMULATION J control_unreachable
+    initial: false
+  catalog_j_failure:
+    name: SIMULATION J failure
+    initial: false
+  catalog_k_smoke:
+    name: SIMULATION K smoke
+    initial: false
+  catalog_k_unreachable:
+    name: SIMULATION K unreachable
+    initial: false
+  catalog_k_permission:
+    name: SIMULATION K permission
+    initial: false
+  catalog_k_control_unreachable:
+    name: SIMULATION K control_unreachable
+    initial: false
+  catalog_k_failure:
+    name: SIMULATION K failure
+    initial: false
+  catalog_l_smoke:
+    name: SIMULATION L smoke
+    initial: false
+  catalog_l_unreachable:
+    name: SIMULATION L unreachable
+    initial: false
+  catalog_l_permission:
+    name: SIMULATION L permission
+    initial: false
+  catalog_l_control_unreachable:
+    name: SIMULATION L control_unreachable
+    initial: false
+  catalog_l_failure:
+    name: SIMULATION L failure
+    initial: false
+  catalog_m_smoke:
+    name: SIMULATION M smoke
+    initial: false
+  catalog_m_unreachable:
+    name: SIMULATION M unreachable
+    initial: false
+  catalog_m_permission:
+    name: SIMULATION M permission
+    initial: false
+  catalog_m_control_unreachable:
+    name: SIMULATION M control_unreachable
+    initial: false
+  catalog_m_failure:
+    name: SIMULATION M failure
+    initial: false
+  catalog_n_smoke:
+    name: SIMULATION N smoke
+    initial: false
+  catalog_n_unreachable:
+    name: SIMULATION N unreachable
+    initial: false
+  catalog_n_permission:
+    name: SIMULATION N permission
+    initial: false
+  catalog_n_control_unreachable:
+    name: SIMULATION N control_unreachable
+    initial: false
+  catalog_n_failure:
+    name: SIMULATION N failure
+    initial: false
+  catalog_o_smoke:
+    name: SIMULATION O smoke
+    initial: false
+  catalog_o_unreachable:
+    name: SIMULATION O unreachable
+    initial: false
+  catalog_o_permission:
+    name: SIMULATION O permission
+    initial: false
+  catalog_o_control_unreachable:
+    name: SIMULATION O control_unreachable
+    initial: false
+  catalog_o_failure:
+    name: SIMULATION O failure
+    initial: false
+  catalog_p_smoke:
+    name: SIMULATION P smoke
+    initial: false
+  catalog_p_unreachable:
+    name: SIMULATION P unreachable
+    initial: false
+  catalog_p_permission:
+    name: SIMULATION P permission
+    initial: false
+  catalog_p_control_unreachable:
+    name: SIMULATION P control_unreachable
+    initial: false
+  catalog_p_failure:
+    name: SIMULATION P failure
+    initial: false
+  catalog_fault:
+    name: SIMULATION fault
+    initial: false
+  catalog_test:
+    name: SIMULATION test
+    initial: false

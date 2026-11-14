@@ -204,3 +204,40 @@ directory. Never commit `.storage`, credentials, `secrets.yaml`, logs, databases
 or real device/account data. The development container does not mount a live
 Home Assistant configuration or expose hardware. LF line endings are normalized
 by `.gitattributes` for Windows/Linux collaboration.
+
+
+## Device catalog and realistic driver checks
+
+[Device support and current evidence](device-compatibility.md) records the complete
+inventory method, canonical/variant counts and provider-specific limits. The
+reviewed snapshot is `dev/catalog/review.json`; `python dev/catalog/build.py`
+generates the runtime literal and model index. `--check` and the catalog regression
+tests reject stale output. The development-only `extract.cjs` reproduces the
+website filter from pinned official sources; run it only in an ignored research
+folder and review differences before changing capabilities.
+
+The single validation route also runs the real HA MQTT/offline ZHA driver phase
+on both exact compatibility versions. Official Mosquitto 2.0.22 is development
+software, not an installed integration dependency. Its container has no published
+port, owns no credentials, uses only synthetic topics on the run's internal
+network, and is removed with the run. No coordinator, production broker, radio or
+real source is used. Inspect `driver-result.json` separately from mock registry
+results. Local tracebacks stay ignored; a failed assertion or cleanup fails the
+whole run. Existing web environments remain untouched.
+
+For the separate 16-detector catalog UI fixture:
+
+```powershell
+pwsh -NoProfile -File ./dev/panel-ui.ps1 -Mode Catalog -Port 8130 -Action Start
+pwsh -NoProfile -File ./dev/panel-ui.ps1 -Mode Catalog -Port 8130 -Action Status
+pwsh -NoProfile -File ./dev/panel-ui.ps1 -Mode Catalog -Port 8130 -Action Stop
+```
+
+Use only those clearly labelled helpers; no cloud/account connection is needed.
+The fixture is mock provider metadata/actions, not the real MQTT driver phase.
+It starts with all helpers off. After a review return helpers off and leave
+linking off. Runtime/account data stays ignored under `config/catalog-ui/`.
+The launcher's existing bridge has outbound access, not LAN-firewall semantics.
+Visual access may require user onboarding; never substitute DOM tests for actual
+phone/tablet/theme/keyboard observations. The completed representative native UI
+review and its limits are recorded in the device support guide.

@@ -1,5 +1,35 @@
 # Changelog
 
+## Unreleased
+
+- Block Bosch BSD-2 linked activation unless its same-device broadcast switch
+  explicitly reports off. Recheck before dispatch and invalidate earlier broader
+  assignments; never change the device setting automatically.
+
+- Add a reviewed offline catalog of 52 definitions / 67 model and variant rows,
+  separate Zigbee2MQTT/ZHA assessments and searchable panel compatibility.
+- Add reviewed Heiman, Aqara ZHA, IAS, Bosch and ShinaSystem HA action contracts,
+  activation only unless the existing PLUS MQTT stop contract applies. Preserve
+  published bindings, source options, group identities and default-off linking.
+- Show cached battery, fault, self-test and firmware details without inferring
+  radio contact; show only current members in group target assignment.
+- Accept actual HA siren IntFlag feature bitmasks while rejecting booleans; the
+  regression was observed failing before correction. Do not adopt non-idle manual
+  control states. Preserve per-target incident deduplication and all status tests.
+- Block positively non-smoke/AlarmMesh-owned replacement origins from starting
+  or releasing action incidents; retain latched smoke through identity loss.
+  The shared read-only result and all original status rules stay unchanged.
+- Extend both compatibility runs with a private synthetic MQTT broker, actual HA
+  discovery/action payload checks and offline real ZHA action/quirk serialization.
+  See [coverage, limitations and current evidence](docs/device-compatibility.md).
+
+- Correct Dutch catalog text and label the activation filter as external sounder;
+  verify the catalog UI with 16 simulated sources, native confirmation/error
+  handling, reconnect and phone/tablet layouts. Keep screenshots local.
+
+No physical tests, live device access or new release/publication are claimed.
+
+
 ## 0.1.0-beta.2 — 2026-11-14
 
 - Add optional, administrator-confirmed group sounder mappings, default off, with

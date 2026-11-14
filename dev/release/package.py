@@ -32,6 +32,9 @@ FOUNDATION_FILES = frozenset(
 )
 REQUIRED_FILES = FOUNDATION_FILES | {
     "capabilities.py",
+    "catalog.py",
+    "catalog_data.py",
+    "profiles.py",
     "linking.py",
     "linking_runtime.py",
     "groups.py",

@@ -11,6 +11,16 @@ entities, with a local panel for detectors, rooms and groups. This test release 
 
 > AlarmMesh is not a certified fire alarm system and must not replace certified standalone smoke detectors.
 
+## Device support under review (after beta.2)
+
+The current working tree adds an offline catalog of **52 converter definitions /
+67 model and variant rows**, additional reviewed HA select/siren/switch profiles,
+read-only battery/fault/test details and searchable compatibility in the existing
+panel. Linking remains off by default; the catalog alone never permits control.
+See [device coverage, prerequisites, upstream gaps and current evidence](docs/device-compatibility.md).
+This work is not yet a new published release. The original branding, two overview
+entities, source-selection schema and smoke rules remain unchanged.
+
 ## Test release: 0.1.0-beta.2
 
 For opt-in testing, enable **Pre-release** in the AlarmMesh Marketplace page and

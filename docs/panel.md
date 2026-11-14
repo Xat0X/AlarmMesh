@@ -102,3 +102,19 @@ The [central acceptance matrix](acceptance-matrix.md) distinguishes automated
 checks, actual UI observations and unperformed items. Earlier hosted CI covers
 the old committed payload, not this new local interface. Physical smoke detection,
 real connection failure and production restart remain separate unperformed acceptance.
+
+
+## Device support in the current working tree
+
+**Compatibility** searches the offline catalog by brand/model and filters provider
+and function; it never discovers/selects/enables devices. **Detectors** separates
+smoke reporting from sounder availability, with activation-only labels where no
+safe stop is established. Details show available battery/fault/test/firmware
+values; missing values stay unavailable. Value-change timestamps are not recent
+radio contact. Requirements and troubleshooting IDs are folded away.
+
+Target assignment shows only checked group members while retaining unsaved
+choices when checking/unchecking a member. Non-controllable detectors can remain
+smoke sources. Exact confirmation, actual control validation and existing source
+selection rules remain in force. Read the [device guide](device-compatibility.md)
+for model/provider conditions, reproducible evidence and the separate review URL.

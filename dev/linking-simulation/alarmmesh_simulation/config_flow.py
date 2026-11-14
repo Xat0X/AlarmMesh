@@ -9,4 +9,6 @@ class SimulationFlow(ConfigFlow, domain="alarmmesh_simulation"):
     async def async_step_import(self, _data):
         await self.async_set_unique_id("alarmmesh-linking-simulation")
         self._abort_if_unique_id_configured()
-        return self.async_create_entry(title="SIMULATED providers only", data={})
+        return self.async_create_entry(
+            title="SIMULATED providers only", data=_data or {}
+        )

@@ -74,7 +74,15 @@ class LinkingRuntime:
     def changed(self, *_args):
         if self._closed or self._paused:
             return
-        statuses = self.runtime.source_statuses
+        # Keep the shared read-only calculation untouched. A known non-smoke
+        # replacement cannot start or clear an execution incident. Missing
+        # identity information still cannot release a previously latched origin.
+        statuses = {
+            source: SourceStatus.UNKNOWN
+            if self.capabilities.source_identity_changed(source)
+            else status
+            for source, status in self.runtime.source_statuses.items()
+        }
         tests = {
             source for source in statuses if self.capabilities.test_blocked(source)
         }
@@ -124,7 +132,9 @@ class LinkingRuntime:
         ):
             return None
         if not any(
-            not self.capabilities.test_blocked(origin) for origin in current.origins
+            not self.capabilities.test_blocked(origin)
+            and not self.capabilities.source_identity_changed(origin)
+            for origin in current.origins
         ):
             return None
         return self.capabilities.resolve(activation.binding)
@@ -155,7 +165,7 @@ class LinkingRuntime:
             self.attempted[target] = set(current.origins)
             record["origins"] = sorted(current.origins)
             state = self.hass.states.get(target)
-            if state and state.state in {"on", "alarm", "smoke_siren", "co_siren"}:
+            if not state or state.state not in control.idle_states:
                 record["status"] = "already_active"
                 return  # An existing/manual action is never adopted as ours.
             data = {"entity_id": target}

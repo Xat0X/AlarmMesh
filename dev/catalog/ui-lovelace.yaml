@@ -1,0 +1,31 @@
+title: CATALOG SIMULATION
+views:
+  - title: Simulated sources
+    cards:
+      - type: markdown
+        content: "SIMULATION ONLY. No broker/radio/real sound. Linking remains OFF until explicitly confirmed. Finish with helpers OFF."
+      - type: entities
+        title: Smoke and availability
+        entities:
+          - input_boolean.catalog_a_smoke
+          - input_boolean.catalog_b_smoke
+          - input_boolean.catalog_c_smoke
+          - input_boolean.catalog_h_smoke
+          - input_boolean.catalog_i_smoke
+          - input_boolean.catalog_j_smoke
+          - input_boolean.catalog_a_unreachable
+          - input_boolean.catalog_b_unreachable
+          - input_boolean.catalog_c_unreachable
+      - type: entities
+        title: Prerequisites and errors
+        entities:
+          - input_boolean.catalog_b_permission
+          - input_boolean.catalog_g_permission
+          - input_boolean.catalog_j_permission
+          - input_boolean.catalog_b_control_unreachable
+          - input_boolean.catalog_c_failure
+          - input_boolean.catalog_test
+          - input_boolean.catalog_fault
+      - type: entities
+        entities:
+          - sensor.catalog_requests

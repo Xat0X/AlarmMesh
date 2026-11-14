@@ -28,7 +28,16 @@ Cancelling changes nothing. Every save rechecks admin rights, current identity,
 capabilities and the edit revision; failed disk writes do not activate changes.
 AlarmMesh never enables a device prerequisite itself.
 
-## Reviewed profiles
+## Current development after beta.2
+
+The [device support guide](device-compatibility.md) records the expanded catalog,
+new MQTT/ZHA routes, read-only details, current checks and upstream gaps. It
+supersedes the beta.2-only support table below for the current working tree.
+Model detection never enables linking. New routes are activation-only; existing
+PLUS MQTT stop authority and published bindings remain unchanged. Physical
+behavior remains untested.
+
+## Published beta.2 profiles (historical scope)
 
 All profiles below were tested in software only. “Linkable” means an eligible HA
 control exists, not that a device sounded or that full automatic recovery is proven.
@@ -89,11 +98,11 @@ radio traffic, health or fire safety. No smoke reported is not a safety guarante
 ## Reproduce the simulation
 
 Run the [complete validation route](development.md#complete-local-validation).
-The same compatibility runner retains its original checks and adds mixed-provider
-linking, independent target failure and lifecycle checks: **17 scenarios** per
-exact HA version. The new fixture supplies registry metadata and local mock HA
-action handlers; actual MQTT/ZHA integrations, transports and radios are absent.
-This proves AlarmMesh's HA contract, not native-driver or hardware end-to-end behavior.
+The beta.2 runner had **17 scenarios** per exact HA version with mock provider
+metadata/actions. The current runner retains them, adds three catalog scenarios
+and 13 additional real HA MQTT/offline ZHA driver checks. See the
+[coverage and evidence guide](device-compatibility.md). No radio or physical-device
+acceptance is claimed; driver checks and metadata fixtures are labelled separately.
 
 For an independent browser environment:
 

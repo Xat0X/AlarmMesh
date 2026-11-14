@@ -2,11 +2,11 @@ param(
     [ValidateSet('Start', 'Status', 'Stop')][string]$Action = 'Status',
     [ValidateSet('2026.10.4', '2026.11.1')][string]$HaVersion = '2026.11.1',
     [ValidateRange(1024, 65535)][int]$Port = 8128,
-    [ValidateSet('Panel', 'Linking')][string]$Mode = 'Panel'
+    [ValidateSet('Panel', 'Linking', 'Catalog')][string]$Mode = 'Panel'
 )
 $ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-$purpose = if ($Mode -eq 'Linking') { 'linking-ui' } else { 'panel-ui' }
+$purpose = if ($Mode -eq 'Catalog') { 'catalog-ui' } elseif ($Mode -eq 'Linking') { 'linking-ui' } else { 'panel-ui' }
 $root = Join-Path $repo "config/$purpose"
 $current = Join-Path $root 'current-run.json'
 function Docker-Checked {
@@ -20,7 +20,7 @@ function Assert-Owner($run) {
         $details.Config.Labels.'org.alarmmesh.purpose' -ne $purpose -or
         $details.Config.Labels.'org.alarmmesh.run' -ne $run.id -or
         $details.Config.Image -ne $run.image -or $details.HostConfig.Privileged -or
-        $details.HostConfig.Devices.Count -gt 0 -or $details.Mounts.Count -ne $(if ($Mode -eq 'Linking') { 3 } else { 2 })) {
+        $details.HostConfig.Devices.Count -gt 0 -or $details.Mounts.Count -ne $(if ($Mode -ne 'Panel') { 3 } else { 2 })) {
         throw 'Panel simulation ownership/isolation mismatch'
     }
     $binding = $details.HostConfig.PortBindings.'8123/tcp'
@@ -32,7 +32,7 @@ function Assert-Owner($run) {
         $config.Count -ne 1 -or $config[0].Source -ne $run.config) {
         throw 'Panel simulation mounts/port mismatch'
     }
-    if ($Mode -eq 'Linking') {
+    if ($Mode -ne 'Panel') {
         $fixture = @($details.Mounts | Where-Object Destination -eq '/config/custom_components/alarmmesh_simulation')
         if ($fixture.Count -ne 1 -or $fixture[0].RW -or $fixture[0].Source -ne (Join-Path $repo 'dev/linking-simulation/alarmmesh_simulation')) {
             throw 'Linking simulation fixture mount mismatch'
@@ -50,7 +50,7 @@ if (-not (Test-Path -LiteralPath $current)) {
     $directory = Join-Path $root $id
     $configuration = Join-Path $directory 'config'
     New-Item -ItemType Directory -Path $configuration | Out-Null
-    $template = if ($Mode -eq 'Linking') { 'linking-simulation' } else { 'mvp-acceptance' }
+    $template = if ($Mode -eq 'Catalog') { 'catalog' } elseif ($Mode -eq 'Linking') { 'linking-simulation' } else { 'mvp-acceptance' }
     $yaml = Get-Content -Raw -Encoding UTF8 (Join-Path $PSScriptRoot "$template/configuration.yaml")
     $yaml = $yaml.Replace('AlarmMesh MVP - SIMULATED', 'AlarmMesh PANEL - SIMULATION ONLY')
     [System.IO.File]::WriteAllText((Join-Path $configuration 'configuration.yaml'), $yaml)
@@ -59,7 +59,7 @@ if (-not (Test-Path -LiteralPath $current)) {
     $network = "$name-net"
     Docker-Checked @('network','create','--label',"org.alarmmesh.purpose=$purpose",'--label',"org.alarmmesh.run=$id",$network) | Out-Null
     $mounts = @('--mount',"type=bind,source=$configuration,target=/config",'--mount',"type=bind,source=$(Join-Path $repo 'custom_components/alarmmesh'),target=/config/custom_components/alarmmesh,readonly")
-    if ($Mode -eq 'Linking') { $mounts += @('--mount',"type=bind,source=$(Join-Path $repo 'dev/linking-simulation/alarmmesh_simulation'),target=/config/custom_components/alarmmesh_simulation,readonly") }
+    if ($Mode -ne 'Panel') { $mounts += @('--mount',"type=bind,source=$(Join-Path $repo 'dev/linking-simulation/alarmmesh_simulation'),target=/config/custom_components/alarmmesh_simulation,readonly") }
     & docker run --rm --name "$name-check" --network $network @mounts --entrypoint python $image -m homeassistant --script check_config -c /config > (Join-Path $directory 'configuration-check.log') 2>&1
     if ($LASTEXITCODE -ne 0) { throw "Configuration failed; review $directory/configuration-check.log" }
     Docker-Checked (@('create','--name',$name,'--label',"org.alarmmesh.purpose=$purpose",'--label',"org.alarmmesh.run=$id",'--network',$network,'--publish',"127.0.0.1:${Port}:8123") + $mounts + @($image)) | Out-Null

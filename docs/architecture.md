@@ -302,14 +302,16 @@ official HA 2026.10.4 and 2026.11.1 containers. It drives HA's actual config/opt
 flows and simulated local sources, then checks the two entities, current-state
 rebuild, stable identities and detached old subscriptions. It is development
 tooling, never loaded by the installed integration. The default harness remains
-2026.10.4. New linking checks use local mock HA actions/registry metadata, without
-loading MQTT/ZHA drivers. No dependencies are added.
+2026.10.4. Linking checks retain the original mock HA actions/registry scenarios. The
+[catalog extension](device-compatibility.md) adds real HA MQTT discovery on a
+private synthetic broker and offline ZHA action/quirk checks with mocked radio I/O.
+The installed integration adds no dependencies or transports.
 
 [UI simulation acceptance](mvp-acceptance.md), technical compatibility and the
 [user-reported pilot](read-only-pilot.md) are different evidence categories.
 `complete` only describes usable current HA values; it proves neither recent
-radio traffic nor physical smoke detection. No ageing threshold or extra model
-property is interpreted. Installation and publication boundaries follow the
+radio traffic nor physical smoke detection. No ageing threshold is introduced. Extra model properties are read only in the
+panel and do not alter smoke/availability interpretation. Installation and publication boundaries follow the
 [installation guide](installation.md) and [guideline review](guidelines.md).
 
 ## Deliberately outside this change
@@ -340,3 +342,39 @@ The historical [review record](review-results.md) maps source/lifecycle coverage
 and earlier tooling corrections. Current linked-sounding evidence is separate in
 the [linking guide](linked-sounding.md); status semantics, source-option schema and
 stable overview unique IDs remain unchanged.
+
+
+## Offline catalog and reviewed action contracts (2026-11-14)
+
+`catalog_data.py` is a generated compact literal from the reviewed developer
+snapshot: 52 definitions and 67 website rows, separate A-F assessments and primary
+references for both providers. `catalog.py` validates counts/references and resolves
+exact provider/model/manufacturer identities. Marketing aliases and shared raw
+Tuya IDs do not grant provider equivalence. Unknown valid HA smoke entities remain
+usable sources. There is no runtime catalog download or upstream source copy.
+
+`profiles.py` holds frozen, bounded contracts; capabilities read only cached HA
+registries/states and verify source/device/config-entry binding, options/features,
+firmware and existing prerequisites. Small select/siren/switch adapters feed the
+same executor. The original four authority fingerprints stay stable. New profiles
+include a contract digest and prerequisite identity; a changed contract invalidates
+saved authority. Group data and options are never silently expanded or rewritten.
+Only the published PLUS MQTT contract has stop authority. Targets must have their
+profile's explicit idle state, preventing takeover of manual Bosch fire/burglar
+or other non-idle controls. HA feature IntFlags are accepted as bitmasks; booleans
+are rejected. The earlier per-target origin-lifetime fix is retained unchanged.
+
+The panel's separate admin-only `alarmmesh/catalog` read returns static evidence
+once; it is not pushed with every live snapshot and is not an action API. Cached
+same-device diagnostics include labelled value-change timestamps, never inferred
+last radio contact. Source and control availability are separate. No extra product
+entities, services, polling, transport, settings or test actions are added.
+
+
+Execution also checks current origin identity. A positively non-smoke or
+AlarmMesh-owned replacement is treated as unknown only in the incident planner:
+it cannot start an incident or provide an explicit release. A prior valid incident
+stays latched until a valid smoke identity reports off. Dispatch rechecks this
+identity immediately before the action. The shared read-only source statuses and
+`evaluate_status` remain untouched. Two regressions first demonstrated unwanted
+activation and premature stopping, then passed after this gate was added.

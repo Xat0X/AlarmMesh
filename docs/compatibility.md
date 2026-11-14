@@ -9,7 +9,11 @@ separate compatibility job while retaining the pinned baseline tests.
 Current local and hosted outcomes are in the [acceptance matrix](acceptance-matrix.md);
 the independent CI matrix uses the [complete validation route](development.md#complete-local-validation).
 The new local [linked-sounding extension](linked-sounding.md) adds three checks
-to the existing runner (17 total), using mock HA controls and registry metadata.
+to the original runner (17 at beta.2), using mock HA controls and registry metadata.
+The current [catalog extension](device-compatibility.md) retains all 17, adds
+three runtime scenarios and 13 driver checks. Driver checks use a run-owned
+Mosquitto 2.0.22 broker on the same internal network, actual HA MQTT discovery,
+and offline installed ZHA actions/quirks with all endpoint I/O mocked.
 Its evidence is recorded separately from the historical read-only results below.
 The historical results below are retained as dated evidence; base `0e7ba38`
 already includes those changes and the supplied branding.
@@ -47,15 +51,19 @@ can fail in its own network components, so `--network none` is not used.
 The selected official image and both in-container version checks use the same
 parameter. Compose validation, HA `check_config`, actual bootstrap and config/
 options flows run before PASS. The runtime refuses a pre-existing `.storage`.
-The examples contain only local helpers, template smoke sensors and mock controls; no
-onboarding, account, real HA or direct device connection is needed.
+The original runtime uses local helpers, template smoke sensors and mock controls.
+The driver phase creates its own fresh HA config and synthetic discovery/state
+topics on its isolated broker, not a real Zigbee2MQTT or radio network.
+No onboarding, user account, real HA access or direct device connection is needed.
 
 ## Scenarios and result files
 
 Each run records requested/actual HA version, HEAD commit, working-tree change
 indicator, relevant local paths and scenario outcomes. `compatibility-result.json`
 is the overall result; `technical-result.json` contains the runtime detail.
-Per-phase logs stay locally ignored. Summaries contain no account/configuration
+`driver-result.json` records the 13 separate driver scenarios and installed
+upstream package versions. The wrapper rejects stale/partial/mismatched reports;
+its summary includes driver outcomes, including partial failure. Per-phase logs stay locally ignored. Summaries contain no account/configuration
 contents or exception text. Do not publish raw local logs without review.
 Failure identifies the phase/scenario and exception type; a fresh rerun is used
 after correction, not reuse of the failed configuration.
@@ -133,3 +141,24 @@ version mismatch, FAIL report). No failed assertion is counted as acceptance.
 No check issues device commands. Do not point this tooling at a real HA
 configuration. It never stops, restarts or recreates the separate web acceptance
 container; existing web lifecycle commands remain documented separately.
+
+
+## Current catalog scenarios
+
+- Validate the complete catalog; verify actual mock HA controls, read-only details,
+  and blocked prerequisites without issuing commands on discovery.
+- Execute all added adapter types together with one independently failing target;
+  assert exact select option, siren tone/duration and switch action.
+- Recheck permission after change, retain overview identity, and detach old
+  executors on reload/unload. No activation-only stop is issued.
+- Driver phase: actual HA MQTT discovery and battery reads, Aqara/IAS/Bosch/
+  ShinaSystem/Heiman wire payloads on synthetic topics, no unsolicited discovery
+  commands, no retired-runtime commands; actual offline Aqara smoke versus
+  buzzer/linkage/test mapping, manual-alarm switch serialization, basic/advanced
+  IAS action serialization to mocked endpoints. This is not full ZHA discovery
+  or physical transport acceptance.
+
+The complete result must contain **20 runtime and 13 driver PASS scenarios**
+for the exact requested version. Independent runs have fresh configurations and
+no published ports. Only run-labelled containers (including the broker) and the
+run-labelled internal network are cleaned up. Web environments are untouched.

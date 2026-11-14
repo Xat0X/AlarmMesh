@@ -153,6 +153,7 @@ function Check-Config {
         result = 'FAIL'
         scenarios = @{}
         cleanup = 'NIET UITGEVOERD'
+        mqtt_broker_image = 'eclipse-mosquitto:2.0.22'
     }
     $mounts = @(
         '--mount', "type=bind,source=$checkPath,target=/config",
@@ -189,9 +190,25 @@ function Check-Config {
         $report.scenarios = $technical.scenarios
         if ($technical.result -ne 'PASS' -or $technical.actual_ha_version -ne $HaVersion -or
             $technical.requested_ha_version -ne $HaVersion -or $technical.run_id -ne $runId -or
-            $technical.git_commit -ne $commit -or @($technical.scenarios.PSObject.Properties).Count -ne 17 -or
+            $technical.git_commit -ne $commit -or @($technical.scenarios.PSObject.Properties).Count -ne 20 -or
             @($technical.scenarios.PSObject.Properties | Where-Object { $_.Value -ne 'PASS' }).Count -gt 0) {
             throw 'Technical report did not confirm this run, version, commit and all scenarios.'
+        }
+        $stage = 'drivers'
+        $brokerPath = Join-Path $checkPath 'mosquitto.conf'
+        [System.IO.File]::WriteAllText($brokerPath, "listener 1883`nallow_anonymous true`npersistence false`n", $utf8)
+        Invoke-Docker -DockerArgs @('run', '-d', '--name', "$runName-broker", '--network', $runNetwork,
+            '--network-alias', 'alarmmesh-sim-broker', '--label', 'org.alarmmesh.purpose=compatibility',
+            '--label', "org.alarmmesh.run=$runId", '--mount', "type=bind,source=$brokerPath,target=/mosquitto/config/mosquitto.conf,readonly",
+            'eclipse-mosquitto:2.0.22')
+        Invoke-CheckContainer -Phase 'drivers' -Command @('/acceptance/check_drivers.py', '--ha-version', $HaVersion)
+        $drivers = Get-Content -Raw -LiteralPath (Join-Path $checkPath 'driver-result.json') | ConvertFrom-Json
+        $report.driver_checks = $drivers.scenarios
+        if ($drivers.result -ne 'PASS' -or $drivers.actual_ha_version -ne $HaVersion -or
+            $drivers.requested_ha_version -ne $HaVersion -or $drivers.run_id -ne $runId -or $drivers.git_commit -ne $commit -or
+            @($drivers.scenarios.PSObject.Properties).Count -ne 14 -or
+            @($drivers.scenarios.PSObject.Properties | Where-Object { $_.Value -ne 'PASS' }).Count -gt 0) {
+            throw 'Driver report did not confirm this run, version, commit and all scenarios.'
         }
         $report.result = 'PASS'
     } catch {
@@ -204,9 +221,13 @@ function Check-Config {
         if (Test-Path -LiteralPath $technicalPath) {
             $report.scenarios = (Get-Content -Raw -LiteralPath $technicalPath | ConvertFrom-Json).scenarios
         }
+        $driverPath = Join-Path $checkPath 'driver-result.json'
+        if (Test-Path -LiteralPath $driverPath) {
+            $report.driver_checks = (Get-Content -Raw -LiteralPath $driverPath | ConvertFrom-Json).scenarios
+        }
     } finally {
         # Exact run-owned names only; never touch web containers or shared networks.
-        foreach ($phase in @('version', 'configuration', 'runtime')) {
+        foreach ($phase in @('version', 'configuration', 'runtime', 'drivers', 'broker')) {
             try {
             $ownedName = "$runName-$phase"
             $nameFilter = 'name=^/' + $ownedName + '$'

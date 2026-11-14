@@ -154,6 +154,7 @@ test("language, theme and unauthorized session react to HA context", () => {
 test("every product label has Dutch and English text; no remote runtime imports", async () => {
   const { TEXT } = await import("../../custom_components/alarmmesh/frontend/translations.js");
   assert.deepEqual(Object.keys(TEXT.en).sort(), Object.keys(TEXT.nl).sort());
+  for (const locale of Object.values(TEXT)) assert.ok(!/[A-Za-z]\?[A-Za-z]|\uFFFD/.test(Object.values(locale).join(" ")), "Translation contains a broken character");
   const js = await readFile(new URL("../../custom_components/alarmmesh/frontend/panel.js", import.meta.url), "utf8");
   assert.ok(!/innerHTML|window\.openai|Tweak|https?:\/\//.test(js));
 });
@@ -226,4 +227,80 @@ test("opening another dialog starts at its heading instead of the old scroll pos
   panel.openDialog({ kind: "edit", group: null });
   assert.equal(root.querySelector("dialog").scrollTop, 0);
   panel.remove();
+});
+
+
+test("target assignments only show current group members, retaining unsaved choices", () => {
+  const { panel, root, transport, calls } = setup();
+  transport.callbacks.at(-1)(linkedData());
+  panel.openDialog({ kind: "edit", group: null });
+  const rows = [...root.querySelectorAll(".binding-row")];
+  assert.ok(rows.every(row => row.hidden));
+  const members = [...root.querySelectorAll('[name="member"]')];
+  members[1].checked = true; members[1].dispatchEvent(new Event("change"));
+  assert.equal(rows.filter(row => !row.hidden).length, 1);
+  const target = rows[1].querySelector("select"); target.querySelector('option[value="siren.simulation_b"]').selected = true;
+  members[1].checked = false; members[1].dispatchEvent(new Event("change"));
+  members[1].checked = true; members[1].dispatchEvent(new Event("change"));
+  assert.equal(target.value, "siren.simulation_b");
+  transport.callbacks.at(-1)(linkedData());
+  assert.equal(root.querySelectorAll(".binding-row")[1].querySelector("select").value, "siren.simulation_b");
+  assert.deepEqual(calls, []); panel.remove();
+});
+
+test("cached diagnostics distinguish changed values from contact and keep limitations folded", () => {
+  const { panel, root, transport, calls } = setup("nl");
+  const data = linkedData();
+  data.sources[0].capability.details = { firmware: null, values: [{ key: "battery", value: 72, unit: "%", changed_at: "2026-11-14T10:00:00Z" }], recent_contact: null };
+  transport.callbacks.at(-1)(data); panel.openDialog({ kind: "source", id: source.entity_id });
+  assert.ok(root.querySelector(".diagnostics").textContent.includes("72 %"));
+  assert.ok(root.querySelector(".diagnostics").textContent.includes("Waarde gewijzigd"));
+  assert.ok(root.querySelector("dialog").textContent.includes("geen laatste radiocontact"));
+  assert.equal(root.querySelector("dialog details").hasAttribute("open"), false);
+  assert.deepEqual(calls, []); panel.remove();
+});
+
+test("catalog is searched locally with provider-specific assessments and safe text", async () => {
+  const { panel, root, calls } = setup();
+  const review = { detection: "conditional", activation: "unconfirmed", stop: "not_authorized", self_test: "not_available", information: [], requirements: [], gaps: [], sources: ["https://www.zigbee2mqtt.io/devices/example.html"] };
+  panel.catalog = { definitions: 1, website_rows: 2, checked: "2026-11-14", entries: [{ model: "Original", vendor: "Example", kind: "smoke", aliases: [{ model: "<img src=x>", vendor: "Variant" }], providers: { zha: review, zigbee2mqtt: { ...review, detection: "documented", activation: "implemented" } } }] };
+  await panel.go("catalog");
+  assert.equal(root.querySelectorAll(".catalog-card").length, 2);
+  const search = root.querySelector('[type="search"]'); search.value = "variant"; search.dispatchEvent(new Event("input"));
+  assert.equal(root.querySelectorAll(".catalog-card").length, 1);
+  assert.equal(root.querySelectorAll(".catalog-card img").length, 0);
+  const provider = root.querySelector('select[aria-label="Provider"]'); provider.querySelector('option[value="zha"]').selected = true; provider.dispatchEvent(new Event("change"));
+  assert.ok(root.querySelector(".catalog-card").textContent.includes("Not yet confirmed"));
+  assert.deepEqual(calls, []); panel.remove();
+});
+
+
+test("Z2M white-label evidence does not advertise implemented ZHA alias control", async () => {
+  const { panel, root, calls } = setup();
+  const base = { detection: "conditional", activation: "implemented", stop: "not_authorized", self_test: "conditional_read_only", information: [], requirements: [], gaps: [], sources: [] };
+  panel.catalogProvider = "zha"; panel.catalogCapability = "implemented";
+  panel.catalog = { definitions: 1, website_rows: 2, checked: "2026-11-14", entries: [{ model: "Canonical", vendor: "Example", kind: "smoke", aliases: [{ model: "Marketing alias", vendor: "Variant", providers: { zha: { ...base, activation: "unconfirmed" } } }], providers: { zha: base, zigbee2mqtt: base } }] };
+  await panel.go("catalog");
+  assert.equal(root.querySelectorAll(".catalog-card").length, 1);
+  assert.ok(!root.querySelector(".catalog-card").textContent.includes("Marketing alias"));
+  const filter = root.querySelector('select[aria-label="Functions and information"]');
+  filter.querySelector('option[value="all"]').selected = true; filter.dispatchEvent(new Event("change"));
+  assert.equal(root.querySelectorAll(".catalog-card").length, 2);
+  assert.ok(root.querySelectorAll(".catalog-card")[1].textContent.includes("Not yet confirmed"));
+  assert.deepEqual(calls, []); panel.remove();
+});
+
+
+test("Bosch broadcast prerequisite is explained in both languages without writes", () => {
+  for (const language of ["en", "nl"]) {
+    const { panel, root, transport, calls } = setup(language);
+    const data = normal();
+    data.sources[0].capability = { origin: "zigbee2mqtt", status: "setting_needed", reason: "bosch_broadcast_must_be_off", controls: [], details: { values: [], firmware: null } };
+    transport.callbacks.at(-1)(data);
+    panel.go("devices"); root.querySelector(".source").click();
+    const text = root.querySelector("dialog").textContent;
+    assert.ok(text.includes("broadcast_alarms"));
+    assert.ok(text.includes(language === "nl" ? "buiten je gekozen doelen" : "outside your selected targets"));
+    assert.deepEqual(calls, []); panel.remove();
+  }
 });

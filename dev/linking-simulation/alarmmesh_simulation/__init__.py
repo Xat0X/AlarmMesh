@@ -22,13 +22,19 @@ DEVICES = (
 async def async_setup(hass, _config):
     hass.async_create_task(
         hass.config_entries.flow.async_init(
-            DOMAIN, context={"source": "import"}, data={}
+            DOMAIN,
+            context={"source": "import"},
+            data={"catalog": bool((_config.get(DOMAIN) or {}).get("catalog"))},
         )
     )
     return True
 
 
 async def async_setup_entry(hass, entry):
+    if entry.data.get("catalog"):
+        from .catalog_fixture import async_setup_catalog
+
+        return await async_setup_catalog(hass, entry)
     registry = er.async_get(hass)
     fixtures = {}
     outputs = {}

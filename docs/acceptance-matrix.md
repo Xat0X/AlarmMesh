@@ -1,5 +1,10 @@
 # Current read-only MVP acceptance — 2026-11-13
 
+Current uncommitted device-catalog work after beta.2 has its own dated
+[coverage and evidence matrix](device-compatibility.md#current-evidence).
+The historical results below are retained and do not claim visual or physical
+acceptance for those additional profiles.
+
 ## New local integrated interface — 2026-11-13
 
 Base **bbd767aa2766f55a2a2a62c10e9df18390d1270f** plus the new local panel/group

@@ -16,11 +16,20 @@ function docker {
     }
     if ($args[0] -ne 'run') { throw 'Unexpected fake Docker invocation.' }
     $name = $args[[array]::IndexOf($args, '--name') + 1]
+    if ($name -like "*-broker") { return }
     $configMount = @($args | Where-Object { $_ -like 'type=bind,*target=/config' })[0]
     $configDir = ($configMount -replace '^type=bind,source=', '' -replace ',target=/config$', '')
     if ($name -like '*-version') { Write-Output '2026.10.4'; return }
     if ($name -like '*-configuration') {
         if ($global:AlarmMeshToolingFault -eq 'configuration') { Write-Output 'SIMULATED configuration failure'; $global:LASTEXITCODE = 42 }
+        return
+    }
+    if ($name -like '*-drivers') {
+        $context = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $configDir 'run-context.json') | ConvertFrom-Json
+        $driver = @{ result='PASS'; actual_ha_version='2026.10.4'; requested_ha_version='2026.10.4'; run_id=$context.run_id; git_commit=$context.git_commit; scenarios=@{} }
+        foreach ($i in 1..14) { $driver.scenarios["driver-$i"] = 'PASS' }
+        if ($global:AlarmMeshToolingFault -eq 'drivers') { $driver.scenarios['driver-1'] = 'FAIL' }
+        [System.IO.File]::WriteAllText((Join-Path $configDir 'driver-result.json'), ($driver | ConvertTo-Json -Depth 5), $utf8)
         return
     }
     $context = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $configDir 'run-context.json') | ConvertFrom-Json
@@ -29,12 +38,12 @@ function docker {
         run_id = $context.run_id; git_commit = $context.git_commit; scenarios = [ordered]@{}
     }
     if ($global:AlarmMeshToolingFault -eq 'stale') { $technical.run_id = 'previous-run' }
-    foreach ($i in 1..17) { $technical.scenarios["scenario-$i"] = 'PASS' }
+    foreach ($i in 1..20) { $technical.scenarios["scenario-$i"] = 'PASS' }
     [System.IO.File]::WriteAllText((Join-Path $configDir 'technical-result.json'), ($technical | ConvertTo-Json -Depth 5), $utf8)
 }
 
 try {
-    foreach ($fault in @('configuration', 'stale', 'cleanup')) {
+    foreach ($fault in @('configuration', 'stale', 'cleanup', 'drivers')) {
         $global:AlarmMeshToolingFault = $fault
         $path = Join-Path $testRoot "$fault.json"
         $failed = $false
@@ -46,6 +55,7 @@ try {
         if ($result.result -ne 'FAIL') { throw "Fault $fault was reported as success." }
         if ($fault -eq 'configuration' -and $result.configuration_check -ne 'FAIL') { throw 'Configuration failure lost.' }
         if ($fault -eq 'stale' -and $result.failed_phase -ne 'runtime') { throw 'Stale runtime report accepted.' }
+        if ($fault -eq 'drivers' -and ($result.failed_phase -ne 'drivers' -or $result.driver_checks.'driver-1' -ne 'FAIL')) { throw 'Failed driver assertion accepted or lost.' }
         if ($fault -eq 'cleanup' -and $result.cleanup -ne 'FAIL') { throw 'Cleanup failure lost.' }
     }
     $rejected = $false
@@ -53,7 +63,7 @@ try {
         & (Join-Path $repoRoot 'dev/mvp-acceptance/mvp-acceptance.ps1') -Action Check -ReportPath (Join-Path $testRoot 'stale.json') | Out-Null
     } catch { $rejected = $true }
     if (-not $rejected) { throw 'Existing output path was accepted.' }
-    Write-Output 'PowerShell tooling fault checks PASS (configuration, stale report, cleanup, existing output)'
+    Write-Output 'PowerShell tooling fault checks PASS (configuration, stale report, cleanup, driver assertion, existing output)'
 } finally {
     Remove-Item Function:docker
     Remove-Variable -Name AlarmMeshToolingFault,AlarmMeshToolingNetworkRunId -Scope Global -ErrorAction SilentlyContinue

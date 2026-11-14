@@ -1,4 +1,4 @@
-import { TEXT } from "./translations.js?v=20261113-linking-2";
+import { TEXT } from "./translations.js?v=20261114-broadcast-1";
 
 // Safe DOM construction: names, labels and registry data are always text nodes.
 const el = (tag, text, cls) => {
@@ -49,7 +49,7 @@ export class AlarmMeshPanel extends HTMLElement {
     this.unsubscribe?.()?.catch?.(() => {}); this.unsubscribe = null;
     this.connection?.removeEventListener("disconnected", this.onDisconnected);
     this.connection?.removeEventListener("ready", this.onReady);
-    this.connection = null;
+    this.connection = null; this.catalog = null; this.catalogError = false;
     this.data = null;
   }
   bindConnection() {
@@ -70,14 +70,26 @@ export class AlarmMeshPanel extends HTMLElement {
         this.data = data.available ? data : null;
         this.transport = data.available ? "ready" : "notLoaded";
         if (!data.available) this.closeDialog();
-        this.render();
+        if (!data.available || this.page !== "catalog" || !this.shadowRoot.querySelector(".catalog-filters")) this.render();
         if (this.detail && this.detail.kind !== "edit" && this.detail.kind !== "delete") this.renderDialog();
       }, { type: "alarmmesh/subscribe" }, { resubscribe: false });
       if (generation !== this.generation || !this.isConnected) unsubscribe()?.catch?.(() => {});
       else this.unsubscribe = unsubscribe;
     } catch { if (generation === this.generation) { this.transport = "error"; this.render(); } }
   }
-  go(page) { this.closeDialog(); this.page = page; this.render(); }
+  async go(page) {
+    this.closeDialog(); this.page = page; this.render();
+    if (page === "catalog" && !this.catalog && this._hass?.user?.is_admin) {
+      const connection = this.connection;
+      try {
+        const data = await this._hass.callWS({ type: "alarmmesh/catalog" });
+        if (this.isConnected && this.connection === connection && this._hass?.user?.is_admin && data?.entries) { this.catalog = data; this.render(); }
+      } catch { this.catalogError = true; this.render(); }
+    }
+  }
+  capabilityLabel(cap) {
+    return this.t[cap.status === "linkable" && !cap.controls.some(c => c.safe_stop) ? "activation_only" : cap.status] || this.t.not_confirmed;
+  }
   badge(result) {
     const state = result.smoke || result.status;
     const node = el("span", this.t[state] || this.t.unknown, `badge ${state === "SMOKE_REPORTED" ? "danger" : state === "NO_SMOKE_REPORTED" ? "clear" : "warning"}`);
@@ -92,7 +104,7 @@ export class AlarmMeshPanel extends HTMLElement {
   render() {
     if (!this.shadowRoot) return;
     const t = this.t;
-    const link = el("link"); link.rel = "stylesheet"; link.href = "/alarmmesh-assets/panel.css?v=20261113-linking-2";
+    const link = el("link"); link.rel = "stylesheet"; link.href = "/alarmmesh-assets/panel.css?v=20261114-broadcast-1";
     const shell = el("div", undefined, "shell");
     shell.classList.toggle("dark", Boolean(this._hass?.themes?.darkMode));
     const side = el("aside");
@@ -100,7 +112,7 @@ export class AlarmMeshPanel extends HTMLElement {
     const image = el("img"); image.src = "/alarmmesh-brand/icon.png"; image.alt = "";
     brand.append(image, el("strong", "AlarmMesh")); side.append(brand);
     const nav = el("nav"); nav.setAttribute("aria-label", "AlarmMesh");
-    for (const [page, symbol] of [["overview", "view-dashboard-outline"], ["devices", "smoke-detector"], ["rooms", "floor-plan"], ["groups", "select-group"]]) {
+    for (const [page, symbol] of [["overview", "view-dashboard-outline"], ["devices", "smoke-detector"], ["rooms", "floor-plan"], ["groups", "select-group"], ["catalog", "book-search-outline"]]) {
       const item = button(t[page], () => this.go(page), "nav-item"); item.prepend(icon(symbol));
       item.dataset.page = page;
       if (this.page === page) item.setAttribute("aria-current", "page");
@@ -123,6 +135,7 @@ export class AlarmMeshPanel extends HTMLElement {
     } else {
       const data = this.data;
       if (this.page === "overview") this.renderOverview(main);
+      if (this.page === "catalog") this.renderCatalog(main);
       if (this.page === "devices") {
         main.append(this.section(t.selected, button(t.choose, () => this.choose())));
         this.sourceList(main, data.sources);
@@ -188,8 +201,8 @@ export class AlarmMeshPanel extends HTMLElement {
     const list = el("div", undefined, "source-list");
     for (const source of sources) {
       const row = button("", () => this.openDialog({ kind: "source", id: source.entity_id }), "source");
-      const name = el("span", undefined, "source-name"); name.append(el("strong", source.name), el("small", [source.area_name || this.t.noRoom, source.model].filter(Boolean).join(" · ")));
-      if (source.capability) name.append(el("small", `${this.t[source.capability.origin]} · ${this.t[source.capability.status]}`));
+      const name = el("span", undefined, "source-name"); name.append(el("strong", source.name), el("small", [source.area_name || this.t.noRoom, source.manufacturer, source.model].filter(Boolean).join(" · ")));
+      if (source.capability) name.append(el("small", `${this.t[source.capability.origin]} · ${this.capabilityLabel(source.capability)}`));
       row.append(icon("smoke-detector"), name, this.badge(source), icon("chevron-right")); list.append(row);
     }
     parent.append(list);
@@ -229,15 +242,21 @@ export class AlarmMeshPanel extends HTMLElement {
       if (!source) { this.closeDialog(); return; }
       dialog.append(el("h2", source.name), this.badge(source));
       const props = el("dl");
-      for (const [label, value] of [[t.state, source.ha_state || t.MISSING], [t.entity, source.entity_id], [t.room, source.area_name || t.noRoom], [t.device, source.device_name], [t.manufacturer, source.manufacturer], [t.model, source.model]]) {
+      for (const [label, value] of [[t.state, source.ha_state || t.MISSING], [t.room, source.area_name || t.noRoom], [t.device, source.device_name], [t.manufacturer, source.manufacturer], [t.model, source.model]]) {
         props.append(el("dt", label), el("dd", value || t.unavailable));
       }
-      dialog.append(props, el("h3", t.membership));
+      dialog.append(props);
+      if (!source.capability) { const technical = el("details"); technical.append(el("summary", t.requirements), el("p", `${t.entity}: ${source.entity_id}`)); dialog.append(technical); }
       if (source.capability) {
         const cap = source.capability;
-        dialog.append(el("h3", t.linkTogether), el("p", `${t[cap.origin]} · ${t[cap.status]}`), el("p", t[cap.reason]), el("p", t.physicalNotTested, "muted"));
-        for (const control of cap.controls) dialog.append(el("p", `${t.proposedControl}: ${control.target}`));
+        dialog.append(el("h3", t.functions), el("p", `${t[cap.origin]} / ${this.capabilityLabel(cap)}`));
+        this.detectorDetails(dialog, source);
+        const limitations = el("details"); limitations.append(el("summary", t.requirements), el("p", t[cap.reason] || t.no_verified_profile), el("p", t.physicalNotTested, "muted"));
+        limitations.append(el("p", `${t.entity}: ${source.entity_id}`));
+        for (const control of cap.controls) limitations.append(el("p", `${t.proposedControl}: ${control.target}`));
+        dialog.append(limitations);
       }
+      dialog.append(el("h3", t.membership));
       if (!source.groups.length) dialog.append(el("p", t.noGroups));
       for (const group of this.data.groups.filter(g => source.groups.includes(g.id))) dialog.append(button(group.name, () => this.openDialog({ kind: "group", id: group.id })));
       const info = button("Home Assistant", () => {
@@ -302,12 +321,15 @@ export class AlarmMeshPanel extends HTMLElement {
       const oldBinding = group?.linking?.bindings.find(b => b.source === source.entity_id);
       empty.selected = !oldBinding;
       for (const control of controls) {
-        const option = el("option", `${control.target} · ${t[control.profile]}`); option.value = control.target; option.disabled = cap.status !== "linkable"; option.selected = oldBinding?.target === control.target; select.append(option);
+        const option = el("option", `${control.target} · ${t[control.profile] || t.activation_only}`); option.value = control.target; option.disabled = cap.status !== "linkable"; option.selected = oldBinding?.target === control.target; select.append(option);
       }
       if (oldBinding && !controls.some(c => c.target === oldBinding.target && c.identity === oldBinding.identity)) {
         const stale = el("option", `${oldBinding.target} · ${t.control_changed}`); stale.value = oldBinding.target; stale.selected = true; select.append(stale);
       }
-      row.append(targetLabel, select, el("small", cap ? `${t[cap.origin]} · ${t[cap.status]}: ${t[cap.reason]}` : t.no_verified_profile));
+      row.append(targetLabel, select, el("small", cap ? `${t[cap.origin]} / ${this.capabilityLabel(cap)}` : t.no_verified_profile));
+      if (cap) { const requirements = el("details"); requirements.append(el("summary", t.requirements), el("p", t[cap.reason] || t.no_verified_profile)); row.append(requirements); }
+      row.hidden = !selected.has(source.entity_id);
+      for (const check of form.querySelectorAll('input[name="member"]')) if (check.value === source.entity_id) check.addEventListener("change", () => { row.hidden = !check.checked; });
       linkingSection.append(row); bindings.push({ source, select, controls, oldBinding });
     }
     form.append(linkingSection);
@@ -353,6 +375,64 @@ export class AlarmMeshPanel extends HTMLElement {
       save.disabled = false;
     });
     dialog.append(form);
+  }
+  detectorDetails(parent, source) {
+    const t = this.t, details = source.capability.details || {};
+    const table = el("dl", undefined, "diagnostics");
+    const add = (label, value) => table.append(el("dt", label), el("dd", value));
+    add(t.detectorType, source.capability.kind ? t[source.capability.kind === "smoke" ? "kind_smoke" : source.capability.kind] : t.genericSmoke);
+    add(t.sourceAvailability, source.ha_state === "on" || source.ha_state === "off" ? t.usableValue : t.unavailable);
+    add(t.controlAvailability, source.capability.controls.length ? t.usableValue : t.unavailable);
+    add(t.firmware, details.firmware || t.unavailable);
+    if (!(details.values || []).length) add(t.additionalInfo, t.unavailable);
+    for (const value of details.values || []) {
+      const cell = el("dd", value.value === null ? t.unavailable : `${t[value.value] || value.value}${value.unit ? " " + value.unit : ""}`);
+      if (value.changed_at) cell.append(el("small", `${t.valueChanged}: ${new Date(value.changed_at).toLocaleString(this._hass.language)}`));
+      table.append(el("dt", t[value.key] || value.key), cell);
+    }
+    parent.append(table, el("small", t.contactUnknown, "muted"));
+  }
+  renderCatalog(parent) {
+    const t = this.t;
+    if (!this.catalog) { parent.append(el("p", this.catalogError ? t.error : t.loading, "notice")); return; }
+    const catalog = this.catalog;
+    parent.append(el("p", `${catalog.definitions} ${t.definitions} / ${catalog.website_rows} ${t.catalogModels} / ${catalog.checked}`, "muted"), el("p", t.catalogNote, "notice"));
+    const filters = el("div", undefined, "catalog-filters");
+    const search = el("input"); search.type = "search"; search.placeholder = t.searchCatalog; search.setAttribute("aria-label", t.searchCatalog); search.value = this.catalogSearch || "";
+    const provider = el("select"); provider.setAttribute("aria-label", t.provider);
+    for (const [value, label] of [["zigbee2mqtt", "Zigbee2MQTT"], ["zha", "ZHA"]]) { const option = el("option", label); option.value = value; provider.append(option); }
+    [...provider.options].find(option => option.value === (this.catalogProvider || "zigbee2mqtt")).selected = true;
+    const capability = el("select"); capability.setAttribute("aria-label", t.functions);
+    for (const [value, label] of [["all", t.allModels], ["implemented", t.externalActivation], ["stop", t.automaticStop], ["detection", t.smokeSource], ["unconfirmed", t.not_confirmed]]) { const option = el("option", label); option.value = value; capability.append(option); }
+    [...capability.options].find(option => option.value === (this.catalogCapability || "all")).selected = true;
+    const results = el("div", undefined, "catalog-results");
+    const count = el("p"); count.setAttribute("role", "status");
+    const update = () => {
+      this.catalogSearch = search.value; this.catalogProvider = provider.value; this.catalogCapability = capability.value;
+      results.replaceChildren(); let shown = 0;
+      for (const entry of catalog.entries) {
+        for (const variant of [{ vendor: entry.vendor, model: entry.model }, ...entry.aliases]) {
+        const review = variant.providers?.[provider.value] || entry.providers[provider.value];
+        const matches = capability.value === "all" || capability.value === "implemented" && review.activation === "implemented" || capability.value === "stop" && review.stop === "implemented" || capability.value === "detection" && review.detection !== "not_available" || capability.value === "unconfirmed" && [review.detection, review.activation].includes("unconfirmed");
+        if (!matches) continue;
+          if (!`${variant.vendor} ${variant.model} ${entry.model}`.toLocaleLowerCase().includes(search.value.toLocaleLowerCase().trim())) continue;
+          shown++;
+          const card = el("article", undefined, "card catalog-card");
+          card.append(el("h3", `${variant.vendor} ${variant.model}`), el("p", `${t[provider.value]} / ${t[entry.kind === "smoke" ? "kind_smoke" : entry.kind] || entry.kind}`));
+          if (variant.model !== entry.model) card.append(el("small", `${t.documentedVariant}: ${entry.vendor} ${entry.model}`, "muted"));
+          const info = el("dl");
+          for (const [label, value] of [[t.smokeSource, review.detection], [t.externalActivation, review.activation], [t.automaticStop, review.stop], [t.selfTestStatus, review.self_test]]) info.append(el("dt", label), el("dd", t[value] || value));
+          const evidence = el("details"); evidence.append(el("summary", t.requirements), el("p", t.sourceReviewEnglish));
+          for (const note of [...review.requirements, ...review.gaps]) evidence.append(el("p", note));
+          evidence.append(el("p", `${t.additionalInfo}: ${review.information.join(", ") || t.unavailable}`));
+          for (const url of review.sources) { const link = el("a", url.includes("zigbee2mqtt.io") ? "Zigbee2MQTT" : url.split("/").slice(-1)[0]); link.href = url; link.target = "_blank"; link.rel = "noopener noreferrer"; evidence.append(link); }
+          card.append(info, evidence); results.append(card);
+        }
+      }
+      count.textContent = `${shown} / ${catalog.website_rows} ${t.catalogModels}`;
+    };
+    search.addEventListener("input", update); provider.addEventListener("change", update); capability.addEventListener("change", update);
+    filters.append(search, provider, capability); parent.append(filters, count, results); update();
   }
   async mutate(payload, error) {
     try {

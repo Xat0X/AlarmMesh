@@ -36,6 +36,9 @@ SCENARIOS = (
     "verified_linking_profiles",
     "mixed_linking_and_failed_target",
     "linking_stop_and_reload_cleanup",
+    "catalog_profiles_and_diagnostics",
+    "catalog_adapter_dispatch",
+    "catalog_permission_reload_and_retired_runtime",
 )
 SCOPE = "technische controle met simulatiebronnen, geen fysieke apparaatvalidatie"
 
@@ -506,6 +509,167 @@ async def main(requested: str, config_dir: Path) -> int:
         )
         old_engine.changed()
         require(len(requests) == 4, "Closed executor dispatched")
+        passed(current)
+        current = "catalog_profiles_and_diagnostics"
+        from custom_components.alarmmesh_simulation.catalog_fixture import (
+            async_setup_catalog,
+        )
+
+        from custom_components.alarmmesh.catalog import CATALOG, validate_catalog
+
+        validate_catalog(CATALOG)
+        require(
+            CATALOG["definitions"] == 52 and CATALOG["website_rows"] == 67,
+            "Catalog coverage",
+        )
+        # Same explicit registry/action fixture, expanded; still no driver claim.
+        await async_setup_catalog(hass, simulation["result"])
+        fixtures = hass.data["alarmmesh_simulation"]["fixtures"]
+        requests = hass.data["alarmmesh_simulation"]["calls"]
+        selected = [item["source"] for item in fixtures.values()]
+        hass.config_entries.async_update_entry(
+            entry, options={CONF_SOURCE_ENTITY_IDS: selected}
+        )
+        require(
+            await hass.config_entries.async_setup(entry.entry_id), "Catalog entry setup"
+        )
+        await settle()
+        panel = entry.runtime_data.panel
+        caps = panel.linking.capabilities
+        expected = {
+            "e": "heiman_activation_mqtt",
+            "f": "basic_ias_zha",
+            "h": "bosch_twinguard_mqtt",
+            "i": "bosch_bsd_mqtt",
+            "k": "ias_mqtt",
+        }
+        for name, profile in expected.items():
+            info = caps.describe(fixtures[name]["source"])
+            require(
+                info["status"] == "linkable"
+                and info["controls"][0]["profile"] == profile,
+                "Catalog profile mismatch",
+            )
+            require(
+                info["details"]["recent_contact"] is None
+                and any(
+                    v["key"] == "battery" and v["value"] == 72
+                    for v in info["details"]["values"]
+                ),
+                "Cached diagnostics mismatch",
+            )
+        require(
+            caps.describe(fixtures["g"]["source"])["status"] == "setting_needed",
+            "ZHA prerequisite ignored",
+        )
+        require(
+            caps.describe(fixtures["j"]["source"])["status"] == "setting_needed",
+            "Remote permission ignored",
+        )
+        require(not requests, "Discovery caused action")
+        passed(current)
+
+        current = "catalog_adapter_dispatch"
+        for name in "gj":
+            hass.states.async_set(f"input_boolean.catalog_{name}_permission", "on")
+        hass.states.async_set("input_boolean.catalog_c_failure", "on")
+        await settle()
+        names = "cefghijk"
+        targets = []
+        for name in names:
+            control = caps.describe(fixtures[name]["source"])["controls"][0]
+            targets.append(
+                {
+                    key: control[key]
+                    for key in ("source", "target", "profile", "identity")
+                }
+            )
+        await panel.groups.async_mutate(
+            {
+                "operation": "create",
+                "revision": panel.groups.revision,
+                "name": "Expanded simulated adapters",
+                "members": selected,
+                "linking": {"enabled": True, "bindings": targets},
+                "confirmed": True,
+            },
+            tuple(selected),
+        )
+        panel.linking.changed()
+        hass.states.async_set("input_boolean.catalog_m_smoke", "on")
+        await settle()
+        require(len(requests) == len(names), "Adapter requests missing or duplicated")
+        observed = {request["target"]: request["data"] for request in requests}
+        for name in "fk":
+            require(
+                observed[fixtures[name]["target"]]["duration"] == 60, "IAS duration"
+            )
+        require(
+            observed[fixtures["k"]["target"]]["tone"] == "burglar", "IAS explicit tone"
+        )
+        require(
+            observed[fixtures["h"]["target"]]["option"] == "fire", "Bosch fire option"
+        )
+        require(
+            observed[fixtures["i"]["target"]]["tone"] == "smoke"
+            and "duration" not in observed[fixtures["i"]["target"]],
+            "Bosch siren contract",
+        )
+        require(
+            {r["status"] for r in panel.linking.records.values()}
+            == {"sent_no_auto_stop", "failed"},
+            "Target failure not isolated",
+        )
+        passed(current)
+
+        current = "catalog_permission_reload_and_retired_runtime"
+        old_engine = panel.linking
+        registry.async_update_entity(fixtures["m"]["source"], device_class="opening")
+        hass.states.async_set("input_boolean.catalog_m_smoke", "off")
+        await settle()
+        require(
+            fixtures["m"]["source"] in old_engine.active,
+            "Identity loss falsely released smoke",
+        )
+        registry.async_update_entity(fixtures["m"]["source"], device_class="smoke")
+        await settle()
+        require(
+            fixtures["m"]["source"] not in old_engine.active,
+            "Valid explicit off failed to release",
+        )
+        registry.async_update_entity(fixtures["m"]["source"], device_class="opening")
+        hass.states.async_set("input_boolean.catalog_m_smoke", "on")
+        await settle()
+        require(
+            fixtures["m"]["source"] not in old_engine.active,
+            "Non-smoke replacement started an incident",
+        )
+        hass.states.async_set("input_boolean.catalog_m_smoke", "off")
+        registry.async_update_entity(fixtures["m"]["source"], device_class="smoke")
+        await settle()
+        require(len(requests) == len(names), "Activation-only unsafe stop")
+        hass.states.async_set("input_boolean.catalog_j_permission", "off")
+        await settle()
+        require(
+            caps.describe(fixtures["j"]["source"])["status"] == "setting_needed",
+            "Permission not rechecked",
+        )
+        require(
+            await hass.config_entries.async_reload(entry.entry_id),
+            "Catalog reload failed",
+        )
+        await settle()
+        old_engine.changed()
+        require(
+            old_engine._closed
+            and len(requests) == len(names)
+            and identity() == original_identity,
+            "Retired catalog engine or identity leak",
+        )
+        require(
+            await hass.config_entries.async_unload(entry.entry_id),
+            "Catalog unload failed",
+        )
         passed(current)
         report["result"] = "PASS"
     except Exception as exc:

@@ -12,6 +12,7 @@ from homeassistant.helpers import area_registry as ar
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 
+from .catalog import CATALOG
 from .groups import GroupError, GroupStore
 from .linking_runtime import LinkingRuntime
 from .runtime import AlarmMeshConfigEntry
@@ -74,7 +75,7 @@ class PanelController:
             "alarmmesh-panel",
             sidebar_title="AlarmMesh",
             sidebar_icon="mdi:smoke-detector",
-            module_url=f"{ASSET_URL}/panel.js?v=20261113-linking-2",
+            module_url=f"{ASSET_URL}/panel.js?v=20261114-broadcast-1",
             require_admin=True,
         )
         self.hub.controller = self
@@ -135,7 +136,7 @@ class PanelController:
                 "ha_state": state.state if state else None,
                 "area_id": room_id,
                 "area_name": area.name if area else None,
-                "model": device.model if device else None,
+                "model": (device.model_id or device.model) if device else None,
                 "manufacturer": device.manufacturer if device else None,
                 "device_name": (device.name_by_user or device.name) if device else None,
                 "groups": [
@@ -214,6 +215,7 @@ async def async_prepare(hass: HomeAssistant) -> PanelHub:
         hass.data[DATA_HUB] = PanelHub()
         websocket_api.async_register_command(hass, ws_subscribe)
         websocket_api.async_register_command(hass, ws_group)
+        websocket_api.async_register_command(hass, ws_catalog)
     return hass.data[DATA_HUB]
 
 
@@ -267,3 +269,11 @@ async def ws_group(hass, connection, msg):
     connection.send_result(msg["id"], {"revision": controller.groups.revision})
     controller.linking.changed()
     hub.publish()
+
+
+@websocket_api.websocket_command({vol.Required("type"): "alarmmesh/catalog"})
+@websocket_api.require_admin
+@callback
+def ws_catalog(hass, connection, msg):
+    """Static offline evidence, fetched once; never grants execution authority."""
+    connection.send_result(msg["id"], CATALOG)
