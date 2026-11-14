@@ -24,7 +24,7 @@ def require(condition: bool, message: str) -> None:
         raise AssertionError(message)
 
 
-async def run(phase: str, requested: str) -> int:
+async def run(phase: str, requested: str, catalog_baseline: bool = False) -> int:
     root = Path("/evidence")
     report = {
         "phase": phase,
@@ -52,8 +52,15 @@ async def run(phase: str, requested: str) -> int:
         from custom_components.alarmmesh.const import CONF_SOURCE_ENTITY_IDS, DOMAIN
 
         registry = er.async_get(hass)
+        sources = (
+            [hass.data["alarmmesh_simulation"]["fixtures"][n]["source"] for n in "ab"]
+            if catalog_baseline
+            else SOURCES
+        )
 
         async def helper(name: str, on: bool) -> None:
+            if catalog_baseline:
+                name = name.replace("mvp_", "catalog_", 1)
             await hass.services.async_call(
                 "input_boolean",
                 "turn_on" if on else "turn_off",
@@ -101,7 +108,7 @@ async def run(phase: str, requested: str) -> int:
                 DOMAIN, context={"source": SOURCE_USER}
             )
             result = await hass.config_entries.flow.async_configure(
-                flow["flow_id"], {CONF_SOURCE_ENTITY_IDS: SOURCES}
+                flow["flow_id"], {CONF_SOURCE_ENTITY_IDS: sources}
             )
             require(result["type"] is FlowResultType.CREATE_ENTRY, "Config flow failed")
             await hass.async_block_till_done()
@@ -109,7 +116,14 @@ async def run(phase: str, requested: str) -> int:
             require(entry.state is ConfigEntryState.LOADED, "AlarmMesh setup failed")
             return entry
 
-        if phase == "seed":
+        if phase == "fresh":
+            require(
+                not hass.config_entries.async_entries(DOMAIN), "Fresh config reused"
+            )
+            entry = await create()
+            expect(entry, "off", "complete")
+            report["checks"].append("fresh_package_real_config_flow_and_two_overviews")
+        elif phase == "seed":
             require(
                 not hass.config_entries.async_entries(DOMAIN),
                 "Seed configuration already has AlarmMesh",
@@ -143,7 +157,16 @@ async def run(phase: str, requested: str) -> int:
             )
             report["checks"].append("seed_selection_custom_identity_and_on_incomplete")
         else:
-            checkpoint = json.loads((root / "checkpoint.json").read_text("utf-8"))
+            checkpoint = json.loads(
+                (
+                    root
+                    / (
+                        "features-checkpoint.json"
+                        if phase == "restart"
+                        else "checkpoint.json"
+                    )
+                ).read_text("utf-8")
+            )
             entries = hass.config_entries.async_entries(DOMAIN)
             require(len(entries) == 1, "Saved configuration missing or duplicated")
             entry = entries[0]
@@ -162,12 +185,20 @@ async def run(phase: str, requested: str) -> int:
             report["checks"].append(
                 "saved_selection_identity_and_actual_helper_states_after_new_process"
             )
-            await helper("mvp_a_smoke", False)
-            expect(entry, "unavailable", "incomplete")
-            await helper("mvp_b_unreachable", False)
-            expect(entry, "off", "complete")
-            report["checks"].append(
-                "current_source_changes_not_cached_alarmmesh_outcome"
+            if phase != "restart":
+                await helper("mvp_a_smoke", False)
+                expect(entry, "unavailable", "incomplete")
+                await helper("mvp_b_unreachable", False)
+                expect(entry, "off", "complete")
+                report["checks"].append(
+                    "current_source_changes_not_cached_alarmmesh_outcome"
+                )
+
+        if catalog_baseline:
+            from check_update_features import check_features
+
+            await check_features(
+                hass, entry, phase, root, helper, require, report["checks"]
             )
 
         # Exercise the HA local-brand loader, without an account, token, CDN or UI.
@@ -200,7 +231,7 @@ async def run(phase: str, requested: str) -> int:
             "ha_brand_loader_reads_six_exact_files_technical_not_visual"
         )
 
-        if phase == "update":
+        if phase == "restart" or (phase == "update" and not catalog_baseline):
             runtime = entry.runtime_data
             require(
                 await hass.config_entries.async_remove(entry.entry_id),
@@ -231,6 +262,21 @@ async def run(phase: str, requested: str) -> int:
             report["checks"].append(
                 "remove_detaches_old_runtime_and_readd_has_exactly_two_current_overviews"
             )
+            if catalog_baseline:
+                from check_update_features import check_corrupt_storage
+
+                await check_corrupt_storage(hass, new_entry, require, report["checks"])
+        if phase == "fresh":
+            runtime = entry.runtime_data
+            require(
+                await hass.config_entries.async_unload(entry.entry_id),
+                "Fresh unload failed",
+            )
+            require(
+                not runtime._listeners and runtime.panel.linking._closed,
+                "Fresh unload leak",
+            )
+            report["checks"].append("fresh_package_unloads_without_subscriptions")
         if phase == "restore":
             report["checks"].append(
                 "stopped_file_snapshot_restored_checkpoint_then_normal_off_complete"
@@ -251,7 +297,7 @@ async def run(phase: str, requested: str) -> int:
                 (root / f"{phase}-shutdown.log").write_text(
                     traceback.format_exc(), encoding="utf-8"
                 )
-        (root / f"{phase}-result.json").write_text(
+        (root / f"phase-{phase}-result.json").write_text(
             json.dumps(report, indent=2), encoding="utf-8"
         )
     print(json.dumps(report))
@@ -260,9 +306,14 @@ async def run(phase: str, requested: str) -> int:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--phase", choices=("seed", "update", "restore"), required=True)
+    parser.add_argument(
+        "--phase",
+        choices=("seed", "update", "restart", "fresh", "restore"),
+        required=True,
+    )
+    parser.add_argument("--catalog-baseline", action="store_true")
     parser.add_argument(
         "--ha-version", choices=("2026.10.4", "2026.11.1"), required=True
     )
     args = parser.parse_args()
-    sys.exit(asyncio.run(run(args.phase, args.ha_version)))
+    sys.exit(asyncio.run(run(args.phase, args.ha_version, args.catalog_baseline)))

@@ -304,3 +304,344 @@ test("Bosch broadcast prerequisite is explained in both languages without writes
     assert.deepEqual(calls, []); panel.remove();
   }
 });
+
+
+function guidedGroupData() {
+  const data = linkedData();
+  const control = data.sources[1].capability.controls[0];
+  data.groups = [{ id: "guide-group", name: "Upstairs", members: data.sources.map(s => s.entity_id), unselected: [], result: data.result,
+    linking_status: "disabled", linking: { enabled: false, bindings: [{ source: control.source, target: control.target, profile: control.profile, identity: control.identity }] } }];
+  return data;
+}
+
+test("setup guide handles empty sources and only navigates to existing configuration", () => {
+  const { panel, root, transport, calls } = setup();
+  const data = normal(); data.sources = []; data.groups = []; data.rooms = []; data.usable = 0;
+  transport.callbacks.at(-1)(data);
+  assert.ok(root.querySelector(".setup-guide").open);
+  assert.equal(root.querySelectorAll(".setup-steps li").length, 3);
+  assert.ok(root.querySelector('[data-step="sources"]').textContent.includes("existing Home Assistant"));
+  root.querySelector('[data-step="groups"] button').click();
+  assert.equal(panel.page, "groups"); assert.deepEqual(calls, []); panel.remove();
+});
+
+test("group check explains off and activation-only without offering a sounder action", () => {
+  const { panel, root, transport, calls } = setup("nl");
+  transport.callbacks.at(-1)(guidedGroupData());
+  panel.openDialog({ kind: "group", id: "guide-group" });
+  const check = root.querySelector(".group-checks");
+  assert.ok(check.textContent.includes("Configuratiecontrole"));
+  assert.ok(check.querySelector('[data-check="disabled"]').textContent.includes("geen apparaat dat al klinkt"));
+  assert.ok(check.querySelector('[data-check="activation-only"]').textContent.includes("geen automatische stop"));
+  assert.ok(check.querySelector('[data-check="current"]').textContent.includes("Dit bevestigt niet"));
+  assert.equal(check.querySelectorAll("input,select,.confirm-linking").length, 0);
+  assert.deepEqual(calls, []); panel.remove();
+});
+
+test("group checks explain stale binding and live prerequisite recovery without a write", () => {
+  const { panel, root, transport, calls } = setup();
+  const data = guidedGroupData();
+  data.groups[0].linking.enabled = true; data.groups[0].linking_status = "review_needed";
+  data.sources[1].capability.status = "setting_needed";
+  data.sources[1].capability.reason = "bosch_broadcast_must_be_off";
+  transport.callbacks.at(-1)(data); panel.openDialog({ kind: "group", id: "guide-group" });
+  assert.ok(root.querySelector('[data-check="binding"]').textContent.includes("broadcast_alarms"));
+  assert.equal(root.querySelector('[data-check="current"]'), null);
+  const recovered = guidedGroupData(); recovered.groups[0].linking.enabled = true; recovered.groups[0].linking_status = "enabled";
+  transport.callbacks.at(-1)(recovered);
+  assert.equal(root.querySelector('[data-check="binding"]'), null);
+  assert.ok(root.querySelector('[data-check="current"]'));
+  assert.deepEqual(calls, []); panel.remove();
+});
+
+test("changed mapping identity is never described as current", () => {
+  const { panel, root, transport, calls } = setup(); const data = guidedGroupData();
+  data.groups[0].linking_status = "review_needed";
+  data.groups[0].linking.bindings[0].identity = "b".repeat(64);
+  transport.callbacks.at(-1)(data); panel.openDialog({ kind: "group", id: "guide-group" });
+  assert.ok(root.querySelector('[data-check="binding"]').textContent.includes("identity or capability changed"));
+  assert.equal(root.querySelector('[data-check="current"]'), null);
+  root.querySelector('[data-check="binding"] button').click();
+  assert.ok(root.querySelector("#group-name")); assert.deepEqual(calls, []); panel.remove();
+});
+
+test("organizer-only groups and missing selections get actionable explanations", () => {
+  const { panel, root, transport, calls } = setup("nl"); const data = guidedGroupData();
+  data.groups[0].linking.bindings = []; data.groups[0].members = [source.entity_id, "binary_sensor.removed"];
+  data.groups[0].unselected = ["binary_sensor.removed"];
+  data.sources[0].status = "UNREACHABLE";
+  transport.callbacks.at(-1)(data); panel.openDialog({ kind: "group", id: "guide-group" });
+  assert.ok(root.querySelector('[data-check="targets"]').textContent.includes("alleen rookbronnen"));
+  assert.ok(root.querySelector('[data-check="unselected"]'));
+  assert.ok(root.querySelector('[data-check="source"]'));
+  root.querySelector('[data-check="source"] button').click();
+  assert.ok(root.querySelector("dialog").textContent.includes("Detector A"));
+  assert.deepEqual(calls, []); panel.remove();
+});
+
+test("group check keeps active smoke and request failure distinct and closes on disconnect", () => {
+  const { panel, root, transport, calls } = setup(); const data = guidedGroupData();
+  data.sources[0].status = "SMOKE_REPORTED";
+  data.incident = { active_sources: [source.entity_id], targets: [{ source: data.sources[1].entity_id, target: data.groups[0].linking.bindings[0].target, status: "failed" }] };
+  transport.callbacks.at(-1)(data); panel.openDialog({ kind: "group", id: "guide-group" });
+  assert.ok(root.querySelector('[data-check="smoke"]').textContent.includes("currently reported"));
+  assert.ok(root.querySelector('[data-check="execution"]').textContent.includes("does not automatically retry"));
+  assert.deepEqual(calls, []); transport.event("disconnected");
+  assert.equal(root.querySelector(".group-checks"), null); assert.equal(root.querySelector(".setup-guide"), null); panel.remove();
+});
+
+function featureData() {
+  const data = linkedData();
+  data.automation = { settings: { revision: 0, enabled: false, recovery: false, recipients: [] }, recipients: [{ service: "mobile_app_simulated_phone", name: "SIMULATED phone" }], scripts: [{ entity_id: "script.simulated_start", identity: "c".repeat(64), name: "SIMULATED action" }], missing_recipients: [], episodes: [], manual_results: [], preview: { title: "AlarmMesh preview", message: "Example source and room" } };
+  data.sources[0].selftest = { available: true, reason: "selftest_supported", control: { source: source.entity_id, identity: "d".repeat(64) }, record: null };
+  data.sources[1].selftest = { available: false, reason: "selftest_unsupported", control: null, record: null };
+  return data;
+}
+
+test("notification settings require exact-recipient acknowledgement and preserve draft on pushes", async () => {
+  const { panel, root, calls, transport } = setup("nl");
+  transport.callbacks.at(-1)(featureData());
+  await panel.go("settings"); panel.openDialog({ kind: "settings" });
+  const form = root.querySelector("dialog form");
+  form.querySelector('[name="notifications-enabled"]').checked = true;
+  form.querySelector('[name="recipient"]').checked = true;
+  const update = featureData(); update.automation.settings.revision = 9;
+  transport.callbacks.at(-1)(update);
+  assert.equal(root.querySelector("dialog form"), form);
+  assert.equal(form.querySelector('[name="recipient"]').checked, true);
+  form.dispatchEvent(new Event("submit", { cancelable: true })); await tick();
+  assert.deepEqual(calls, []);
+  root.querySelector(".confirm-execute").click(); await tick();
+  assert.deepEqual(calls, []);
+  root.querySelector('[name="confirm-request"]').checked = true;
+  root.querySelector(".confirm-execute").click(); await tick();
+  assert.deepEqual(calls[0], { type: "alarmmesh/settings", revision: 0, notifications: { enabled: true, recovery: false, recipients: [{ service: "mobile_app_simulated_phone", enabled: true }] }, confirmed: true });
+  panel.remove();
+});
+
+test("empty notification selection and cancelling an explicit test make no request", async () => {
+  const { panel, root, calls, transport } = setup(); transport.callbacks.at(-1)(featureData());
+  panel.openDialog({ kind: "settings" });
+  const form = root.querySelector("dialog form"); form.querySelector('[name="notifications-enabled"]').checked = true;
+  form.dispatchEvent(new Event("submit", { cancelable: true })); await tick();
+  assert.ok(form.textContent.includes("at least one")); assert.deepEqual(calls, []);
+  [...form.querySelectorAll("button")].find(b => b.textContent === "Send test notification").click();
+  assert.ok(form.querySelector(".request-confirmation").textContent.includes("SIMULATED phone"));
+  [...form.querySelectorAll(".request-confirmation button")].find(b => b.textContent === "Cancel").click();
+  assert.equal(form.querySelector(".request-confirmation"), null); assert.deepEqual(calls, []); panel.remove();
+});
+
+test("explicit notification test names only the chosen server target and is not replayed", async () => {
+  const { panel, root, calls, transport } = setup(); transport.callbacks.at(-1)(featureData());
+  panel._hass.callWS = async payload => { calls.push(payload); return { status: "accepted" }; };
+  panel.openDialog({ kind: "test", actionKind: "notification", target: "mobile_app_simulated_phone", name: "SIMULATED phone" });
+  root.querySelector('[name="confirm-request"]').checked = true;
+  const execute = root.querySelector(".confirm-execute"); execute.click(); await tick();
+  assert.equal(calls.length, 1); assert.equal(calls[0].kind, "notification"); assert.equal(calls[0].target, "mobile_app_simulated_phone");
+  assert.equal(calls[0].confirmed, true); assert.match(calls[0].request_id, /^[a-f0-9]{32}$/);
+  transport.callbacks.at(-1)(featureData());
+  assert.equal(execute.disabled, true); assert.equal(calls.length, 1);
+  assert.ok(root.querySelector("dialog").textContent.includes("physical result unconfirmed")); panel.remove();
+});
+
+test("group origin subset and ordered script actions share the existing explicit preview", async () => {
+  const { panel, root, calls, transport } = setup(); transport.callbacks.at(-1)(featureData());
+  panel.openDialog({ kind: "edit", group: null });
+  const form = root.querySelector("dialog form"); form.querySelector("#group-name").value = "Simulation";
+  for (const member of form.querySelectorAll('[name="member"]')) member.checked = true;
+  form.querySelectorAll('[name="origin"]')[1].checked = false;
+  form.querySelector('[name="actions-enabled"]').checked = true;
+  [...form.querySelectorAll(".action-config button")].find(b => b.textContent === "Add script").click();
+  const select = form.querySelector('[data-phase="start"] select'); select.querySelector('option[value="script.simulated_start"]').selected = true; select.dispatchEvent(new Event("change"));
+  form.dispatchEvent(new Event("submit", { cancelable: true })); await tick();
+  assert.deepEqual(calls, []); assert.ok(form.querySelector(".link-confirmation").textContent.includes("SIMULATED action"));
+  assert.ok(form.querySelector(".link-confirmation").textContent.includes("own physical or external consequences"));
+  form.querySelector(".confirm-ack").checked = true; form.querySelector(".confirm-linking").click(); await tick();
+  assert.deepEqual(calls[0].origins, [source.entity_id]);
+  assert.deepEqual(calls[0].actions, { enabled: true, start: [{ entity_id: "script.simulated_start", identity: "c".repeat(64) }], recovery: [] });
+  assert.equal(calls[0].confirmed, true); panel.remove();
+});
+
+test("offline configuration draft survives without displaying cached current smoke", async () => {
+  const { panel, root, transport } = setup(); transport.callbacks.at(-1)(featureData());
+  panel.openDialog({ kind: "edit", group: null }); const form = root.querySelector("dialog form");
+  form.querySelector("#group-name").value = "Keep this draft";
+  transport.event("disconnected");
+  assert.equal(panel.data, null); assert.equal(root.querySelector(".hero"), null);
+  assert.equal(root.querySelector("dialog form"), form); assert.ok(root.querySelector(".offline-draft"));
+  assert.equal(form.querySelector('button[type="submit"]').disabled, true);
+  transport.event("ready"); await tick(); transport.callbacks.at(-1)(featureData());
+  assert.equal(root.querySelector("dialog form"), form); assert.equal(form.querySelector("#group-name").value, "Keep this draft");
+  assert.equal(form.querySelector('button[type="submit"]').disabled, false); panel.remove();
+});
+
+test("self-test is offered only with its own reviewed control and exact target confirmation", async () => {
+  const { panel, root, transport, calls } = setup(); const data = featureData(); transport.callbacks.at(-1)(data);
+  panel.openDialog({ kind: "source", id: data.sources[1].entity_id });
+  assert.ok(root.querySelector("dialog").textContent.includes("not a self-test"));
+  assert.ok(![...root.querySelectorAll("dialog button")].some(b => b.textContent === "Start built-in self-test"));
+  panel.openDialog({ kind: "source", id: data.sources[0].entity_id });
+  [...root.querySelectorAll("dialog button")].find(b => b.textContent === "Start built-in self-test").click();
+  assert.deepEqual(calls, []); assert.ok(root.querySelector("dialog").textContent.includes("Sound may occur"));
+  assert.ok(root.querySelector("dialog").textContent.includes(data.sources[0].name));
+  root.querySelector('[name="confirm-request"]').checked = true; root.querySelector(".confirm-execute").click(); await tick();
+  assert.equal(calls[0].kind, "selftest"); assert.equal(calls[0].target, data.sources[0].entity_id); assert.equal(calls[0].identity, "d".repeat(64)); panel.remove();
+});
+
+test("incident details distinguish current smoke, delivery failures and explicit device result", async () => {
+  const { panel, root, transport } = setup("nl"); const data = featureData();
+  data.sources[0].status = "SMOKE_REPORTED"; data.sources[0].ha_state = "on";
+  data.automation.episodes = [{ group_id: "notifications", id: "e".repeat(32), started: "2026-11-14T12:00:00Z", phase: "start", origins: [source.entity_id], receipts: { phone: { target: "mobile_app_simulated_phone", kind: "notification", phase: "start", status: "failed" } } }];
+  data.selftest = { source: source.entity_id, status: "outcome_unknown" };
+  transport.callbacks.at(-1)(data); await panel.go("incidents");
+  const text = root.querySelector("main").textContent;
+  assert.ok(text.includes("Rook gemeld")); assert.ok(text.includes("Aanvraag mislukt")); assert.ok(text.includes("geen geslaagde test"));
+  assert.ok(text.includes("Actuele rookmeldingen staan los")); panel.remove();
+});
+
+test("stored changed sounder identity is retained until explicitly reselected", async () => {
+  const { panel, root, transport, calls } = setup(); const data = guidedGroupData();
+  data.groups[0].linking.bindings[0].identity = "b".repeat(64);
+  transport.callbacks.at(-1)(data); panel.openDialog({ kind: "edit", group: data.groups[0] });
+  root.querySelector("dialog form").dispatchEvent(new Event("submit", { cancelable: true })); await tick();
+  assert.equal(calls[0].linking.bindings[0].identity, "b".repeat(64));
+  panel.remove();
+});
+
+test("an unselected stored sounder is not silently deleted by an organizer edit", async () => {
+  const { panel, root, transport, calls } = setup(); const data = guidedGroupData();
+  const targetSource = data.sources[1].entity_id, old = structuredClone(data.groups[0].linking.bindings);
+  data.sources = data.sources.slice(0, 1); data.groups[0].unselected = [targetSource];
+  transport.callbacks.at(-1)(data); panel.openDialog({ kind: "edit", group: data.groups[0] });
+  root.querySelector("#group-name").value = "Keep stale choices";
+  root.querySelector("dialog form").dispatchEvent(new Event("submit", { cancelable: true })); await tick();
+  assert.deepEqual(calls[0].linking.bindings, old); panel.remove();
+});
+
+test("notification confirmation freezes its exact selection until cancelled", async () => {
+  const { panel, root, transport, calls } = setup(); transport.callbacks.at(-1)(featureData());
+  panel.openDialog({ kind: "settings" }); const form = root.querySelector("dialog form");
+  form.querySelector('[name="notifications-enabled"]').checked = true;
+  const recipient = form.querySelector('[name="recipient"]'); recipient.checked = true;
+  form.dispatchEvent(new Event("submit", { cancelable: true })); await tick();
+  assert.equal(recipient.disabled, true);
+  const cancel = [...form.querySelectorAll(".request-confirmation button")].find(b => b.textContent === "Cancel");
+  cancel.click(); assert.equal(recipient.disabled, false); assert.equal(recipient.checked, true);
+  assert.deepEqual(calls, []); panel.remove();
+});
+
+test("group confirmation locks script editing and cannot dispatch while disconnected", async () => {
+  const { panel, root, transport, calls } = setup(); const data = featureData();
+  transport.callbacks.at(-1)(data); panel.openDialog({ kind: "edit", group: null });
+  const form = root.querySelector("dialog form"); form.querySelector("#group-name").value = "Preview";
+  for (const member of form.querySelectorAll('[name="member"]')) member.checked = true;
+  form.querySelector('[name="link-enabled"]').checked = true;
+  const target = form.querySelectorAll('[name="link-target"]')[1]; target.options[1].selected = true;
+  form.dispatchEvent(new Event("submit", { cancelable: true })); await tick();
+  const add = [...form.querySelectorAll(".action-config button")].find(b => b.textContent === "Add script");
+  assert.equal(add.disabled, true);
+  form.querySelector(".confirm-ack").checked = true;
+  transport.event("disconnected");
+  const confirm = form.querySelector(".confirm-linking"); assert.equal(confirm.disabled, true);
+  confirm.dispatchEvent(new Event("click")); await tick(); assert.deepEqual(calls, []);
+  transport.event("ready"); await tick(); transport.callbacks.at(-1)(data);
+  assert.equal(add.disabled, true); assert.equal(form.querySelector('button[type="submit"]').disabled, true);
+  assert.equal(confirm.disabled, false);
+  [...form.querySelectorAll(".link-confirmation button")].find(b => b.textContent === "Back").click();
+  assert.equal(add.disabled, false); panel.remove();
+});
+
+test("changed script identity is visible and cannot be tested as the stored script", () => {
+  const { panel, root, transport, calls } = setup(); const data = featureData();
+  const group = { ...guidedGroupData().groups[0], actions: { enabled: false, start: [{entity_id: "script.simulated_start", identity: "a".repeat(64)}], recovery: [] } };
+  transport.callbacks.at(-1)(data); panel.openDialog({kind: "edit", group});
+  const row = root.querySelector(".action-row"), select = row.querySelector("select");
+  assert.ok(select.selectedOptions?.[0]?.textContent.includes("changed") || [...select.options].find(o => o.selected)?.textContent.includes("changed"));
+  assert.equal([...row.querySelectorAll("button")].find(b => b.textContent === "Test this script").disabled, true);
+  assert.deepEqual(calls, []); panel.remove();
+});
+
+test("self-test confirmation follows only its own request's live result", async () => {
+  const { panel, root, transport } = setup(); transport.callbacks.at(-1)(featureData()); let request;
+  panel._hass.callWS = async payload => { request = payload.request_id; return { status: "request_sent" }; };
+  panel.openDialog({kind: "test", actionKind: "selftest", target: source.entity_id, name: "SIMULATED A", identity: "d".repeat(64)});
+  root.querySelector('[name="confirm-request"]').checked = true; root.querySelector(".confirm-execute").click(); await tick();
+  const update = featureData(); update.selftest = { request_id: request, status: "test_active", source: source.entity_id };
+  transport.callbacks.at(-1)(update);
+  assert.ok(root.querySelector(".request-confirmation").textContent.includes("test is active"));
+  update.selftest.status = "device_success"; transport.callbacks.at(-1)(update);
+  assert.ok(root.querySelector(".request-confirmation").textContent.includes("explicitly reports success"));
+  update.selftest = { ...update.selftest, request_id: "f".repeat(32), status: "failed" }; transport.callbacks.at(-1)(update);
+  assert.ok(root.querySelector(".request-confirmation").textContent.includes("explicitly reports success")); panel.remove();
+});
+
+test("scripts can move both ways and the reviewed configuration names its origins", async () => {
+  const { panel, root, transport, calls } = setup(); const data = featureData();
+  data.automation.scripts.push({entity_id: "script.simulated_second", identity: "e".repeat(64), name: "SIMULATED second"});
+  transport.callbacks.at(-1)(data); panel.openDialog({kind: "edit", group: null});
+  const form = root.querySelector("dialog form"); form.querySelector("#group-name").value = "Ordered scripts";
+  form.querySelector('[name="member"]').checked = true; form.querySelector('[name="actions-enabled"]').checked = true;
+  for (const id of ["script.simulated_start", "script.simulated_second"]) {
+    [...form.querySelectorAll(".action-config button")].find(b => b.textContent === "Add script").click();
+    const select = [...form.querySelectorAll('[data-phase="start"] select')].at(-1);
+    select.querySelector(`option[value="${id}"]`).selected = true; select.dispatchEvent(new Event("change"));
+  }
+  const first = form.querySelector(".action-row");
+  assert.equal([...first.querySelectorAll("button")].find(b => b.textContent === "Move up").disabled, true);
+  [...first.querySelectorAll("button")].find(b => b.textContent === "Move down").click();
+  const rows = form.querySelectorAll(".action-row");
+  assert.equal(rows[0].querySelector("select").value, "script.simulated_second");
+  assert.equal(rows[1].querySelector("select").value, "script.simulated_start");
+  form.dispatchEvent(new Event("submit", {cancelable: true})); await tick();
+  assert.ok(form.querySelector(".link-confirmation").textContent.includes("Detector A"));
+  form.querySelector(".confirm-ack").checked = true; form.querySelector(".confirm-linking").click(); await tick();
+  assert.deepEqual(calls[0].actions.start.map(s => s.entity_id), ["script.simulated_second", "script.simulated_start"]);
+  panel.remove();
+});
+
+test("default dialog warning and danger colors meet normal-text contrast in each theme", async () => {
+  const css = await readFile(new URL("../../custom_components/alarmmesh/frontend/panel.css", import.meta.url), "utf8");
+  const lum = hex => hex.match(/../g).map(c => parseInt(c,16)/255).map(c => c <= .04045 ? c/12.92 : ((c+.055)/1.055)**2.4).reduce((s,c,i) => s+c*[.2126,.7152,.0722][i],0);
+  for (const [selector,background] of [["dialog", "ffffff"],["dialog.dark", "172736"]]) {
+    const rule = [...css.matchAll(/(dialog(?:\.dark)?)\{([^}]+)\}/g)].filter(m => m[1] === selector).at(-1)[2];
+    for (const key of ["warn","alarm"]) {
+      const color = rule.match(new RegExp(`--${key}:#([a-f0-9]{6})`))[1];
+      const [low,high] = [lum(color),lum(background)].sort((a,b) => a-b);
+      assert.ok((high+.05)/(low+.05) >= 4.5, `${selector} ${key} normal-text contrast`);
+    }
+    const {panel,root}=setup(); panel.hass={...panel._hass,themes:{darkMode:selector.includes("dark")}};
+    panel.openDialog({kind:"settings"}); assert.equal(root.querySelector("dialog").classList.contains("dark"),selector.includes("dark")); panel.remove();
+  }
+});
+
+test("link-only incident details name groups and distinguish uncleared unknown origins", () => {
+  const {panel,root,transport}=setup(); const data=guidedGroupData();
+  data.groups[0].linking.enabled=true;
+  data.sources[0].status="UNREACHABLE"; data.sources[0].ha_state="unavailable";
+  data.incident={active_sources:[source.entity_id],targets:[]};
+  transport.callbacks.at(-1)(data); panel.go("incidents");
+  assert.ok(root.querySelector("main").textContent.includes("Upstairs"));
+  assert.ok(root.querySelector("main").textContent.includes("explicit no-smoke"));
+  assert.ok(root.querySelector("main").textContent.includes("Detector A"));
+  assert.equal(root.querySelector("main .badge.danger"),null);
+  panel.remove();
+});
+
+
+test("confirming after an unchecked attempt clears the obsolete validation warning", async () => {
+  const { panel, root, calls, transport } = setup();
+  transport.callbacks.at(-1)(featureData());
+  panel._hass.callWS = async payload => { calls.push(payload); return { status: "accepted" }; };
+  panel.openDialog({ kind: "test", actionKind: "script", target: "script.simulated_start", identity: "a".repeat(64), name: "SIMULATED start" });
+  const box = root.querySelector(".request-confirmation"), execute = box.querySelector(".confirm-execute");
+  execute.click(); await tick();
+  assert.ok(box.querySelector(".form-error").textContent.length > 0);
+  assert.equal(calls.length, 0);
+  box.querySelector('[name="confirm-request"]').checked = true;
+  execute.click(); await tick();
+  assert.equal(calls.length, 1);
+  assert.equal(box.querySelector(".form-error").textContent, "");
+  assert.ok(box.querySelector(".request-status").textContent.includes("accepted"));
+  assert.equal(execute.disabled, true);
+  panel.remove();
+});

@@ -16,7 +16,7 @@ page, then **Configure**. This is the original entity selector and backend
 validation. Saving changed options reloads the integration. Cancelling or invalid
 input leaves the saved selection unchanged. No second source selection is stored.
 
-## Four screens
+## Panel screens
 
 - **Overview** shows the shared current smoke result, usable/selected source
   counts, assigned room count, group count, attention items and room cards.
@@ -24,7 +24,7 @@ input leaves the saved selection unchanged. No second source selection is stored
 - **Detectors** lists only selected sources. Open a row for the real HA state,
   source entity, assigned area, known device/model/manufacturer and groups. The
   Home Assistant button opens HA's entity information. No model, battery level or
-  radio-contact time is guessed. Battery and floor values are currently omitted.
+  radio-contact time is guessed. Available cached diagnostics are shown when HA exposes them; missing data stays unavailable.
 - **Rooms** uses HA assignments, with entity assignment before device assignment.
   Only areas containing selected sources appear; others are under **No area**.
   Change assignments in HA, not in a second AlarmMesh room registry.
@@ -118,3 +118,48 @@ choices when checking/unchecking a member. Non-controllable detectors can remain
 smoke sources. Exact confirmation, actual control validation and existing source
 selection rules remain in force. Read the [device guide](device-compatibility.md)
 for model/provider conditions, reproducible evidence and the separate review URL.
+
+## Guided setup and group troubleshooting (local development)
+
+The Overview's **Set up and check / Instellen en controleren** disclosure leads
+to the existing source selector and group pages. Opening these steps changes no
+configuration. Organizing groups does not require enabling linked sounding.
+
+Open a group for a **Configuration check / Configuratiecontrole**. It distinguishes
+disabled linking, no assigned sounders, stale source references, unavailable or
+active smoke reports, changed mappings, model prerequisites, activation-only
+limits and recorded request failures. Buttons open the existing detector details
+or group form; there is no test, retry, mute or automatic enable action. Edits
+still require the original validation and explicit confirmation before saving.
+
+The check reads current pushed data and updates an open group detail. Existing
+unsaved edit forms remain untouched. Losing the connection closes the detail and
+clears current checks. Matching assignments do not prove that a device will sound
+or that smoke detection/radio communication is healthy. Disabling a group does
+not stop a sounder that is already active.
+
+
+## Incident features in the current working tree
+
+**Settings** now contains Companion recipients, per-recipient toggles, previews and
+separately confirmed test notifications. The compatibility catalog is accessible
+there. **Groups** adds explicit incident origins and ordered existing HA scripts
+for start/recovery, with exact configuration confirmation. **Incidents** separates
+current smoke, sounder requests, deliveries, scripts and device-test outcomes.
+Detector details offer a built-in test only for an actual reviewed control.
+
+Read the [incident guide and current evidence](incident-features.md) for supported
+models, limits, receipt retention and the separate simulation on port 8131.
+New automation defaults off. The existing guided setup/configuration checks above
+remain; a read-only navigation button never performs an action. Background pushes
+preserve forms; disconnect removes current status and disables submission while
+retaining configuration drafts. Visual acceptance of these new screens is open.
+
+Saved assignments that become unavailable or change identity are now retained and
+marked in the editor. Choose a current control explicitly to replace one, or
+remove it deliberately. Script ordering has Up/Down controls with contextual
+keyboard labels. A confirmation locks the reviewed choices until Back/Cancel;
+disconnect disables execution without losing the draft. Self-test confirmations
+follow only their own request's activity/result. Incident details also show groups
+and sources still awaiting explicit no-smoke values. See the
+[finishing review](finish-review.md) for current evidence and open visual checks.

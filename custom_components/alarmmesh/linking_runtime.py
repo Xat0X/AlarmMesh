@@ -33,6 +33,8 @@ class LinkingRuntime:
         self._observation_unsub = None
         self._semaphore = asyncio.Semaphore(8)
         self._last_snapshot = self.snapshot()
+        self.effects_changed = lambda: None
+        self.independent_test_source = lambda source: False
 
     def start(self):
         self._paused = False
@@ -69,6 +71,7 @@ class LinkingRuntime:
         if snapshot != self._last_snapshot and not self._closed and not self._paused:
             self._last_snapshot = deepcopy(snapshot)
             self.publish()
+            self.effects_changed()
 
     @callback
     def changed(self, *_args):
@@ -84,7 +87,10 @@ class LinkingRuntime:
             for source, status in self.runtime.source_statuses.items()
         }
         tests = {
-            source for source in statuses if self.capabilities.test_blocked(source)
+            source
+            for source in statuses
+            if self.capabilities.test_blocked(source)
+            and not self.independent_test_source(source)
         }
         was_active = bool(self.active)
         self.active = update_incidents(self.active, self.previous, statuses, tests)
@@ -95,7 +101,9 @@ class LinkingRuntime:
             origins.intersection_update(self.active)
         for group in self.groups.groups:
             if group["linking"]["enabled"]:
-                origins = self.active.intersection(group["members"])
+                origins = self.active.intersection(
+                    group.get("origins", group["members"])
+                )
                 for binding in group["linking"]["bindings"]:
                     if (attempted := self.attempted.get(binding["target"])) is not None:
                         attempted.update(origins)
@@ -112,6 +120,7 @@ class LinkingRuntime:
                 self.hass, self._run(), "AlarmMesh linked sounding"
             )
             self._task = None if task.done() else task
+        self.effects_changed()
 
     def _current(self, activation: Activation) -> Control | None:
         """Last gate immediately before dispatch, even after waiting for a slot."""
@@ -132,7 +141,10 @@ class LinkingRuntime:
         ):
             return None
         if not any(
-            not self.capabilities.test_blocked(origin)
+            (
+                not self.capabilities.test_blocked(origin)
+                or self.independent_test_source(origin)
+            )
             and not self.capabilities.source_identity_changed(origin)
             for origin in current.origins
         ):

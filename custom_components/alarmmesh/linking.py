@@ -39,7 +39,7 @@ def plan_activations(active: set[str], groups: list[dict]) -> tuple[Activation, 
         linking = group.get("linking", {})
         if not linking.get("enabled"):
             continue
-        origins = active.intersection(group["members"])
+        origins = active.intersection(group.get("origins", group["members"]))
         for binding in linking.get("bindings", ()):
             if not origins or binding["source"] in active:
                 continue

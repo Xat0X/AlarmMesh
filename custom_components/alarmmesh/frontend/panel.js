@@ -1,4 +1,4 @@
-import { TEXT } from "./translations.js?v=20261114-broadcast-1";
+import { TEXT } from "./translations.js?v=20261115-flows-1";
 
 // Safe DOM construction: names, labels and registry data are always text nodes.
 const el = (tag, text, cls) => {
@@ -29,7 +29,7 @@ export class AlarmMeshPanel extends HTMLElement {
     this.transport = "loading";
     this.generation = 0;
     this.detail = null;
-    this.onDisconnected = () => { this.generation++; this.unsubscribe?.()?.catch?.(() => {}); this.unsubscribe = null; this.data = null; this.transport = "offline"; this.closeDialog(); this.render(); };
+    this.onDisconnected = () => { this.generation++; this.unsubscribe?.()?.catch?.(() => {}); this.unsubscribe = null; this.data = null; this.transport = "offline"; this.offlineDraft(); this.render(); };
     this.onReady = () => this.subscribe();
   }
   set hass(value) {
@@ -42,7 +42,7 @@ export class AlarmMeshPanel extends HTMLElement {
   set narrow(value) { this._narrow = value; }
   set panel(value) { this._panel = value; }
   get t() { return TEXT[this._hass?.language?.startsWith("nl") ? "nl" : "en"]; }
-  connectedCallback() { if (this._hass) this.bindConnection(); this.render(); }
+  connectedCallback() { if (new URLSearchParams(window.location?.search || "").has("incident") || new URLSearchParams(window.location?.search || "").get("view") === "incidents") this.page = "incidents"; if (this._hass) this.bindConnection(); this.render(); }
   disconnectedCallback() { this.unbindConnection(); this.closeDialog(); }
   unbindConnection() {
     this.generation++;
@@ -69,9 +69,11 @@ export class AlarmMeshPanel extends HTMLElement {
         if (generation !== this.generation || !this.isConnected) return;
         this.data = data.available ? data : null;
         this.transport = data.available ? "ready" : "notLoaded";
-        if (!data.available) this.closeDialog();
+        if (!data.available) this.offlineDraft();
+        else if (this.shadowRoot.querySelector(".offline-draft")) { this.shadowRoot.querySelector(".offline-draft").remove(); for (const b of this.shadowRoot.querySelectorAll('dialog button[type="submit"],dialog .confirm-execute,dialog .confirm-linking')) if (!b.dataset.started && !b.dataset.confirmLocked) b.disabled = false; }
+        this.updateTestResult();
         if (!data.available || this.page !== "catalog" || !this.shadowRoot.querySelector(".catalog-filters")) this.render();
-        if (this.detail && this.detail.kind !== "edit" && this.detail.kind !== "delete") this.renderDialog();
+        if (this.detail && !["edit", "delete", "settings", "test"].includes(this.detail.kind)) this.renderDialog();
       }, { type: "alarmmesh/subscribe" }, { resubscribe: false });
       if (generation !== this.generation || !this.isConnected) unsubscribe()?.catch?.(() => {});
       else this.unsubscribe = unsubscribe;
@@ -103,8 +105,9 @@ export class AlarmMeshPanel extends HTMLElement {
   }
   render() {
     if (!this.shadowRoot) return;
+    this.shadowRoot.querySelector("dialog")?.classList.toggle("dark", Boolean(this._hass?.themes?.darkMode));
     const t = this.t;
-    const link = el("link"); link.rel = "stylesheet"; link.href = "/alarmmesh-assets/panel.css?v=20261114-broadcast-1";
+    const link = el("link"); link.rel = "stylesheet"; link.href = "/alarmmesh-assets/panel.css?v=20261115-flows-1";
     const shell = el("div", undefined, "shell");
     shell.classList.toggle("dark", Boolean(this._hass?.themes?.darkMode));
     const side = el("aside");
@@ -112,7 +115,7 @@ export class AlarmMeshPanel extends HTMLElement {
     const image = el("img"); image.src = "/alarmmesh-brand/icon.png"; image.alt = "";
     brand.append(image, el("strong", "AlarmMesh")); side.append(brand);
     const nav = el("nav"); nav.setAttribute("aria-label", "AlarmMesh");
-    for (const [page, symbol] of [["overview", "view-dashboard-outline"], ["devices", "smoke-detector"], ["rooms", "floor-plan"], ["groups", "select-group"], ["catalog", "book-search-outline"]]) {
+    for (const [page, symbol] of [["overview", "view-dashboard-outline"], ["devices", "smoke-detector"], ["rooms", "floor-plan"], ["groups", "select-group"], ["settings", "cog-outline"]]) {
       const item = button(t[page], () => this.go(page), "nav-item"); item.prepend(icon(symbol));
       item.dataset.page = page;
       if (this.page === page) item.setAttribute("aria-current", "page");
@@ -136,6 +139,8 @@ export class AlarmMeshPanel extends HTMLElement {
       const data = this.data;
       if (this.page === "overview") this.renderOverview(main);
       if (this.page === "catalog") this.renderCatalog(main);
+      if (this.page === "settings") this.renderSettings(main);
+      if (this.page === "incidents") this.renderIncidents(main);
       if (this.page === "devices") {
         main.append(this.section(t.selected, button(t.choose, () => this.choose())));
         this.sourceList(main, data.sources);
@@ -172,6 +177,7 @@ export class AlarmMeshPanel extends HTMLElement {
     const active = data.sources.filter(s => s.status === "SMOKE_REPORTED");
     for (const source of active) hero.append(button(`${t.alarmFrom}: ${source.name} · ${source.area_name || t.noRoom}`, () => this.openDialog({ kind: "source", id: source.entity_id }), "alarm-source"));
     main.append(hero);
+    hero.append(button(t.viewIncidents, () => this.go("incidents"), "button incident-link"));
     const stats = el("div", undefined, "stats");
     for (const [label, value, note] of [[t.sources, `${data.usable} / ${data.sources.length}`, t.usable], [t.rooms, data.rooms.filter(r => r.id).length, "Home Assistant"], [t.groups, data.groups.length, t.organized]]) {
       const stat = el("div", undefined, "stat"); stat.append(el("span", label), el("strong", value), el("small", note)); stats.append(stat);
@@ -193,9 +199,88 @@ export class AlarmMeshPanel extends HTMLElement {
     }
     const attention = data.sources.filter(s => !["SMOKE_REPORTED", "NO_SMOKE_REPORTED"].includes(s.status));
     if (attention.length) { main.append(this.section(t.attention)); this.sourceList(main, attention); }
+    this.renderSetupGuide(main);
     const allRooms = button("→", () => this.go("rooms"));
     allRooms.setAttribute("aria-label", t.rooms);
     main.append(this.section(t.rooms, allRooms)); this.roomCards(main, data.rooms);
+  }
+  renderSetupGuide(parent) {
+    const t = this.t, data = this.data;
+    const guide = el("details", undefined, "setup-guide");
+    guide.open = this.setupGuideOpen ?? (!data.sources.length || !data.groups.length);
+    guide.addEventListener("toggle", () => { this.setupGuideOpen = guide.open; });
+    guide.append(el("summary", t.setupTitle), el("p", t.setupNote));
+    const steps = el("ol", undefined, "setup-steps");
+    const add = (title, note, label, action, key) => {
+      const item = el("li"); item.dataset.step = key;
+      const copy = el("div"); copy.append(el("h3", title), el("p", note));
+      item.append(copy, button(label, action)); steps.append(item);
+    };
+    add(t.setupSources, data.sources.length ? `${data.sources.length} · ${t.selected}` : t.setupNoSources,
+      t.choose, () => this.choose(), "sources");
+    add(t.setupGroups, data.groups.length ? `${data.groups.length} · ${t.groups}` : t.setupNoGroups,
+      t.groups, () => this.go("groups"), "groups");
+    const review = data.groups.filter(g => g.linking_status === "review_needed");
+    add(t.setupCheck, review.length ? `${review.length} · ${t.review_needed}` : t.setupCheckNote,
+      t.inspectGroups, () => this.go("groups"), "check");
+    guide.append(steps); parent.append(guide);
+  }
+  renderGroupChecks(parent, group) {
+    const t = this.t, data = this.data;
+    const section = el("section", undefined, "group-checks");
+    section.setAttribute("aria-label", t.groupCheckTitle);
+    section.append(el("h3", t.groupCheckTitle), el("p", t.groupCheckNote));
+    const mode = el("p", `${t.linkTogether}: ${t[group.linking_status || "disabled"]}`, "configuration-mode");
+    section.append(mode);
+    const list = el("ul", undefined, "check-list");
+    const add = (message, actionLabel, action, warning = false, key = "") => {
+      const row = el("li", undefined, warning ? "check-item warning-text" : "check-item");
+      if (key) row.dataset.check = key;
+      row.append(icon(warning ? "alert-circle-outline" : "information-outline"), el("span", message));
+      if (action) row.append(button(actionLabel, action));
+      list.append(row);
+    };
+    const edit = () => this.openDialog({ kind: "edit", group });
+    if (group.members.length < 2) add(t.checkFewMembers, t.edit, edit, false, "members");
+    for (const id of group.unselected || []) add(`${t.stale}: ${id}`, t.choose, () => this.choose(), true, "unselected");
+    const sources = data.sources.filter(s => group.members.includes(s.entity_id));
+    for (const source of sources) {
+      if (!["SMOKE_REPORTED", "NO_SMOKE_REPORTED"].includes(source.status))
+        add(`${source.name}: ${t.checkSourceUnavailable}`, t.inspectDetector,
+          () => this.openDialog({ kind: "source", id: source.entity_id }), true, "source");
+      else if (source.status === "SMOKE_REPORTED")
+        add(`${source.name}: ${t.checkSmokeActive}`, t.inspectDetector,
+          () => this.openDialog({ kind: "source", id: source.entity_id }), true, "smoke");
+    }
+    const bindings = group.linking?.bindings || [];
+    let unresolved = 0, activationOnly = 0;
+    if (!bindings.length) add(t.checkNoTargets, t.edit, edit, false, "targets");
+    for (const binding of bindings) {
+      const source = data.sources.find(s => s.entity_id === binding.source);
+      const cap = source?.capability;
+      const control = cap?.controls?.find(c => c.source === binding.source && c.target === binding.target && c.profile === binding.profile && c.identity === binding.identity);
+      if (!group.members.includes(binding.source) || !source || cap?.status !== "linkable" || !control) {
+        unresolved++;
+        const reason = cap && cap.status !== "linkable" ? (t[cap.reason] || t.control_changed) : t.control_changed;
+        add(`${source?.name || binding.source}: ${reason}`, t.edit, edit, true, "binding");
+      } else if (!control.safe_stop) activationOnly++;
+    }
+    if (activationOnly) add(`${activationOnly} · ${t.checkActivationOnly}`, null, null, false, "activation-only");
+    if (group.linking_status === "review_needed" && !unresolved && !(group.unselected || []).length)
+      add(t.checkBackendReview, t.edit, edit, true, "backend");
+    if (bindings.length && !unresolved && !(group.unselected || []).length)
+      add(t.checkMappingsCurrent, null, null, false, "current");
+    if (!group.linking?.enabled) add(t.checkDisabled, null, null, false, "disabled");
+    const outcomes = data.incident?.targets || [];
+    for (const outcome of outcomes.filter(o => bindings.some(b => b.target === o.target))) {
+      if (["failed", "blocked", "stop_failed", "outcome_unknown", "not_stopped"].includes(outcome.status)) {
+        const source = data.sources.find(s => s.entity_id === outcome.source);
+        add(`${source?.name || outcome.source}: ${t[outcome.status] || outcome.status}. ${t.checkFailureAdvice}`,
+          source ? t.inspectDetector : null,
+          source ? () => this.openDialog({ kind: "source", id: source.entity_id }) : null, true, "execution");
+      }
+    }
+    section.append(list); parent.append(section);
   }
   sourceList(parent, sources) {
     const list = el("div", undefined, "source-list");
@@ -234,6 +319,7 @@ export class AlarmMeshPanel extends HTMLElement {
     const first = !dialog;
     if (first) { dialog = el("dialog"); this.shadowRoot.append(dialog); }
     else dialog.replaceChildren();
+    dialog.classList.toggle("dark", Boolean(this._hass?.themes?.darkMode));
     dialog.setAttribute("aria-label", t.details);
     const close = button(t.close, () => this.closeDialog());
     dialog.append(close);
@@ -256,6 +342,14 @@ export class AlarmMeshPanel extends HTMLElement {
         for (const control of cap.controls) limitations.append(el("p", `${t.proposedControl}: ${control.target}`));
         dialog.append(limitations);
       }
+      if (source.selftest) {
+        dialog.append(el("h3", t.selfTests), el("p", t[source.selftest.reason]));
+        if (source.selftest.record) dialog.append(el("p", `${t.lastTest}: ${t['test_' + source.selftest.record.status]} · ${new Date(source.selftest.record.started).toLocaleString(this._hass.language)}`));
+        if (source.selftest.available) {
+          if (!source.selftest.control.has_explicit_result) dialog.append(el("p", t.selfTestNoResult));
+          dialog.append(button(t.startSelfTest, () => this.openDialog({ kind: "test", actionKind: "selftest", target: source.entity_id, identity: source.selftest.control.identity, name: source.name }), "button destructive"));
+        }
+      }
       dialog.append(el("h3", t.membership));
       if (!source.groups.length) dialog.append(el("p", t.noGroups));
       for (const group of this.data.groups.filter(g => source.groups.includes(g.id))) dialog.append(button(group.name, () => this.openDialog({ kind: "group", id: group.id })));
@@ -269,14 +363,19 @@ export class AlarmMeshPanel extends HTMLElement {
       const group = collection.find(g => g.id === detail.id);
       if (!group) { this.closeDialog(); return; }
       dialog.append(el("h2", group.name || t.noRoom), this.badge(group.result), el("p", t[group.result.availability]));
+      if (detail.kind === "group") this.renderGroupChecks(dialog, group);
       this.sourceList(dialog, this.data.sources.filter(s => group.members.includes(s.entity_id)));
       if (detail.kind === "group") {
         if (!group.members.length) dialog.append(el("p", t.emptyGroup));
         for (const member of group.unselected) dialog.append(el("p", `${member} · ${t.stale}`, "warning-text"));
         dialog.append(el("p", t.groupNote), button(t.edit, () => this.openDialog({ kind: "edit", group })), button(t.remove, () => this.openDialog({ kind: "delete", group }), "button destructive"));
-        dialog.append(el("p", `${t.linkTogether}: ${t[group.linking_status || "disabled"]}`));
       }
     } else if (detail.kind === "edit") this.groupForm(dialog, detail.group);
+    else if (detail.kind === "settings") this.notificationForm(dialog);
+    else if (detail.kind === "test") {
+      dialog.append(el("h2", detail.actionKind === "selftest" ? t.startSelfTest : t.explicitTest), el("p", detail.name), el("p", detail.actionKind === "selftest" ? t.selfTestWarning : detail.actionKind === "script" ? t.scriptConsequences : t.notifyTestWarning));
+      this.confirmRequest(dialog, detail);
+    }
     else if (detail.kind === "delete") {
       dialog.append(el("h2", t.confirmDelete), el("p", detail.group.name), el("p", t.deleteNote));
       detail.revision ??= this.data.revision;
@@ -311,63 +410,91 @@ export class AlarmMeshPanel extends HTMLElement {
     const toggle = el("input"); toggle.type = "checkbox"; toggle.name = "link-enabled"; toggle.checked = Boolean(group?.linking?.enabled);
     toggleLabel.append(toggle, el("span", t.enableLink)); linkingSection.append(toggleLabel);
     const bindings = [];
-    for (const source of this.data.sources) {
+    const bindingSources = [...this.data.sources, ...(group?.linking?.bindings || []).filter(b => !this.data.sources.some(s => s.entity_id === b.source)).map(b => ({ entity_id: b.source, name: b.source }))];
+    for (const source of bindingSources) {
       const cap = source.capability;
       const row = el("div", undefined, "binding-row");
-      const targetLabel = el("label", `${source.name} · ${t.smokeSource}`);
+      const targetLabel = el("label", `${source.name} · ${source.area_name || t.noRoom}`);
       const select = el("select"); select.id = `binding-${source.entity_id}`; select.name = "link-target"; targetLabel.htmlFor = select.id;
       const empty = el("option", t.detection_only); empty.value = ""; select.append(empty);
       const controls = cap?.controls || [];
       const oldBinding = group?.linking?.bindings.find(b => b.source === source.entity_id);
       empty.selected = !oldBinding;
+      const currentBinding = controls.find(c => c.target === oldBinding?.target && c.identity === oldBinding?.identity);
       for (const control of controls) {
-        const option = el("option", `${control.target} · ${t[control.profile] || t.activation_only}`); option.value = control.target; option.disabled = cap.status !== "linkable"; option.selected = oldBinding?.target === control.target; select.append(option);
+        const option = el("option", `${source.name} · ${t[control.profile] || t.activation_only}`); option.value = control.target; option.disabled = cap.status !== "linkable"; option.selected = currentBinding?.target === control.target; select.append(option);
       }
       if (oldBinding && !controls.some(c => c.target === oldBinding.target && c.identity === oldBinding.identity)) {
-        const stale = el("option", `${oldBinding.target} · ${t.control_changed}`); stale.value = oldBinding.target; stale.selected = true; select.append(stale);
+        const stale = el("option", t.storedControlChanged); stale.value = `stored:${oldBinding.target}`; stale.selected = true; select.append(stale);
       }
       row.append(targetLabel, select, el("small", cap ? `${t[cap.origin]} / ${this.capabilityLabel(cap)}` : t.no_verified_profile));
-      if (cap) { const requirements = el("details"); requirements.append(el("summary", t.requirements), el("p", t[cap.reason] || t.no_verified_profile)); row.append(requirements); }
+      if (cap) { row.append(el("small", t[cap.reason] || t.no_verified_profile)); const requirements = el("details"); requirements.append(el("summary", t.technicalDetails), el("p", `${source.model || t.unknown} · ${source.entity_id}`)); for (const control of controls) requirements.append(el("p", control.target)); row.append(requirements); }
+      else row.append(el("small", t.storedSourceMissing, "warning-text"));
       row.hidden = !selected.has(source.entity_id);
       for (const check of form.querySelectorAll('input[name="member"]')) if (check.value === source.entity_id) check.addEventListener("change", () => { row.hidden = !check.checked; });
       linkingSection.append(row); bindings.push({ source, select, controls, oldBinding });
     }
-    form.append(linkingSection);
+    const originSection = el("section", undefined, "linking-section");
+    originSection.append(el("h3", t.incidentSources), el("p", t.incidentSourceNote));
+    const originRows = [];
+    for (const source of choices) {
+      const row = el("label", undefined, "check");
+      const check = el("input"); check.type = "checkbox"; check.name = "origin"; check.value = source.id; check.checked = !group?.origins || group.origins.includes(source.id);
+      row.append(check, el("span", source.name)); row.hidden = !selected.has(source.id); originSection.append(row); originRows.push(check);
+      for (const member of form.querySelectorAll('[name="member"]')) if (member.value === source.id) member.addEventListener("change", () => { row.hidden = !member.checked; });
+    }
+    form.append(originSection, linkingSection);
+    const actionFields = this.actionFields(form, group?.actions);
     const actions = el("div", undefined, "actions"); const save = el("button", t.save, "button primary"); save.type = "submit";
     actions.append(button(t.cancel, () => this.closeDialog()), save); form.append(error, actions);
     form.addEventListener("submit", async event => {
       event.preventDefault();
+      if (form.querySelector(".request-confirmation,.link-confirmation")) { error.textContent = t.finishConfirmation; return; }
       if (!name.value.trim() || name.value.trim().length > 64) { error.textContent = t.invalid_name; name.setAttribute("aria-invalid", "true"); name.focus(); return; }
       name.removeAttribute("aria-invalid");
       const members = [...form.querySelectorAll('input[name="member"]')].filter(c => c.checked).map(c => c.value);
       const mapped = bindings.filter(b => members.includes(b.source.entity_id) && b.select.value).map(b => {
+        if (b.select.value.startsWith("stored:")) return b.oldBinding;
         const control = b.controls.find(c => c.target === b.select.value);
         return control ? { source: control.source, target: control.target, profile: control.profile, identity: control.identity } : b.oldBinding;
       });
       const payload = { operation: group ? "update" : "create", ...(group ? { group_id: group.id } : {}), revision, name: name.value.trim(), members };
+      const origins = originRows.filter(c => c.checked && members.includes(c.value)).map(c => c.value);
+      if (group?.origins || origins.length !== members.length) payload.origins = origins;
+      const actionValue = actionFields();
+      if (group?.actions || actionValue.enabled || actionValue.start.length || actionValue.recovery.length) payload.actions = actionValue;
       if (group?.linking || toggle.checked || mapped.length) payload.linking = { enabled: toggle.checked, bindings: mapped };
-      if (toggle.checked) {
-        if (members.length < 2 || !mapped.length || mapped.some(b => !b) || members.some(id => !this.data.sources.some(s => s.entity_id === id))) { error.textContent = t.invalid_linking; return; }
-        if (mapped.some(binding => { const cap = this.data.sources.find(s => s.entity_id === binding.source)?.capability; return cap?.status !== "linkable" || !cap.controls.some(c => c.target === binding.target && c.identity === binding.identity); })) { error.textContent = t.control_changed; return; }
-        const frozen = [...form.querySelectorAll("input,select")]; frozen.forEach(node => { node.disabled = true; }); save.disabled = true;
+      if (!this.data) { error.textContent = t.offline; return; }
+      if (toggle.checked || actionValue.enabled) {
+        if (!origins.length) { error.textContent = t.invalid_origins; return; }
+        if (actionValue.enabled && !actionValue.start.length && !actionValue.recovery.length) { error.textContent = t.invalid_actions; return; }
+        if (toggle.checked && (members.length < 2 || !mapped.length || mapped.some(b => !b) || members.some(id => !this.data.sources.some(s => s.entity_id === id)))) { error.textContent = t.invalid_linking; return; }
+        if (toggle.checked && mapped.some(binding => { const cap = this.data.sources.find(s => s.entity_id === binding.source)?.capability; return cap?.status !== "linkable" || !cap.controls.some(c => c.target === binding.target && c.identity === binding.identity); })) { error.textContent = t.control_changed; return; }
+        const restore = this.lockControls(form);
         const confirmation = el("section", undefined, "link-confirmation");
-        confirmation.append(el("h3", t.confirmLink), el("p", t.commandNote));
-        for (const destination of mapped) {
+        confirmation.append(el("h3", toggle.checked ? t.confirmLink : t.confirmAutomation), el("p", t.commandNote));
+        confirmation.append(el("p", `${t.incidentSources}: ${origins.map(id => { const s = this.data.sources.find(s => s.entity_id === id); return s ? `${s.name} (${s.area_name || t.noRoom})` : id; }).join(", ")}`));
+        for (const destination of toggle.checked ? mapped : []) {
           const targetName = this.data.sources.find(s => s.entity_id === destination.source)?.name || destination.source;
-          for (const source of this.data.sources.filter(s => members.includes(s.entity_id) && s.entity_id !== destination.source)) confirmation.append(el("p", `${source.name} → ${targetName} (${destination.target})`));
+          for (const source of this.data.sources.filter(s => origins.includes(s.entity_id) && s.entity_id !== destination.source)) confirmation.append(el("p", `${source.name} → ${targetName} (${destination.target})`));
           const control = bindings.flatMap(b => b.controls).find(c => c.target === destination.target);
           confirmation.append(el("p", control?.safe_stop ? t.automation_stop_separate : t.no_safe_stop, "warning-text"));
+        }
+        if (actionValue.enabled) {
+          confirmation.append(el("p", t.scriptConsequences));
+          for (const phase of ["start", "recovery"]) for (const [index, action] of actionValue[phase].entries()) confirmation.append(el("p", `${t['phase_' + phase]} ${index + 1}: ${this.data.automation?.scripts.find(s => s.entity_id === action.entity_id)?.name || action.entity_id}`));
         }
         confirmation.append(el("p", t.physicalNotTested));
         const ackLabel = el("label", undefined, "check");
         const ack = el("input"); ack.type = "checkbox"; ack.className = "confirm-ack"; ackLabel.append(ack, el("span", t.acceptLink));
         const confirm = button(t.confirmEnable, async () => {
           if (!ack.checked) { error.textContent = t.linking_confirmation_required; ack.focus(); return; }
+          if (!this.data) { error.textContent = t.offline; return; }
           confirm.disabled = true;
           await this.mutate({ ...payload, confirmed: true }, error);
           confirm.disabled = false;
         }, "button primary confirm-linking");
-        confirmation.append(ackLabel, error, button(t.back, () => { confirmation.remove(); form.insertBefore(error, actions); error.textContent = ""; frozen.forEach(node => { node.disabled = false; }); save.disabled = false; }), confirm);
+        confirmation.append(ackLabel, error, button(t.back, () => { confirmation.remove(); form.insertBefore(error, actions); error.textContent = ""; restore(); }), confirm);
         form.append(confirmation); ack.focus(); return;
       }
       save.disabled = true;
@@ -433,6 +560,177 @@ export class AlarmMeshPanel extends HTMLElement {
     };
     search.addEventListener("input", update); provider.addEventListener("change", update); capability.addEventListener("change", update);
     filters.append(search, provider, capability); parent.append(filters, count, results); update();
+  }
+  offlineDraft() {
+    if (!["edit", "settings"].includes(this.detail?.kind)) { this.closeDialog(); return; }
+    const dialog = this.shadowRoot.querySelector("dialog");
+    if (!dialog) return;
+    if (!dialog.querySelector(".offline-draft")) dialog.prepend(el("p", this.t.offlineDraft, "notice offline-draft"));
+    for (const b of dialog.querySelectorAll('button[type="submit"],.confirm-execute,.confirm-linking')) b.disabled = true;
+  }
+  renderSettings(parent) {
+    const t = this.t, automation = this.data.automation;
+    parent.append(button(t.catalog, () => this.go("catalog")), button(t.viewIncidents, () => this.go("incidents")));
+    if (!automation) return;
+    const section = el("section", undefined, "notice");
+    section.append(el("h2", t.notifications), el("p", `${t.notifications}: ${t[automation.settings.enabled ? "enabled" : "disabled"]}`), el("p", t.notificationNote));
+    for (const recipient of automation.settings.recipients) section.append(el("p", `${recipient.service.replace(/^mobile_app_/, "")}: ${t[recipient.enabled ? "enabled" : "disabled"]}${automation.missing_recipients.includes(recipient.service) ? ' · ' + t.recipient_unavailable : ''}`));
+    section.append(button(t.configureNotifications, () => this.openDialog({ kind: "settings" }), "button primary"));
+    if (automation.error) section.append(el("p", t[automation.error] || t.error, "warning-text"));
+    parent.append(section, el("p", t.actionsLocation, "notice"));
+  }
+  notificationForm(dialog) {
+    const t = this.t, a = this.data.automation;
+    if (!a) return;
+    const cfg = a.settings, revision = cfg.revision, form = el("form");
+    dialog.append(el("h2", t.notifications), el("p", t.notificationNote));
+    const toggle = this.checkField(form, t.enableNotifications, cfg.enabled, "notifications-enabled");
+    const recovery = this.checkField(form, t.recoveryNotification, cfg.recovery, "notifications-recovery");
+    const stored = new Map(cfg.recipients.map(r => [r.service, r]));
+    const choices = [...a.recipients, ...cfg.recipients.filter(r => !a.recipients.some(n => n.service === r.service)).map(r => ({ ...r, name: r.service, missing: true }))];
+    const recipients = [];
+    if (!choices.length) form.append(el("p", t.noRecipients, "notice"));
+    for (const recipient of choices) {
+      const row = el("section", undefined, "recipient-row");
+      const input = this.checkField(row, `${recipient.name}${recipient.missing ? ' · ' + t.recipient_unavailable : ''}`, stored.get(recipient.service)?.enabled || false, "recipient");
+      input.value = recipient.service; recipients.push(input);
+      if (!recipient.missing) row.append(button(t.testNotification, () => this.confirmRequest(form, { actionKind: "notification", target: recipient.service, name: recipient.name }), "button"));
+      form.append(row);
+    }
+    const preview = el("details"); preview.append(el("summary", t.messagePreview), el("strong", a.preview.title), el("p", a.preview.message, "message-preview")); form.append(preview);
+    const error = el("p", "", "form-error"); error.setAttribute("role", "alert");
+    const save = el("button", t.saveSettings, "button primary"); save.type = "submit";
+    form.append(error, save, button(t.cancel, () => this.closeDialog()));
+    form.addEventListener("submit", async event => {
+      event.preventDefault();
+      if (form.querySelector(".request-confirmation")) { error.textContent = t.finishConfirmation; return; }
+      if (!this.data) { error.textContent = t.offline; return; }
+      const value = { enabled: toggle.checked, recovery: recovery.checked, recipients: recipients.filter(r => r.checked || stored.has(r.value)).map(r => ({ service: r.value, enabled: r.checked })) };
+      if (value.enabled && !value.recipients.some(r => r.enabled)) { error.textContent = t.invalid_notifications; return; }
+      const send = async confirmed => {
+        save.disabled = true;
+        try { await this._hass.callWS({ type: "alarmmesh/settings", revision, notifications: value, confirmed }); this.closeDialog(); }
+        catch (e) { error.textContent = t[e.code] || t.error; save.disabled = Boolean(save.dataset.confirmLocked); }
+      };
+      if (!value.enabled) { await send(false); return; }
+      this.confirmRequest(form, { name: t.confirmAutomation, confirmationOnly: true, note: `${t.notificationNote}\n${value.recipients.filter(r => r.enabled).map(r => r.service).join(', ')}`, execute: () => send(true) });
+    });
+    dialog.append(form);
+  }
+  checkField(parent, text, checked, name) {
+    const label = el("label", undefined, "check"), input = el("input");
+    input.type = "checkbox"; input.checked = Boolean(checked); input.name = name;
+    label.append(input, el("span", text)); parent.append(label); return input;
+  }
+  lockControls(parent) {
+    const controls = [...parent.querySelectorAll("input,select,button")].map(node => [node, node.disabled]);
+    for (const [node] of controls) { node.dataset.confirmLocked = "true"; node.disabled = true; }
+    return () => {
+      for (const [node, disabled] of controls) { delete node.dataset.confirmLocked; node.disabled = disabled; }
+      if (!this.data) this.offlineDraft();
+    };
+  }
+  confirmRequest(parent, detail) {
+    const t = this.t;
+    const previous = parent.querySelector(".request-confirmation"); previous?.restore?.(); previous?.remove();
+    const restore = this.lockControls(parent);
+    const box = el("section", undefined, "notice request-confirmation");
+    box.restore = restore;
+    box.append(el("h3", detail.name || t.explicitTest), el("p", detail.note || (detail.actionKind === "selftest" ? t.selfTestWarning : detail.actionKind === "script" ? t.scriptConsequences : t.notifyTestWarning)));
+    const ack = this.checkField(box, t.confirmExactTarget, false, "confirm-request");
+    const error = el("p", "", "form-error"); error.setAttribute("role", "alert");
+    const status = el("p", "", "request-status"); status.setAttribute("role", "status");
+    const execute = button(t.confirmRequest, async () => {
+      if (!ack.checked) { error.textContent = t.test_confirmation_required; ack.focus(); return; }
+      if (!this.data) { error.textContent = t.offline; return; }
+      error.textContent = "";
+      execute.disabled = true;
+      execute.dataset.started = "true";
+      if (detail.execute) { await detail.execute(); return; }
+      try {
+        const request = globalThis.crypto.randomUUID().replaceAll("-", "");
+        if (detail.actionKind === "selftest") box.dataset.selftestRequest = request;
+        const result = await this._hass.callWS({ type: "alarmmesh/test", kind: detail.actionKind, target: detail.target, identity: detail.identity || "", confirmed: true, request_id: request });
+        status.textContent = t[(detail.actionKind === "selftest" ? "test_" : "delivery_") + result.status] || t.error;
+        this.updateTestResult();
+      } catch (e) { error.textContent = t[e.code] || t.error; }
+    }, "button destructive confirm-execute");
+    box.append(status, error, button(t.cancel, () => { box.remove(); restore(); }), execute); parent.append(box); ack.focus();
+  }
+  updateTestResult() {
+    const result = this.data?.selftest;
+    for (const box of this.shadowRoot.querySelectorAll("[data-selftest-request]")) {
+      if (result?.request_id === box.dataset.selftestRequest) box.querySelector(".request-status").textContent = this.t["test_" + result.status] || this.t.error;
+    }
+  }
+  actionFields(parent, saved) {
+    const t = this.t, section = el("section", undefined, "linking-section action-config");
+    section.append(el("h3", t.incidentActions), el("p", t.scriptConsequences));
+    const enabled = this.checkField(section, t.enableActions, saved?.enabled, "actions-enabled");
+    const lists = {};
+    for (const phase of ["start", "recovery"]) {
+      const items = (saved?.[phase] || []).map(b => ({ ...b }));
+      const area = el("div"); area.dataset.phase = phase;
+      section.append(el("h3", t['phase_' + phase]), area);
+      const draw = focusIndex => {
+        area.replaceChildren();
+        for (const [index, binding] of items.entries()) {
+          const row = el("div", undefined, "action-row"), select = el("select"); select.setAttribute("aria-label", `${t['phase_' + phase]} ${index + 1}`);
+          const empty = el("option", t.chooseScript); empty.value = ""; select.append(empty);
+          const current = this.data?.automation?.scripts.find(s => s.entity_id === binding.entity_id && s.identity === binding.identity);
+          for (const script of this.data?.automation?.scripts || []) { const option = el("option", script.name); option.value = script.entity_id; option.selected = script === current; select.append(option); }
+          if (binding.entity_id && !current) { const name = this.data?.automation?.scripts.find(s => s.entity_id === binding.entity_id)?.name || binding.entity_id; const option = el("option", `${name} · ${t.script_changed}`); option.value = `stored:${binding.entity_id}`; option.selected = true; select.append(option); }
+          select.addEventListener("change", () => { const script = this.data?.automation?.scripts.find(s => s.entity_id === select.value); if (script) items[index] = { entity_id: script.entity_id, identity: script.identity }; else if (!select.value) items[index] = { entity_id: "", identity: "" }; draw(index); });
+          const test = button(t.testScript, () => { const b = items[index]; const script = this.data?.automation?.scripts.find(s => s.entity_id === b?.entity_id && s.identity === b.identity); if (script) this.confirmRequest(section, { actionKind: "script", target: b.entity_id, identity: b.identity, name: script.name }); });
+          test.disabled = !current;
+          const up = button(t.moveUp, () => { [items[index - 1], items[index]] = [items[index], items[index - 1]]; draw(index - 1); }); up.disabled = index === 0;
+          const down = button(t.moveDown, () => { [items[index + 1], items[index]] = [items[index], items[index + 1]]; draw(index + 1); }); down.disabled = index === items.length - 1;
+          for (const [node, title] of [[up, t.moveUp], [down, t.moveDown], [test, t.testScript]]) node.setAttribute("aria-label", `${title}: ${current?.name || binding.entity_id || t.chooseScript}, ${t['phase_' + phase]} ${index + 1}`);
+          row.append(el("span", `${index + 1}.`), select,
+            up, down,
+            button(t.removeAction, () => { items.splice(index, 1); draw(Math.min(index, items.length - 1)); }),
+            test);
+          if (binding.entity_id && !current) row.append(el("small", t.script_changed, "warning-text"));
+          area.append(row);
+        }
+        if (focusIndex !== undefined) { if (items.length) area.querySelectorAll("select")[focusIndex]?.focus(); else add.focus(); }
+      };
+      const add = button(t.addScript, () => { if (items.length < 20) { items.push({ entity_id: "", identity: "" }); draw(items.length - 1); } }); section.append(add);
+      lists[phase] = items; draw();
+    }
+    parent.append(section);
+    return () => ({ enabled: enabled.checked, start: lists.start.map(b => ({ ...b })), recovery: lists.recovery.map(b => ({ ...b })) });
+  }
+  renderIncidents(parent) {
+    const t = this.t, data = this.data;
+    parent.append(el("p", t.incidentNote, "notice"));
+    this.sourceList(parent, data.sources.filter(s => s.status === "SMOKE_REPORTED"));
+    const active = data.incident?.active_sources || [];
+    const pending = active.filter(id => data.sources.find(s => s.entity_id === id)?.status !== "SMOKE_REPORTED");
+    if (pending.length) parent.append(el("p", `${t.incidentPending}: ${pending.map(id => data.sources.find(s => s.entity_id === id)?.name || id).join(", ")}`, "notice"));
+    const groups = data.groups.filter(g => (g.origins || g.members).some(id => active.includes(id)));
+    if (groups.length) { const section=el("section",undefined,"notice"); section.append(el("h2",t.groups)); for (const group of groups) section.append(button(group.name,()=>this.openDialog({kind:"group",id:group.id}))); parent.append(section); }
+    for (const target of data.incident?.targets || []) parent.append(el("p", `${data.sources.find(s => s.entity_id === target.source)?.name || target.source}: ${t[target.status] || target.status}`));
+    const episodes = data.automation?.episodes || [];
+    if (!episodes.length && !(data.incident?.active_sources || []).length) parent.append(el("p", t.noIncidents));
+    for (const episode of episodes) {
+      const card = el("section", undefined, "notice incident-episode"); card.dataset.incident = episode.id;
+      const group = data.groups.find(g => g.id === episode.group_id);
+      card.append(el("h2", group?.name || t.notifications), el("p", `${t['phase_' + episode.phase]} · ${new Date(episode.started).toLocaleString(this._hass.language)}`));
+      for (const source of episode.origins) card.append(el("p", data.sources.find(s => s.entity_id === source)?.name || source));
+      for (const receipt of Object.values(episode.receipts)) {
+        const row = el("div", undefined, "execution-row");
+        const name = data.automation?.scripts.find(s => s.entity_id === receipt.target)?.name || receipt.target.replace(/^mobile_app_/, "");
+        row.append(icon(["failed", "blocked", "outcome_unknown"].includes(receipt.status) ? "alert-circle-outline" : "check-circle-outline"), el("span", `${name}: ${t['delivery_' + receipt.status]} · ${t['phase_' + receipt.phase]}`));
+        if (["failed", "blocked", "outcome_unknown"].includes(receipt.status)) row.append(el("small", receipt.kind === "script" ? t.script_changed : t.deliveryAdvice));
+        card.append(row);
+      }
+      parent.append(card);
+    }
+    for (const row of data.automation?.manual_results || []) parent.append(el("p", `${t.explicitTest} · ${row.target}: ${t['delivery_' + row.status]}`));
+    if (data.selftest) parent.append(el("section", undefined, "notice selftest-result"));
+    const self = parent.querySelector(".selftest-result");
+    if (self) self.append(el("h2", t.selfTests), el("p", `${data.sources.find(s => s.entity_id === data.selftest.source)?.name || data.selftest.source}: ${t['test_' + data.selftest.status]}`), el("p", t.deviceResultNote));
   }
   async mutate(payload, error) {
     try {

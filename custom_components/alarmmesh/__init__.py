@@ -4,7 +4,9 @@ from homeassistant.const import Platform
 from homeassistant.core import Event, EventStateChangedData, HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryError
 from homeassistant.helpers.event import async_track_state_change_event
+from homeassistant.helpers.storage import Store
 
+from .automation import NotificationStore
 from .const import CONF_SOURCE_ENTITY_IDS
 from .groups import GroupStore
 from .panel import PanelController, async_prepare
@@ -68,7 +70,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: AlarmMeshConfigEntry) -
     """Remove entities before HA stops sources and clears entry runtime data."""
     panel = entry.runtime_data.panel
     if panel is not None:
-        await panel.linking.pause()
+        await panel.async_pause()
     try:
         unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     except Exception:
@@ -85,3 +87,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: AlarmMeshConfigEntry) -
 async def async_remove_entry(hass: HomeAssistant, entry: AlarmMeshConfigEntry) -> None:
     """Remove only this entry's organizational groups on explicit entry deletion."""
     await GroupStore(hass, entry.entry_id).store.async_remove()
+    await NotificationStore(hass, entry.entry_id).store.async_remove()
+    for purpose in ("receipts", "selftest"):
+        await Store(hass, 1, f"alarmmesh.{purpose}.{entry.entry_id}").async_remove()

@@ -12,6 +12,7 @@ import traceback
 from importlib.metadata import version
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, Mock
+from uuid import uuid4
 
 import paho.mqtt.client as paho
 from check_runtime import require
@@ -102,6 +103,7 @@ async def zha_checks(passed):
     and event emission are replaced; no application/controller is started.
     """
     import zigpy.types as t
+    from zha.application.platforms.button import AqaraSelfTestButton
     from zha.application.platforms.siren import AdvancedSiren, BasicSiren
     from zha.application.platforms.switch import AqaraBuzzerManualAlarm
     from zhaquirks.xiaomi.aqara.smoke import LumiSensorSmokeAcn03, OppleCluster
@@ -154,6 +156,21 @@ async def zha_checks(passed):
         b"\x26\x01" not in data and b"\x27\x01" not in data, "Mute/self-test serialized"
     )
     passed("zha_actual_aqara_switch_action")
+
+    self_test = object.__new__(AqaraSelfTestButton)
+    self_test._cluster = opple
+    before = endpoint.request.await_count
+    await self_test.async_press()
+    require(
+        endpoint.request.await_count == before + 1,
+        "Aqara built-in test missed endpoint",
+    )
+    data = endpoint.request.call_args.kwargs["data"]
+    require(
+        b"\x27\x01" in data and b"\x26\x01" not in data and b"\x3d\x01" not in data,
+        "Self-test serialized a mute/sounder command",
+    )
+    passed("zha_actual_aqara_selftest_button")
 
     for cls, kwargs, name in (
         (BasicSiren, {"duration": 60}, "zha_actual_basic_ias_action"),
@@ -309,7 +326,7 @@ async def main(requested):
                         "unique_id": unique,
                         "device": device,
                         "name": prop,
-                        "state_topic": topic,
+                        **({"state_topic": topic} if domain != "button" else {}),
                         "availability_topic": topic + "/availability",
                         **payload,
                     },
@@ -344,6 +361,12 @@ async def main(requested):
                     "payload_off": False,
                 },
             )
+            if index == 1:
+                await discover(
+                    "button",
+                    "selftest",
+                    {"command_topic": topic + "/set/selftest", "payload_press": "test"},
+                )
             payload = {"command_topic": topic + "/set/" + key}
             if domain == "select":
                 payload.update(
@@ -473,6 +496,29 @@ async def main(requested):
                     return
                 await asyncio.sleep(0.05)
             raise AssertionError("Synthetic MQTT state did not arrive")
+
+        control = panel.selftests.resolve(sources[1])
+        require(control is not None, "Actual discovered self-test button missing")
+        await panel.selftests.start(
+            sources[1], control["identity"], True, request_id=uuid4().hex
+        )
+        topic, payload = await asyncio.wait_for(messages.get(), 10)
+        require(
+            topic == "alarmmesh_simulation/synthetic1/set/selftest"
+            and payload == "test",
+            "Unexpected MQTT built-in self-test payload",
+        )
+        states[1]["test"] = True
+        await publish("alarmmesh_simulation/synthetic1", states[1])
+        await wait_state(lambda: panel.selftests.record["status"] == "test_active")
+        states[1]["test"] = False
+        await publish("alarmmesh_simulation/synthetic1", states[1])
+        await wait_state(lambda: panel.selftests.record["status"] == "outcome_unknown")
+        require(
+            not panel.linking.active and messages.empty(),
+            "Self-test created smoke or an extra command",
+        )
+        passed("real_mqtt_selftest_button_and_feedback")
 
         states[0]["test"] = True
         await publish("alarmmesh_simulation/synthetic0", states[0])

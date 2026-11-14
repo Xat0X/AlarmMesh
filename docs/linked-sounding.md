@@ -60,7 +60,10 @@ guessed into modern siren support. No direct MQTT, cluster or device adapter is 
 ## Incident and lifecycle behavior
 
 - A selected raw smoke `on` starts an incident, including the initial snapshot.
-  An observed self-test does not start one. Manual sounder/linkage states are not
+  A separate test flag does not start one. For the new reviewed built-in
+  test routes, independently reported smoke remains an origin even during a test;
+  true smoke is never suppressed. Legacy unconfirmed contracts retain their
+  conservative test guard. Manual sounder/linkage states are not
   smoke sources. An unreported test cannot be inferred from an ordinary smoke `on`.
 - Each origin remains independently active until its source explicitly reports
   `off`. Unknown, unavailable or missing never means the smoke ended. This
@@ -199,3 +202,9 @@ is retained as historical evidence, not the final beta.2 result.
 See [beta.2 notes](releases/0.1.0-beta.2.md) for installation, rollback and support
 limits. Actual MQTT/ZHA drivers, physical activation and existing-installation
 upgrade acceptance for this beta remain unperformed.
+
+
+The current [incident extension](incident-features.md) adds an explicit group-origin
+subset and separate notifications/scripts/self-tests. It reuses this executor and
+preserves per-target deduplication, manual-alarm protection and limited stop rights.
+It does not enable existing/new groups automatically or expand sounder profiles.

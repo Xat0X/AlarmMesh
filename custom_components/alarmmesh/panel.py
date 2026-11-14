@@ -1,21 +1,28 @@
 """Authenticated push presentation, HA registry metadata and panel lifecycle."""
 
+import re
 from collections.abc import Callable
+from copy import deepcopy
 from pathlib import Path
 
 import voluptuous as vol
 
 from homeassistant.components import frontend, panel_custom, websocket_api
 from homeassistant.components.http import StaticPathConfig
+from homeassistant.const import EVENT_SERVICE_REGISTERED, EVENT_SERVICE_REMOVED
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import area_registry as ar
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.event import async_track_state_change_event
 
+from .automation import AutomationError
 from .catalog import CATALOG
+from .effects import IncidentEffects
 from .groups import GroupError, GroupStore
 from .linking_runtime import LinkingRuntime
 from .runtime import AlarmMeshConfigEntry
+from .self_test import SelfTests
 from .status import SourceStatus, StatusResult, evaluate_status
 
 DATA_HUB = "alarmmesh_panel"
@@ -56,15 +63,26 @@ class PanelController:
         self.runtime = entry.runtime_data
         self.groups = GroupStore(hass, entry.entry_id)
         self.linking = LinkingRuntime(hass, entry, self.groups, hub.publish)
+        self.effects = IncidentEffects(
+            hass, entry, self.linking, self.groups, hub.publish
+        )
+        self.selftests = SelfTests(hass, entry, self.linking, hub.publish)
+        self.linking.effects_changed = self.effects.changed
+        self.linking.independent_test_source = self.selftests.independent_source
         self.unsubscribers: list[Callable] = []
+        self.script_unsubscribe = None
 
     async def async_start(self) -> None:
         await self.groups.async_load()
+        await self.effects.load()
+        await self.selftests.load()
         self.unsubscribers.append(self.runtime.async_add_observer(self.hub.publish))
         for event in (
             er.EVENT_ENTITY_REGISTRY_UPDATED,
             dr.EVENT_DEVICE_REGISTRY_UPDATED,
             ar.EVENT_AREA_REGISTRY_UPDATED,
+            EVENT_SERVICE_REGISTERED,
+            EVENT_SERVICE_REMOVED,
         ):
             self.unsubscribers.append(
                 self.hass.bus.async_listen(event, self._registry_changed)
@@ -75,21 +93,44 @@ class PanelController:
             "alarmmesh-panel",
             sidebar_title="AlarmMesh",
             sidebar_icon="mdi:smoke-detector",
-            module_url=f"{ASSET_URL}/panel.js?v=20261114-broadcast-1",
+            module_url=f"{ASSET_URL}/panel.js?v=20261115-flows-1",
             require_admin=True,
         )
         self.hub.controller = self
+        self._watch_scripts()
         self.linking.start()
         self.hub.publish()
 
     @callback
     def _registry_changed(self, *_args):
         self.linking.refresh_watch()
+        self._watch_scripts()
+        self.selftests.check_identity()
         self.hub.publish()
 
+    def _watch_scripts(self):
+        if self.script_unsubscribe:
+            self.script_unsubscribe()
+            self.script_unsubscribe = None
+        ids = [
+            e.entity_id
+            for e in er.async_get(self.hass).entities.values()
+            if e.domain == "script"
+        ]
+        if ids:
+            self.script_unsubscribe = async_track_state_change_event(
+                self.hass, ids, self.hub.publish
+            )
+
     async def async_close(self) -> None:
+        await self.async_pause()
+        await self.selftests.close()
+        await self.effects.close()
         await self.linking.close()
         await self.groups.async_close()
+        if self.script_unsubscribe:
+            self.script_unsubscribe()
+            self.script_unsubscribe = None
         for unsubscribe in self.unsubscribers:
             unsubscribe()
         self.unsubscribers.clear()
@@ -97,6 +138,11 @@ class PanelController:
             self.hub.controller = None
             frontend.async_remove_panel(self.hass, "alarmmesh")
             self.hub.publish()
+
+    async def async_pause(self):
+        await self.linking.pause()
+        await self.effects.pause()
+        await self.selftests.pause()
 
     def snapshot(self) -> dict:
         """Resolve entity area before device area; don't infer device capabilities."""
@@ -143,6 +189,7 @@ class PanelController:
                     g["id"] for g in self.groups.groups if entity_id in g["members"]
                 ],
                 "capability": self.linking.capabilities.describe(entity_id),
+                "selftest": self.selftests.describe(entity_id),
             }
             sources.append(source)
             room = rooms.setdefault(
@@ -196,6 +243,8 @@ class PanelController:
             "groups": groups,
             "revision": self.groups.revision,
             "incident": self.linking.snapshot(),
+            "automation": self.effects.snapshot(),
+            "selftest": deepcopy(self.selftests.record),
         }
 
 
@@ -216,6 +265,8 @@ async def async_prepare(hass: HomeAssistant) -> PanelHub:
         websocket_api.async_register_command(hass, ws_subscribe)
         websocket_api.async_register_command(hass, ws_group)
         websocket_api.async_register_command(hass, ws_catalog)
+        websocket_api.async_register_command(hass, ws_settings)
+        websocket_api.async_register_command(hass, ws_test)
     return hass.data[DATA_HUB]
 
 
@@ -251,6 +302,8 @@ def ws_subscribe(hass, connection, msg):
         ),
         vol.Optional("linking"): dict,
         vol.Optional("confirmed"): bool,
+        vol.Optional("origins"): [str],
+        vol.Optional("actions"): dict,
     }
 )
 @websocket_api.require_admin
@@ -277,3 +330,85 @@ async def ws_group(hass, connection, msg):
 def ws_catalog(hass, connection, msg):
     """Static offline evidence, fetched once; never grants execution authority."""
     connection.send_result(msg["id"], CATALOG)
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "alarmmesh/settings",
+        vol.Required("revision"): int,
+        vol.Required("notifications"): dict,
+        vol.Optional("confirmed", default=False): bool,
+    }
+)
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_settings(hass, connection, msg):
+    controller = hass.data[DATA_HUB].controller
+    if controller is None or controller.linking._paused:
+        connection.send_error(msg["id"], "not_loaded", "AlarmMesh is not loaded")
+        return
+    try:
+        await controller.effects.settings.save(
+            msg["notifications"], msg["revision"], msg["confirmed"]
+        )
+    except (AutomationError, OSError) as err:
+        code = (
+            str(err) if isinstance(err, AutomationError) else "automation_storage_error"
+        )
+        connection.send_error(msg["id"], code, code)
+        return
+    connection.send_result(
+        msg["id"], {"revision": controller.effects.settings.revision}
+    )
+    controller.effects.changed()
+    controller.hub.publish()
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "alarmmesh/test",
+        vol.Required("kind"): vol.In(["notification", "script", "selftest"]),
+        vol.Required("target"): vol.All(str, vol.Length(max=255)),
+        vol.Optional("identity", default=""): vol.All(str, vol.Length(max=64)),
+        vol.Required("confirmed"): bool,
+        vol.Required("request_id"): vol.All(str, vol.Length(min=32, max=32)),
+    }
+)
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_test(hass, connection, msg):
+    controller = hass.data[DATA_HUB].controller
+    if controller is None:
+        connection.send_error(msg["id"], "not_loaded", "AlarmMesh is not loaded")
+        return
+    try:
+
+        def authorized():
+            return connection.user is not None and connection.user.is_admin
+
+        if msg["kind"] == "selftest":
+            if not re.fullmatch("[a-f0-9]{32}", msg["request_id"]):
+                raise AutomationError("invalid_request")
+            result = await controller.selftests.start(
+                msg["target"],
+                msg["identity"],
+                msg["confirmed"],
+                authorized,
+                msg["request_id"],
+            )
+        else:
+            result = await controller.effects.manual(
+                msg["kind"],
+                msg["target"],
+                msg["identity"],
+                msg["confirmed"],
+                msg["request_id"],
+                authorized,
+            )
+    except (AutomationError, OSError) as err:
+        code = (
+            str(err) if isinstance(err, AutomationError) else "automation_storage_error"
+        )
+        connection.send_error(msg["id"], code, code)
+        return
+    connection.send_result(msg["id"], result)

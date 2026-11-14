@@ -23,7 +23,8 @@ Targets are deduplicated across groups. Calls use an eight-slot semaphore and
 ten-second timeout, with no automatic retry of dispatched failures. Heiman's
 documented automation-only stop is restricted to current-runtime ownership;
 Aqara and SMSZB-120 have no automatic stop. Successful action completion is not
-physical confirmation. Incidents, requests and ownership are never persisted.
+physical confirmation. Sounder incidents, requests and ownership are never persisted. The optional
+notification/script ledger below stores bounded receipts, not smoke observations.
 
 The executor starts after panel/group setup, including current already-on sources.
 Unload pauses and cancels/drains work before platform teardown. Success closes all
@@ -41,7 +42,7 @@ JavaScript, CDN, build step or second login. `frontend`, `http` and `websocket_a
 are built-in HA dependencies, not new pip requirements. Manifest version, config
 entry version, options schema and overview unique IDs are unchanged.
 
-The panel and both `alarmmesh/*` WebSocket commands are **admin-only**, using HA's
+The panel and all `alarmmesh/*` WebSocket commands are **admin-only**, using HA's
 own authorization decorator. This deliberately avoids exposing an unfiltered
 whole-home result to a user lacking source-entity permissions. Existing overview
 entities retain HA's normal entity access. Mutations always recheck admin rights;
@@ -314,12 +315,15 @@ radio traffic nor physical smoke detection. No ageing threshold is introduced. E
 panel and do not alter smoke/availability interpretation. Installation and publication boundaries follow the
 [installation guide](installation.md) and [guideline review](guidelines.md).
 
-## Deliberately outside this change
+## Boundaries retained by the current integration
 
 - Automatic entity selection or rename tracking.
-- Generic siren controls, silencing, reset, and device test actions.
-- Notifications, escalations, user-supplied commands and direct vendor adapters.
-- Device discovery, direct device access, polling, timers and coordinators.
+- Generic unreviewed siren controls, silencing and reset.
+- Arbitrary user-supplied commands, critical/escalating notification payloads and
+  direct vendor adapters. The explicitly requested ordinary notifications, existing
+  script actions and reviewed built-in tests are described below.
+- Device discovery, direct device access, polling and source-ageing timers.
+  Bounded explicit-test deadlines/receipt expiry do not measure source health.
 - Claims of reliability, certification, or production readiness.
 
 ## Future implementation boundaries
@@ -327,8 +331,8 @@ panel and do not alter smoke/availability interpretation. Installation and publi
 Design each capability separately before adding it. Future vendor adapters should
 use established Home Assistant entities or explicit capability contracts. Keep
 state interpretation separate from actions with physical effects. The passive
-runtime defines unavailable handling, fresh startup snapshots and cleanup; future
-work still needs its own decisions about stale reports, deduplication, explicit
+runtime defines unavailable handling, fresh startup snapshots and cleanup; the
+explicit extensions below make separate decisions about stale reports, deduplication, explicit
 user intent and background work before adding behavior.
 
 Add tests for each new behavior and failure mode. Any future platform needs its
@@ -378,3 +382,63 @@ stays latched until a valid smoke identity reports off. Dispatch rechecks this
 identity immediately before the action. The shared read-only source statuses and
 `evaluate_status` remain untouched. Two regressions first demonstrated unwanted
 activation and premature stopping, then passed after this gate was added.
+
+
+## Incident outputs and reviewed self-tests (local development)
+
+See [contracts, user behavior and current evidence](incident-features.md).
+`IncidentEffects` consumes the same `LinkingRuntime.active` origins; it does not
+introduce another smoke calculation. Groups can restrict origins to a validated
+member subset. Old payload schemas 1/2 load without enabling actions or writing
+storage; schema 3 is written only for explicitly extended group content. Outer
+HA Store version, source options, domain, config-entry version and unique IDs stay
+unchanged. Existing link choices remain intact. Rollback from schema 3 requires
+a matching pre-update backup; older code does not understand its payload.
+
+`automation.py` validates actual registered Companion services and registry-bound
+script identities. `alarmmesh/settings` and `alarmmesh/test` use HA admin checks,
+strict schemas and confirmation; manual requests recheck authorization at dispatch.
+Browser input never specifies a raw payload or arbitrary service. `effects.py`
+shares the existing eight-slot executor limit and bounded calls, with independent
+recipient/group error isolation. Scripts are started in order, not awaited to
+physical completion. Explicit off from every relevant source is required for
+recovery. No automatic retry, external rollback or background heartbeat is added.
+
+HA Store version 1 keys `alarmmesh.notifications.<entry>`,
+`alarmmesh.receipts.<entry>` and `alarmmesh.selftest.<entry>` respectively hold
+settings, minimal receipt ledger and last self-test record. Writes precede
+requests; interrupted sending intents become unknown and are not replayed.
+Receipt storage is limited to 101 episode keys, 60 receipts each and 256 source
+references; recovered episodes expire after 24 hours. No token, message body,
+provider payload or observed source state is stored there. Damaged stores fail
+setup without dispatch/overwrite. Entry deletion removes only entry-owned data.
+
+`self_test.py` resolves exact same-device MQTT/ZHA HA entities. It subscribes before
+request dispatch, observes separate activity/result fields, refuses smoke/conflicts,
+rechecks after waiting and permits one request at a time. A 120-second one-shot
+deadline bounds this explicit operation, not source freshness. Only a fresh,
+correlated HALO result can report device success; other routes remain unknown.
+The reviewed ZHA Aqara button has no separate result entity. Smoke observations
+remain unmodified and are never suppressed by these separate supported tests.
+
+Each self-test task now owns a distinct request context: request ID, record,
+fixed deadline and its own subscription/timer handles. Dispatch checks this exact
+ownership and deadline again after acquiring an execution slot. Observation and
+timeout callbacks capture that context; callbacks from a retired request cannot
+modify or save a successor. Disk writes share the initialization lock and check
+ownership after acquiring it. Late completion/failure/cancellation returns only
+the originating record, never the current global record. Unload first blocks new
+requests, cancels/drains all request tasks and clears only their owned watches.
+This is a race correction within the existing mechanism; persisted record shape,
+storage version, status semantics and execution limits are unchanged.
+
+Unload pauses and drains sounders, effects and self-tests before platform teardown;
+failed teardown keeps all action dispatch paused. Successful close detaches script,
+registry, test-result and source subscriptions/timers. New runtime objects load
+current source states and durable receipts without adopting external sounders.
+The frontend keeps five primary tabs and presents Settings/incident details with
+unchanged branding. All new text is packaged in both Dutch and English.
+
+Reviewed separate-smoke contract evidence is cached against the source registry/device
+identity within the runtime. Test-control loss cannot turn an independently reported
+smoke value into a test echo. This cache stores no source state or device ownership.

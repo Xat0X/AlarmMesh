@@ -11,9 +11,13 @@ the independent CI matrix uses the [complete validation route](development.md#co
 The new local [linked-sounding extension](linked-sounding.md) adds three checks
 to the original runner (17 at beta.2), using mock HA controls and registry metadata.
 The current [catalog extension](device-compatibility.md) retains all 17, adds
-three runtime scenarios and 13 driver checks. Driver checks use a run-owned
+three runtime scenarios (20 total at beta.3) and 14 driver checks. Driver checks use a run-owned
 Mosquitto 2.0.22 broker on the same internal network, actual HA MQTT discovery,
 and offline installed ZHA actions/quirks with all endpoint I/O mocked.
+The current incident extension adds four runtime and two driver checks: **24
+runtime + 16 driver scenarios per HA version**, retaining every earlier scenario.
+They exercise actual settings/group WebSocket APIs, real event-only HA scripts,
+mock Companion receivers, receipt reload and separate self-test/smoke feedback.
 Its evidence is recorded separately from the historical read-only results below.
 The historical results below are retained as dated evidence; base `0e7ba38`
 already includes those changes and the supplied branding.
@@ -61,7 +65,7 @@ No onboarding, user account, real HA access or direct device connection is neede
 Each run records requested/actual HA version, HEAD commit, working-tree change
 indicator, relevant local paths and scenario outcomes. `compatibility-result.json`
 is the overall result; `technical-result.json` contains the runtime detail.
-`driver-result.json` records the 13 separate driver scenarios and installed
+`driver-result.json` records the separate driver scenarios and installed
 upstream package versions. The wrapper rejects stale/partial/mismatched reports;
 its summary includes driver outcomes, including partial failure. Per-phase logs stay locally ignored. Summaries contain no account/configuration
 contents or exception text. Do not publish raw local logs without review.

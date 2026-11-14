@@ -8,6 +8,11 @@
 
 Smoke reports and source availability from existing Home Assistant smoke detector
 entities, with a local panel for detectors, rooms and groups. This test release adds [optional linked sounding](docs/linked-sounding.md), off by default.
+The current unpublished working tree also adds [Companion notifications, group
+script actions, incident details and reviewed built-in self-test requests](docs/incident-features.md).
+New automatic behavior defaults off; existing explicit choices are preserved.
+The [current finishing review](docs/finish-review.md) records the completed form,
+incident and package checks, plus the remaining visual acceptance boundary.
 
 > AlarmMesh is not a certified fire alarm system and must not replace certified standalone smoke detectors.
 
@@ -65,9 +70,10 @@ in-memory result is shown by exactly two entities, with no physical device entry
   completeness of source information, not fire safety.
 
 No smoke reported is not a guarantee of safety. Optional linking calls only
-explicitly mapped, verified existing HA controls. It does not add AlarmMesh
-services, notifications or device tests. Activation-only profiles have no automatic
-stop; a completed HA action is not audible confirmation.
+explicitly mapped, verified existing HA controls. It adds no arbitrary AlarmMesh services or device transport. In the current
+working tree, notifications and script actions require separate opt-in; built-in
+self-test requests require a reviewed model/provider contract and confirmation.
+Activation-only profiles have no automatic stop; a completed HA action is not audible confirmation.
 
 ## Install and select sources
 

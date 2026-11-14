@@ -4,7 +4,7 @@
     "step": {
       "user": {
         "title": "AlarmMesh-bronnen selecteren",
-        "description": "AlarmMesh biedt twee alleen-lezen overzichten: samengevoegde rookmeldingen en volledigheid van broninformatie. Geen rook gemeld is geen garantie op veiligheid. Samen afgaan is optioneel, staat standaard uit en wordt apart ingesteld in het AlarmMesh-paneel. Geen notificaties of apparaattests.",
+        "description": "AlarmMesh toont rookmeldingen en broninformatie. Samen afgaan, gsm-meldingen en incidentacties zijn optioneel en worden afzonderlijk ingesteld in het AlarmMesh-paneel; nieuwe automatische functies staan standaard uit. Zelftests zijn alleen beschikbaar voor aantoonbaar ondersteunde apparaten en vereisen afzonderlijke bevestiging. Geen rook gemeld is geen veiligheidsgarantie.",
         "data": {
           "source_entity_ids": "Rookmelderbronnen"
         },
@@ -30,7 +30,7 @@
     "step": {
       "init": {
         "title": "AlarmMesh-bronnen aanpassen",
-        "description": "AlarmMesh biedt twee alleen-lezen overzichten: samengevoegde rookmeldingen en volledigheid van broninformatie. Geen rook gemeld is geen garantie op veiligheid. Samen afgaan is optioneel, staat standaard uit en wordt apart ingesteld in het AlarmMesh-paneel. Geen notificaties of apparaattests.",
+        "description": "AlarmMesh toont rookmeldingen en broninformatie. Samen afgaan, gsm-meldingen en incidentacties zijn optioneel en worden afzonderlijk ingesteld in het AlarmMesh-paneel; nieuwe automatische functies staan standaard uit. Zelftests zijn alleen beschikbaar voor aantoonbaar ondersteunde apparaten en vereisen afzonderlijke bevestiging. Geen rook gemeld is geen veiligheidsgarantie.",
         "data": {
           "source_entity_ids": "Rookmelderbronnen"
         },

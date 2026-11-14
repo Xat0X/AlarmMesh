@@ -2,11 +2,11 @@ param(
     [ValidateSet('Start', 'Status', 'Stop')][string]$Action = 'Status',
     [ValidateSet('2026.10.4', '2026.11.1')][string]$HaVersion = '2026.11.1',
     [ValidateRange(1024, 65535)][int]$Port = 8128,
-    [ValidateSet('Panel', 'Linking', 'Catalog')][string]$Mode = 'Panel'
+    [ValidateSet('Panel', 'Linking', 'Catalog', 'Incidents')][string]$Mode = 'Panel'
 )
 $ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-$purpose = if ($Mode -eq 'Catalog') { 'catalog-ui' } elseif ($Mode -eq 'Linking') { 'linking-ui' } else { 'panel-ui' }
+$purpose = if ($Mode -eq 'Incidents') { 'incident-ui' } elseif ($Mode -eq 'Catalog') { 'catalog-ui' } elseif ($Mode -eq 'Linking') { 'linking-ui' } else { 'panel-ui' }
 $root = Join-Path $repo "config/$purpose"
 $current = Join-Path $root 'current-run.json'
 function Docker-Checked {
@@ -50,7 +50,7 @@ if (-not (Test-Path -LiteralPath $current)) {
     $directory = Join-Path $root $id
     $configuration = Join-Path $directory 'config'
     New-Item -ItemType Directory -Path $configuration | Out-Null
-    $template = if ($Mode -eq 'Catalog') { 'catalog' } elseif ($Mode -eq 'Linking') { 'linking-simulation' } else { 'mvp-acceptance' }
+    $template = if ($Mode -eq 'Incidents') { 'incident-acceptance' } elseif ($Mode -eq 'Catalog') { 'catalog' } elseif ($Mode -eq 'Linking') { 'linking-simulation' } else { 'mvp-acceptance' }
     $yaml = Get-Content -Raw -Encoding UTF8 (Join-Path $PSScriptRoot "$template/configuration.yaml")
     $yaml = $yaml.Replace('AlarmMesh MVP - SIMULATED', 'AlarmMesh PANEL - SIMULATION ONLY')
     [System.IO.File]::WriteAllText((Join-Path $configuration 'configuration.yaml'), $yaml)

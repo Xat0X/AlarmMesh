@@ -7,6 +7,12 @@ from uuid import uuid4
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
 
+from .automation import (
+    DEFAULT_ACTIONS,
+    AutomationError,
+    script_target,
+    validate_actions,
+)
 from .capabilities import Capabilities
 
 MAX_NAME = 64
@@ -39,18 +45,16 @@ class GroupStore:
                 or not isinstance(data.get("groups"), list)
                 or len(data["groups"]) > MAX_GROUPS
                 or type(data.get("schema", 1)) is not int
-                or data.get("schema", 1) not in (1, 2)
+                or data.get("schema", 1) not in (1, 2, 3)
             ):
                 raise GroupError("invalid_storage")
             ids = set()
             for group in data["groups"]:
-                if not isinstance(group, dict) or set(group) not in (
-                    {
-                        "id",
-                        "name",
-                        "members",
-                    },
-                    {"id", "name", "members", "linking"},
+                if (
+                    not isinstance(group, dict)
+                    or not {"id", "name", "members"} <= group.keys()
+                    or not group.keys()
+                    <= {"id", "name", "members", "linking", "origins", "actions"}
                 ):
                     raise GroupError("invalid_storage")
                 group_id = group["id"]
@@ -66,10 +70,63 @@ class GroupStore:
                 self.validate_link_shape(
                     group.get("linking", {"enabled": False, "bindings": []})
                 )
+                self.validate_origins(
+                    group.get("origins", group["members"]), group["members"]
+                )
+                try:
+                    validate_actions(group.get("actions", DEFAULT_ACTIONS))
+                except AutomationError as err:
+                    raise GroupError("invalid_storage") from err
             self.revision = data["revision"]
             self.groups = deepcopy(data["groups"])
             for group in self.groups:
                 group.setdefault("linking", {"enabled": False, "bindings": []})
+
+    @staticmethod
+    def validate_origins(origins, members):
+        _, origins = GroupStore.validate("origins", origins)
+        if not set(origins) <= set(members):
+            raise GroupError("invalid_origins")
+        return origins
+
+    def validate_extensions(self, command, members, previous, selected):
+        value = {}
+        if "origins" in command or (previous and "origins" in previous):
+            value["origins"] = self.validate_origins(
+                command.get(
+                    "origins", previous.get("origins", members) if previous else members
+                ),
+                members,
+            )
+        if "actions" in command or (previous and "actions" in previous):
+            old = (
+                previous.get("actions", DEFAULT_ACTIONS)
+                if previous
+                else DEFAULT_ACTIONS
+            )
+            actions = deepcopy(command.get("actions", old))
+            try:
+                validate_actions(actions)
+            except AutomationError as err:
+                raise GroupError(str(err)) from err
+            if actions["enabled"]:
+                if command.get("confirmed") is not True:
+                    raise GroupError("automation_confirmation_required")
+                if not value.get("origins", members) or not set(
+                    value.get("origins", members)
+                ) <= set(selected):
+                    raise GroupError("invalid_origins")
+            for phase in ("start", "recovery"):
+                for binding in actions[phase]:
+                    current = script_target(
+                        self.capabilities.hass, binding["entity_id"]
+                    )
+                    if (
+                        current is None or current["identity"] != binding["identity"]
+                    ) and (actions["enabled"] or binding not in old[phase]):
+                        raise GroupError("script_changed")
+            value["actions"] = actions
+        return value
 
     @staticmethod
     def validate_link_shape(value: object) -> None:
@@ -198,14 +255,23 @@ class GroupStore:
                     "linking": self.validate_linking(
                         command, members, selected, previous
                     ),
+                    **self.validate_extensions(command, members, previous, selected),
                 }
+                if value["linking"]["enabled"] and not value.get("origins", members):
+                    raise GroupError("invalid_origins")
                 if previous:
                     groups = [value if g["id"] == group_id else g for g in groups]
                 else:
                     groups.append(value)
             revision = self.revision + 1
             await self.store.async_save(
-                {"schema": 2, "revision": revision, "groups": groups}
+                {
+                    "schema": 3
+                    if any("origins" in g or "actions" in g for g in groups)
+                    else 2,
+                    "revision": revision,
+                    "groups": groups,
+                }
             )
             self.groups, self.revision = groups, revision
 

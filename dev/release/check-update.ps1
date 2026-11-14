@@ -1,6 +1,8 @@
 param(
     [ValidateSet('2026.10.4', '2026.11.1')]
-    [string]$HaVersion = '2026.10.4'
+    [string]$HaVersion = '2026.10.4',
+    [ValidateSet('0e7ba38', 'b2f3d7')]
+    [string]$PreviousRevision = 'b2f3d7'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -16,12 +18,13 @@ $packageRoot = Join-Path $repoRoot "config/release-packages/$runId"
 $utf8 = [System.Text.UTF8Encoding]::new($false)
 $report = [ordered]@{
     base_commit = (& git -C $repoRoot rev-parse HEAD)
-    previous_revision = (& git -C $repoRoot rev-parse '0e7ba38^{commit}')
+    previous_revision = (& git -C $repoRoot rev-parse ($PreviousRevision + '^{commit}'))
     ha_version = $HaVersion
     result = 'FAIL'
     scope = 'file replacement and stopped-file snapshot recovery; not Marketplace/HACS or HA backup acceptance'
     stages = [ordered]@{}
 }
+$extended = $PreviousRevision -eq 'b2f3d7'
 $stage = 'packages'
 $networkCreated = $false
 $cleanupFailed = $false
@@ -42,12 +45,16 @@ function Invoke-Phase {
         '--mount', "type=bind,source=$ConfigPath,target=/config",
         '--mount', "type=bind,source=$InstallPath,target=/config/custom_components/alarmmesh,readonly",
         '--mount', "type=bind,source=$PSScriptRoot,target=/check,readonly",
-        '--mount', "type=bind,source=$root,target=/evidence",
-        '--entrypoint', 'python', "ghcr.io/home-assistant/home-assistant:$HaVersion",
+        '--mount', "type=bind,source=$root,target=/evidence")
+    if ($extended) {
+        $args += @('--mount', "type=bind,source=$(Join-Path $repoRoot 'dev/linking-simulation/alarmmesh_simulation'),target=/config/custom_components/alarmmesh_simulation,readonly")
+    }
+    $args += @('--entrypoint', 'python', "ghcr.io/home-assistant/home-assistant:$HaVersion",
         '/check/check_update.py', '--phase', $Phase, '--ha-version', $HaVersion)
+    if ($extended) { $args += '--catalog-baseline' }
     & docker @args > (Join-Path $root "$Phase.log") 2>&1
     if ($LASTEXITCODE -ne 0) { throw "Update phase $Phase failed (exit $LASTEXITCODE)." }
-    $result = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root "$Phase-result.json") | ConvertFrom-Json
+    $result = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root "phase-$Phase-result.json") | ConvertFrom-Json
     if ($result.result -ne 'PASS' -or $result.actual_ha_version -ne $HaVersion) { throw 'Update phase report mismatch.' }
     $report.stages[$Phase] = 'PASS'
 }
@@ -55,7 +62,7 @@ function Invoke-Phase {
 try {
     & python (Join-Path $PSScriptRoot 'package.py') --output (Join-Path $packageRoot 'current') > (Join-Path $root 'package-current.log') 2>&1
     if ($LASTEXITCODE -ne 0) { throw 'Current package failed.' }
-    & python (Join-Path $PSScriptRoot 'package.py') --revision 0e7ba38 --output (Join-Path $packageRoot 'previous') > (Join-Path $root 'package-previous.log') 2>&1
+    & python (Join-Path $PSScriptRoot 'package.py') --revision $PreviousRevision --output (Join-Path $packageRoot 'previous') > (Join-Path $root 'package-previous.log') 2>&1
     if ($LASTEXITCODE -ne 0) { throw 'Previous package failed.' }
     $current = Join-Path $packageRoot 'current/alarmmesh.zip'
     $previous = Join-Path $packageRoot 'previous/alarmmesh.zip'
@@ -66,7 +73,15 @@ try {
     $config = Join-Path $root 'config'
     $installed = Join-Path $root 'installed'
     New-Item -ItemType Directory -Path $config,$installed | Out-Null
-    Copy-Item -LiteralPath (Join-Path $repoRoot 'dev/mvp-acceptance/configuration.yaml'),(Join-Path $repoRoot 'dev/mvp-acceptance/ui-lovelace.yaml') -Destination $config
+    $template = if ($extended) { 'dev/incident-acceptance' } else { 'dev/mvp-acceptance' }
+    Copy-Item -LiteralPath (Join-Path $repoRoot "$template/configuration.yaml"),(Join-Path $repoRoot "$template/ui-lovelace.yaml") -Destination $config
+    if ($extended) {
+        # Simulation helpers must restore their saved checkpoint on a new HA
+        # process, rather than resetting via YAML initial:false. No storage edits.
+        $yamlPath = Join-Path $config 'configuration.yaml'
+        $yaml = [System.IO.File]::ReadAllText($yamlPath).Replace("    initial: false`r`n", '').Replace("    initial: false`n", '')
+        [System.IO.File]::WriteAllText($yamlPath, $yaml, $utf8)
+    }
     Expand-Archive -LiteralPath $previous -DestinationPath $installed
     & docker network create --internal --label org.alarmmesh.purpose=update-check --label "org.alarmmesh.run=$runId" $network > (Join-Path $root 'network.log') 2>&1
     if ($LASTEXITCODE -ne 0) { throw 'Cannot create own internal update network.' }
@@ -91,6 +106,15 @@ try {
     }
     Expand-Archive -LiteralPath $current -DestinationPath $installed -Force
     Invoke-Phase 'update' $config $installed
+    if ($extended) {
+        $stage = 'restart'
+        Invoke-Phase 'restart' $config $installed
+        $stage = 'fresh'
+        $fresh = Join-Path $root 'fresh-config'
+        New-Item -ItemType Directory -Path $fresh | Out-Null
+        Copy-Item -LiteralPath (Join-Path $repoRoot "$template/configuration.yaml"),(Join-Path $repoRoot "$template/ui-lovelace.yaml") -Destination $fresh
+        Invoke-Phase 'fresh' $fresh $installed
+    }
     $stage = 'restore'
     $restoreRoot = Join-Path $root 'restored'
     Assert-OwnPath $restoreRoot
@@ -105,7 +129,7 @@ try {
     [System.IO.File]::WriteAllText((Join-Path $root 'host-failure.log'), ($_ | Out-String) + $_.ScriptStackTrace, $utf8)
 } finally {
     try {
-        foreach ($phase in @('seed','update','restore')) {
+        foreach ($phase in @('seed','update','restart','fresh','restore')) {
             $container = "$name-$phase"
             $existing = & docker container ls -a --filter ('name=^/' + $container + '$') --format '{{.Names}}'
             if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect own container cleanup.' }

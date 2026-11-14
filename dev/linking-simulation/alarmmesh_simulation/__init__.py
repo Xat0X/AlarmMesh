@@ -24,13 +24,20 @@ async def async_setup(hass, _config):
         hass.config_entries.flow.async_init(
             DOMAIN,
             context={"source": "import"},
-            data={"catalog": bool((_config.get(DOMAIN) or {}).get("catalog"))},
+            data={
+                key: bool((_config.get(DOMAIN) or {}).get(key))
+                for key in ("catalog", "incidents")
+            },
         )
     )
     return True
 
 
 async def async_setup_entry(hass, entry):
+    if entry.data.get("incidents"):
+        from .incident_fixture import async_setup_incidents
+
+        return await async_setup_incidents(hass, entry)
     if entry.data.get("catalog"):
         from .catalog_fixture import async_setup_catalog
 

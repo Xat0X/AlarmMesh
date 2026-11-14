@@ -54,7 +54,7 @@ phone/tablet layout, contrast or native keyboard focus. Use the separate
 The Python fixture substitutes only the missing upstream UI-wheel filesystem
 root in the pip HA harness; real HTTP routes, panel registration, WebSocket auth,
 HA registries and group storage remain in use. Official image runs use their
-real bundled frontend and now check **17** scenarios, including authenticated
+real bundled frontend and now check **24 runtime + 16 driver** scenarios, including authenticated
 panel subscription/group mutations, asset serving, persistent groups, verified
 mock control profiles, mixed-provider failure isolation and linking cleanup.
 The [linking simulation](linked-sounding.md#reproduce-the-simulation) uses mock
@@ -241,3 +241,11 @@ The launcher's existing bridge has outbound access, not LAN-firewall semantics.
 Visual access may require user onboarding; never substitute DOM tests for actual
 phone/tablet/theme/keyboard observations. The completed representative native UI
 review and its limits are recorded in the device support guide.
+
+
+The current incident-feature working tree uses the same validation route, adding
+mock phone/script/self-test regressions and preserving all pre-existing tests.
+[Incident evidence and simulation](incident-features.md) records the exact final
+counts, ignored local reports and current UI-host limitation; DOM tests are not
+visual acceptance. Use `-Mode Incidents -Port 8131` with the existing panel launcher
+for the separate event-only/mock-phone instance. No product dependencies changed.

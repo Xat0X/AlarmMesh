@@ -27,7 +27,7 @@ function docker {
     if ($name -like '*-drivers') {
         $context = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $configDir 'run-context.json') | ConvertFrom-Json
         $driver = @{ result='PASS'; actual_ha_version='2026.10.4'; requested_ha_version='2026.10.4'; run_id=$context.run_id; git_commit=$context.git_commit; scenarios=@{} }
-        foreach ($i in 1..14) { $driver.scenarios["driver-$i"] = 'PASS' }
+        foreach ($i in 1..16) { $driver.scenarios["driver-$i"] = 'PASS' }
         if ($global:AlarmMeshToolingFault -eq 'drivers') { $driver.scenarios['driver-1'] = 'FAIL' }
         [System.IO.File]::WriteAllText((Join-Path $configDir 'driver-result.json'), ($driver | ConvertTo-Json -Depth 5), $utf8)
         return
@@ -38,7 +38,7 @@ function docker {
         run_id = $context.run_id; git_commit = $context.git_commit; scenarios = [ordered]@{}
     }
     if ($global:AlarmMeshToolingFault -eq 'stale') { $technical.run_id = 'previous-run' }
-    foreach ($i in 1..20) { $technical.scenarios["scenario-$i"] = 'PASS' }
+    foreach ($i in 1..24) { $technical.scenarios["scenario-$i"] = 'PASS' }
     [System.IO.File]::WriteAllText((Join-Path $configDir 'technical-result.json'), ($technical | ConvertTo-Json -Depth 5), $utf8)
 }
 

@@ -1,0 +1,248 @@
+"""Additional scenarios in the existing image checker; no physical endpoints."""
+
+from uuid import uuid4
+
+from homeassistant.exceptions import HomeAssistantError
+from homeassistant.setup import async_setup_component
+
+from custom_components.alarmmesh.automation import script_target
+from custom_components.alarmmesh.const import CONF_SOURCE_ENTITY_IDS
+
+
+async def check_features(hass, entry, registry, fixtures, ws_request, require, passed):
+    a, b = (fixtures[n]["source"] for n in "ab")
+    for name in "ab":
+        hass.states.async_set(f"input_boolean.catalog_{name}_smoke", "off")
+    hass.states.async_set("input_boolean.catalog_test", "off")
+    hass.config_entries.async_update_entry(
+        entry, options={CONF_SOURCE_ENTITY_IDS: [a, b]}
+    )
+    require(await hass.config_entries.async_setup(entry.entry_id), "Feature setup")
+
+    async def settle():
+        for _ in range(12):
+            await hass.async_block_till_done()
+            panel = entry.runtime_data.panel
+            tasks = [
+                t
+                for t in (
+                    panel.linking._task,
+                    panel.effects._task,
+                    *panel.selftests.tasks,
+                )
+                if t is not None
+            ]
+            if not tasks:
+                return
+            for task in tasks:
+                await task
+        raise AssertionError("Feature tasks did not settle")
+
+    calls, actions = [], []
+
+    async def notify(call):
+        calls.append((call.service, dict(call.data)))
+        if call.service.endswith("_b"):
+            raise HomeAssistantError("Simulated recipient failure")
+
+    for name in "ab":
+        hass.services.async_register("notify", "mobile_app_simulated_" + name, notify)
+
+    def observe(event):
+        actions.append(event.data["phase"])
+
+    unsubscribe = hass.bus.async_listen("alarmmesh_simulated_script", observe)
+    try:
+        require(
+            await async_setup_component(
+                hass,
+                "script",
+                {
+                    "script": {
+                        "alarmmesh_simulated_start": {
+                            "alias": "SIMULATED start",
+                            "sequence": [
+                                {
+                                    "event": "alarmmesh_simulated_script",
+                                    "event_data": {"phase": "start"},
+                                }
+                            ],
+                        },
+                        "alarmmesh_simulated_recovery": {
+                            "alias": "SIMULATED recovery",
+                            "sequence": [
+                                {
+                                    "event": "alarmmesh_simulated_script",
+                                    "event_data": {"phase": "recovery"},
+                                }
+                            ],
+                        },
+                    }
+                },
+            ),
+            "Actual script integration setup",
+        )
+        await settle()
+        panel = entry.runtime_data.panel
+
+        def script(name):
+            target = script_target(hass, "script.alarmmesh_simulated_" + name)
+            require(target is not None, "Actual script registry target missing")
+            return {k: target[k] for k in ("entity_id", "identity")}
+
+        require(
+            not calls and not actions and not panel.effects.settings.value["enabled"],
+            "Default-on automation",
+        )
+        await ws_request(
+            {
+                "id": 100,
+                "type": "alarmmesh/settings",
+                "revision": 0,
+                "confirmed": True,
+                "notifications": {
+                    "enabled": True,
+                    "recovery": True,
+                    "recipients": [
+                        {"service": "mobile_app_simulated_" + n, "enabled": True}
+                        for n in "ab"
+                    ],
+                },
+            }
+        )
+        await ws_request(
+            {
+                "id": 101,
+                "type": "alarmmesh/group",
+                "operation": "create",
+                "revision": panel.groups.revision,
+                "name": "SIMULATED incident actions",
+                "members": [a, b],
+                "origins": [a],
+                "confirmed": True,
+                "actions": {
+                    "enabled": True,
+                    "start": [script("start")],
+                    "recovery": [script("recovery")],
+                },
+            }
+        )
+        await settle()
+        require(not calls and not actions, "Configuration sent an unsolicited action")
+        passed("incident_settings_and_real_script_api")
+
+        hass.states.async_set("input_boolean.catalog_a_smoke", "on")
+        await settle()
+        require(len(calls) == 2 and actions == ["start"], "Initial incident delivery")
+        panel.linking.changed()
+        await settle()
+        require(len(calls) == 2 and actions == ["start"], "Duplicate event replayed")
+        hass.states.async_set("input_boolean.catalog_b_unreachable", "on")
+        hass.states.async_set("input_boolean.catalog_a_smoke", "off")
+        await settle()
+        require(
+            len(calls) == 2 and actions == ["start", "recovery"],
+            "Group recovery or false global recovery",
+        )
+        hass.states.async_set("input_boolean.catalog_b_unreachable", "off")
+        await settle()
+        require(len(calls) == 4, "Confirmed notification recovery")
+        require(
+            "/alarmmesh?incident=" in calls[0][1]["data"]["url"],
+            "Incident deep link missing",
+        )
+        passed("incident_delivery_failure_and_explicit_recovery")
+
+        hass.states.async_set("input_boolean.catalog_a_smoke", "on")
+        hass.states.async_set("input_boolean.catalog_b_smoke", "on")
+        await settle()
+        before = (len(calls), list(actions))
+        retired = panel
+        require(
+            await hass.config_entries.async_reload(entry.entry_id), "Feature reload"
+        )
+        await settle()
+        require((len(calls), actions) == before, "Receipts replayed on reload")
+        retired.effects.changed()
+        require(
+            retired.effects.closed and retired.linking._closed, "Retired feature worker"
+        )
+        hass.states.async_set("input_boolean.catalog_b_smoke", "off")
+        hass.states.async_set("input_boolean.catalog_a_smoke", "off")
+        await settle()
+        passed("incident_receipts_reload_and_retired_workers")
+
+        panel = entry.runtime_data.panel
+        source = registry.async_get(a)
+        button = registry.async_get_or_create(
+            "button",
+            "mqtt",
+            "sim_a_trigger_selftest_zigbee2mqtt",
+            config_entry=next(
+                e for e in hass.config_entries.async_entries("alarmmesh_simulation")
+            ),
+            device_id=source.device_id,
+            suggested_object_id="simulated_builtin_test",
+        )
+        hass.states.async_set(button.entity_id, "unknown")
+        test_calls = []
+
+        async def press(call):
+            require(
+                call.data == {"entity_id": button.entity_id},
+                "Unexpected self-test payload",
+            )
+            test_calls.append(call.data["entity_id"])
+            hass.states.async_set("input_boolean.catalog_test", "on")
+
+        hass.services.async_register("button", "press", press)
+        await settle()
+        control = panel.selftests.resolve(a)
+        require(control is not None, "Reviewed self-test missing")
+        before = (len(calls), list(actions))
+        await ws_request(
+            {
+                "id": 102,
+                "type": "alarmmesh/test",
+                "kind": "selftest",
+                "target": a,
+                "identity": control["identity"],
+                "confirmed": True,
+                "request_id": uuid4().hex,
+            }
+        )
+        await settle()
+        require(
+            len(test_calls) == 1 and (len(calls), actions) == before,
+            "Self-test became incident",
+        )
+        require(
+            panel.selftests.record["status"] == "test_active", "Test active feedback"
+        )
+        hass.states.async_set("input_boolean.catalog_a_smoke", "on")
+        await settle()
+        require(
+            hass.states.is_state(a, "on") and a in panel.linking.active,
+            "Real smoke hidden by test",
+        )
+        require(
+            len(calls) == before[0] + 2 and len(actions) == len(before[1]) + 1,
+            "Smoke delivery suppressed by test",
+        )
+        panel.selftests._expired(None)
+        await settle()
+        require(
+            panel.selftests.record["status"] == "outcome_unknown",
+            "Timeout reported success",
+        )
+        old = panel
+        require(
+            await hass.config_entries.async_unload(entry.entry_id), "Feature unload"
+        )
+        require(
+            old.effects.closed and old.selftests.closed and not old.script_unsubscribe,
+            "Feature subscription leak",
+        )
+        passed("selftest_request_real_smoke_and_interruption")
+    finally:
+        unsubscribe()

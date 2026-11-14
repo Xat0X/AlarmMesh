@@ -1,5 +1,48 @@
 # Changelog
 
+## 0.1.0-beta.4 — 2026-11-15
+
+- Complete visual simulation checks for group actions, smoke/outage/recovery and
+  built-in self-test activity, timeout and explicit results; see the
+  [visual flow review](docs/visual-flow-review.md). Clear obsolete confirmation
+  warnings and align long incident rows with a fixed icon column. No real outputs.
+
+- Finish group/script editors: preserve unavailable or changed assignments until
+  explicit replacement/removal, lock the reviewed configuration, reject offline
+  confirmation and retain drafts through reconnect. Show names/rooms before IDs.
+- Show live self-test results only for the matching request, and show involved
+  groups plus uncleared unknown origins even when notifications/scripts are off.
+  Add two-way script ordering, clearer previews and stronger default dialog contrast.
+- Extend the existing package/update runner from published beta.3 to this working
+  tree, including fresh installation, process restart, explicit settings, corrupt
+  storage and stopped-file recovery. See the completed isolated visual flow review; physical acceptance remains open.
+
+- Fix self-test request ownership: an expired queued task cannot borrow a later
+  confirmation, dispatch, alter its successor's status/storage/watchers or return
+  its successor's result. Bind callbacks and deadlines to individual requests;
+  retain identity, authorization, smoke/conflict checks and cancellation cleanup.
+- Correct setup/options text in English and Dutch for optional notifications,
+  incident scripts and separately confirmed supported self-tests.
+
+- Add separate group incident-origin selection without replacing the existing
+  linking engine, deduplication, Bosch safeguards or ownership-limited stopping.
+- Add default-off Companion notification settings and ordered per-group HA script
+  start/recovery actions, server-validated targets, explicit test confirmation,
+  durable bounded receipts, error isolation and no automatic replay after reload.
+- Add capability-gated built-in self-test requests through reviewed existing HA
+  buttons/selects. Keep real smoke, activity and explicit device result separate;
+  interrupted/no-result tests are unknown, never passed.
+- Add Settings and incident details in Dutch/English, preserved offline drafts,
+  receiver/script availability and exact-target confirmations. Preserve the local
+  guided setup/configuration checks below and original branding.
+- Extend isolated backend/DOM and both exact-HA compatibility checks, event-only
+  script/mock-phone simulation, and reviewed package inventory. No real device,
+  phone, cloud or physical self-test was used. Later isolated visual checks are recorded in the [visual flow review](docs/visual-flow-review.md); physical acceptance remains open.
+
+- Add read-only guided setup and contextual group configuration checks, with
+  source/mapping/prerequisite explanations and existing navigation only. Keep
+  explicit confirmation, action execution and default-off behavior unchanged.
+
 ## 0.1.0-beta.3 — 2026-11-14
 
 - Block Bosch BSD-2 linked activation unless its same-device broadcast switch

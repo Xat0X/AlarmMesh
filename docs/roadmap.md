@@ -1,5 +1,11 @@
 # Proposed next steps — no implementation authorization
 
+The proposal below records the earlier read-only planning boundary. A subsequent
+explicit assignment now implements default-off notifications/group scripts and
+reviewed device-test requests in the unpublished working tree; see the
+[incident guide and outstanding acceptance](incident-features.md). This does not
+complete physical acceptance or authorize further automation.
+
 The repo already has extensive source/lifecycle regressions. Hosted a300d39 and
 bbd767a, plus the simulation UI evidence, are verified; see the
 [current acceptance matrix](acceptance-matrix.md).

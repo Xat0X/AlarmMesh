@@ -38,11 +38,16 @@ REQUIRED_FILES = FOUNDATION_FILES | {
     "linking.py",
     "linking_runtime.py",
     "groups.py",
+    "automation.py",
+    "effects.py",
+    "self_test.py",
     "panel.py",
     "frontend/panel.js",
     "frontend/panel.css",
     "frontend/translations.js",
 }
+CATALOG_FILES = REQUIRED_FILES - {"automation.py", "effects.py", "self_test.py"}
+CATALOG_REVISION = "b2f3d719a86cffb0a533fa5650dce624fd2275f2"
 
 
 def git(repo: Path, *arguments: str) -> bytes:
@@ -52,9 +57,14 @@ def git(repo: Path, *arguments: str) -> bytes:
     ).stdout
 
 
-def validate_files(files: dict[str, bytes], *, legacy: bool = False) -> dict:
+def validate_files(
+    files: dict[str, bytes], *, legacy: bool = False, catalog: bool = False
+) -> dict:
     """Fail closed on missing/unreviewed files and wrong installation metadata."""
-    if set(files) != (FOUNDATION_FILES if legacy else REQUIRED_FILES):
+    expected = (
+        FOUNDATION_FILES if legacy else CATALOG_FILES if catalog else REQUIRED_FILES
+    )
+    if (legacy and catalog) or set(files) != expected:
         raise ValueError(
             "Integration file inventory differs from the reviewed allowlist"
         )
@@ -84,9 +94,11 @@ def validate_files(files: dict[str, bytes], *, legacy: bool = False) -> dict:
     return manifest
 
 
-def write_zip(files: dict[str, bytes], path: Path, *, legacy: bool = False) -> str:
+def write_zip(
+    files: dict[str, bytes], path: Path, *, legacy: bool = False, catalog: bool = False
+) -> str:
     """Use fixed metadata/order and stored bytes for cross-platform repeatability."""
-    validate_files(files, legacy=legacy)
+    validate_files(files, legacy=legacy, catalog=catalog)
     with zipfile.ZipFile(path, "x", compression=zipfile.ZIP_STORED) as archive:
         for name, content in sorted(files.items()):
             info = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
@@ -153,10 +165,11 @@ def build(repo: Path, output: Path, revision: str | None = None) -> dict:
     # Explicit old inventory is allowed only for an exact historical Git build.
     # Working-tree builds must always contain the complete reviewed panel payload.
     legacy = bool(revision and set(files) == FOUNDATION_FILES)
-    manifest = validate_files(files, legacy=legacy)
+    catalog = bool(revision and commit == CATALOG_REVISION)
+    manifest = validate_files(files, legacy=legacy, catalog=catalog)
     output.mkdir(parents=True, exist_ok=False)
     archive = output / "alarmmesh.zip"
-    digest = write_zip(files, archive, legacy=legacy)
+    digest = write_zip(files, archive, legacy=legacy, catalog=catalog)
     changes = (
         []
         if revision

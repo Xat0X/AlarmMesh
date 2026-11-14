@@ -126,6 +126,10 @@ function Check-Config {
     foreach ($file in $exampleFiles) {
         Copy-Item -LiteralPath (Join-Path $sourcePath $file) -Destination $checkPath
     }
+    # Frontend bootstrap may already load script. Supply the mock event-only
+    # scripts in this fresh YAML before setup; never edit existing HA storage.
+    $scriptExample = Join-Path $repoRoot 'dev/incident-acceptance/technical-scripts.yaml'
+    Add-Content -LiteralPath (Join-Path $checkPath 'configuration.yaml') -Value ("`n" + (Get-Content -Raw -Encoding UTF8 -LiteralPath $scriptExample)) -Encoding UTF8
     $commit = & git -C $repoRoot rev-parse HEAD
     if ($LASTEXITCODE -ne 0) { throw 'Cannot identify tested Git commit.' }
     $changes = @(& git -C $repoRoot status --porcelain --untracked-files=all -- custom_components/alarmmesh dev tests .github)
@@ -190,7 +194,7 @@ function Check-Config {
         $report.scenarios = $technical.scenarios
         if ($technical.result -ne 'PASS' -or $technical.actual_ha_version -ne $HaVersion -or
             $technical.requested_ha_version -ne $HaVersion -or $technical.run_id -ne $runId -or
-            $technical.git_commit -ne $commit -or @($technical.scenarios.PSObject.Properties).Count -ne 20 -or
+            $technical.git_commit -ne $commit -or @($technical.scenarios.PSObject.Properties).Count -ne 24 -or
             @($technical.scenarios.PSObject.Properties | Where-Object { $_.Value -ne 'PASS' }).Count -gt 0) {
             throw 'Technical report did not confirm this run, version, commit and all scenarios.'
         }
@@ -206,7 +210,7 @@ function Check-Config {
         $report.driver_checks = $drivers.scenarios
         if ($drivers.result -ne 'PASS' -or $drivers.actual_ha_version -ne $HaVersion -or
             $drivers.requested_ha_version -ne $HaVersion -or $drivers.run_id -ne $runId -or $drivers.git_commit -ne $commit -or
-            @($drivers.scenarios.PSObject.Properties).Count -ne 14 -or
+            @($drivers.scenarios.PSObject.Properties).Count -ne 16 -or
             @($drivers.scenarios.PSObject.Properties | Where-Object { $_.Value -ne 'PASS' }).Count -gt 0) {
             throw 'Driver report did not confirm this run, version, commit and all scenarios.'
         }

@@ -1,7 +1,13 @@
 # Current read-only MVP acceptance — 2026-11-13
 
+The **2026-11-14 incident-feature working tree** has its current automated results,
+separate UI-host blocker and exact local simulation URL in the
+[incident feature evidence](incident-features.md#actuele-controleresultaten).
+The earlier observations below are preserved; they do not validate these new screens,
+notifications, scripts or self-tests.
+
 Current uncommitted device-catalog work after beta.2 has its own dated
-[coverage and evidence matrix](device-compatibility.md#current-evidence).
+[coverage and evidence matrix](device-compatibility.md#historical-catalog-implementation-and-ui-evidence).
 The historical results below are retained and do not claim visual or physical
 acceptance for those additional profiles.
 

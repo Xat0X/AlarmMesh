@@ -1,0 +1,14 @@
+# Only appended to a fresh technical-check configuration before HA bootstrap.
+script:
+  alarmmesh_simulated_start:
+    alias: SIMULATED start
+    sequence:
+      - event: alarmmesh_simulated_script
+        event_data:
+          phase: start
+  alarmmesh_simulated_recovery:
+    alias: SIMULATED recovery
+    sequence:
+      - event: alarmmesh_simulated_script
+        event_data:
+          phase: recovery

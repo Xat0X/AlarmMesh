@@ -279,3 +279,12 @@ Primary API references, checked 2026-11-14:
 [siren entity contract](https://contributors.home-assistant.io/core/entities/siren/),
 [switch contract](https://contributors.home-assistant.io/core/entities/switch/).
 Model/provider evidence uses pinned official repositories in each assessment.
+
+
+## Separate built-in self-test requests (unpublished working tree)
+
+The catalog assessments above record the earlier read-only test-status coverage.
+They are not authority to start a device test. The [incident guide](incident-features.md)
+adds a separately reviewed small set of button/select self-test contracts, their
+provider-specific prerequisites and unknown-result behavior. Existing external
+activation/stop profiles are unchanged. No physical acceptance is claimed.

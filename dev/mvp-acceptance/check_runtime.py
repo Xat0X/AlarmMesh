@@ -39,6 +39,10 @@ SCENARIOS = (
     "catalog_profiles_and_diagnostics",
     "catalog_adapter_dispatch",
     "catalog_permission_reload_and_retired_runtime",
+    "incident_settings_and_real_script_api",
+    "incident_delivery_failure_and_explicit_recovery",
+    "incident_receipts_reload_and_retired_workers",
+    "selftest_request_real_smoke_and_interruption",
 )
 SCOPE = "technische controle met simulatiebronnen, geen fysieke apparaatvalidatie"
 
@@ -671,6 +675,12 @@ async def main(requested: str, config_dir: Path) -> int:
             "Catalog unload failed",
         )
         passed(current)
+        current = "incident_feature_checks"
+        from check_features import check_features
+
+        await check_features(
+            hass, entry, registry, fixtures, ws_request, require, passed
+        )
         report["result"] = "PASS"
     except Exception as exc:
         report["scenarios"][current] = "FAIL"

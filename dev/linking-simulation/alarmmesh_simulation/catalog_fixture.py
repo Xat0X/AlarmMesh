@@ -301,6 +301,10 @@ async def async_setup_catalog(hass, entry):
     ]
     helpers += ["input_boolean.catalog_fault", "input_boolean.catalog_test"]
     entry.async_on_unload(async_track_state_change_event(hass, helpers, update))
-    hass.data["alarmmesh_simulation"] = {"fixtures": fixtures, "calls": calls}
+    hass.data["alarmmesh_simulation"] = {
+        "fixtures": fixtures,
+        "calls": calls,
+        "command": command,
+    }
     update()
     return True
