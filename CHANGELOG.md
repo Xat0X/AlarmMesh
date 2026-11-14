@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.0-beta.3 — 2026-11-14
 
 - Block Bosch BSD-2 linked activation unless its same-device broadcast switch
   explicitly reports off. Recheck before dispatch and invalidate earlier broader
@@ -27,7 +27,9 @@
   verify the catalog UI with 16 simulated sources, native confirmation/error
   handling, reconnect and phone/tablet layouts. Keep screenshots local.
 
-No physical tests, live device access or new release/publication are claimed.
+Opt-in catalog test release. See [installation and limits](docs/releases/0.1.0-beta.3.md).
+Validation: 367 backend tests, 20 frontend tests and, on each tested HA version,
+20 runtime plus 14 driver checks. No physical tests or live device access performed.
 
 
 ## 0.1.0-beta.2 — 2026-11-14

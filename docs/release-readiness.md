@@ -1,27 +1,30 @@
-# Linked-sounding test release — 0.1.0-beta.2
+# Catalog test release — 0.1.0-beta.3
 
-Prepared 2026-11-14 at the owner's request. Product baseline:
-`c3f02ea05e504ce2caec6d84759e31100419c36f`, including the independently reviewed
-incident correction. This release changes metadata/documentation only.
+Prepared 2026-11-14 at the owner's request for installation review on an existing
+Home Assistant. Reviewed product baseline:
+`e092fd6ead2739f3603bb7583a3c57accb506048`.
+This release changes only version metadata and release documentation.
 
-Manifest and release tag use **0.1.0-beta.2**. Publish only as a GitHub
-pre-release, without marking it latest stable, after the exact release commit's
-hosted tests, hassfest and both compatibility jobs succeed. Source-folder
-installation, dependencies and minimum HA version remain unchanged.
+Manifest and tag use **0.1.0-beta.3**. Publish as GitHub pre-release, never latest
+stable, only after all hosted checks for the exact release commit succeed.
+The normal source-folder installer route, dependencies and minimum HA remain
+unchanged. No live HA installation or physical action is part of publication.
 
-Existing beta.1 groups migrate in memory with linking false; new groups also
-default false. Only explicit administrator-confirmed configuration can enable
-sounder targets. No production installation or physical activation is performed.
+New groups and old groups without linking remain disabled. Explicitly enabled
+configurations are preserved: the installation notes tell the owner to disable
+them before updating for this review. Catalog recognition never enables linking.
+BSD-2 requires its same-device broadcast setting to explicitly report off;
+the changed authority requires re-review of earlier broader local assignments.
 
-The product baseline passed hosted CI with 323 backend tests, 15 frontend tests
-and 17 simulated scenarios on each tested HA version (2026.10.4 and 2026.11.1).
-The exact release metadata commit requires its own hosted run before publication.
+The product baseline passed hosted tests (367 backend, 20 frontend), hassfest
+and both HA compatibility jobs, including 20 runtime and 14 driver checks per
+version. The release metadata commit must pass its own workflow before publication.
 
-See [release notes](releases/0.1.0-beta.2.md) for install, default-off review,
-model/provider restrictions and backup-based rollback. The older beta.1 cannot
-read the new persisted group payload; replacing files alone is not rollback.
+See [release notes](releases/0.1.0-beta.3.md) for installation, default-off review,
+support coverage, Bosch behavior and backup-based recovery. Technical driver
+checks do not establish complete provider/radio or physical device acceptance.
+Earlier dated catalog/UI evidence remains historical in the support guide.
 
-Remaining: actual MQTT/ZHA driver and physical acceptance, owner-observed upgrade
-and recovery on the existing installation, and previously recorded artwork,
-license/catalog and wide-logo limitations. No stable-release or certification
-claim is made. Earlier dated acceptance evidence remains historical.
+Outstanding: owner-observed upgrade/recovery of this payload, physical acceptance,
+and previously recorded license/artwork/catalog-admission decisions. This work
+does not make stable-release or certification claims.

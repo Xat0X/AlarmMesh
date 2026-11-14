@@ -1,4 +1,4 @@
-# Device support and evidence — development after beta.2
+# Device support and evidence — 0.1.0-beta.3
 
 AlarmMesh continues to read any explicitly selected, valid Home Assistant
 `binary_sensor` with device class `smoke`, including unknown models. Recognition
@@ -17,8 +17,10 @@ the [review snapshot](../dev/catalog/review.json).
 ## Inventory and denominators
 
 Checked **2026-11-14**, starting from clean main
-`8c088d4a354c35106ab105b64827ceb7fc1233a8` (manifest stays `0.1.0-beta.2`).
-Current work is uncommitted; earlier release/CI results do not cover this work.
+`8c088d4a354c35106ab105b64827ceb7fc1233a8`. The reviewed catalog and Bosch
+correction are committed at `e092fd6ead2739f3603bb7583a3c57accb506048`;
+beta.3 changes only release metadata/documentation on that product baseline.
+See [release notes](releases/0.1.0-beta.3.md) for installation and current checks.
 
 The official website dataset contains 5,868 rows. Its actual filter predicate
 `row.exposes.includes("smoke")` selects **67 model/variant rows** and **59 page
@@ -159,7 +161,7 @@ basic/advanced IAS actions and Aqara quirk/switch code with endpoint I/O mocked.
 It is not a running Zigbee2MQTT/converter transport or full ZHA discovery/radio
 test. Registry fixtures remain explicitly identified as metadata mocks.
 
-## Current evidence
+## Historical catalog implementation and UI evidence
 
 Results below are from **2026-11-14**, base
 `8c088d4a354c35106ab105b64827ceb7fc1233a8` plus this uncommitted catalog work.
