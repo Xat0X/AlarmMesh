@@ -138,7 +138,7 @@ class SelfTests:
                 self.record["status"] = "outcome_unknown"
                 await self.store.async_save(self.record)
 
-    def resolve(self, source):
+    def resolve(self, source, *, cache=True):
         if (
             source not in self.entry.runtime_data.source_entity_ids
             or self.cap.source_identity_changed(source)
@@ -197,14 +197,15 @@ class SelfTests:
             return None
         # Cached contract evidence, not observed smoke or command ownership. Losing
         # the test control cannot make a genuine separate smoke value a test echo.
-        self.separate_smoke[source] = (
-            entity.id,
-            entity.unique_id,
-            device.id,
-            origin,
-            model,
-            vendor,
-        )
+        if cache:
+            self.separate_smoke[source] = (
+                entity.id,
+                entity.unique_id,
+                device.id,
+                origin,
+                model,
+                vendor,
+            )
         sounders = [
             {k: c[k] for k in ("target", "identity", "idle_states")}
             for c in self.cap.describe(source)["controls"]
@@ -246,9 +247,9 @@ class SelfTests:
             "sounders": sounders,
         }
 
-    def independent_source(self, source):
+    def independent_source(self, source, *, cache=True):
         # These contracts expose smoke separately from self-test/linkage status.
-        if self.resolve(source) is not None:
+        if self.resolve(source, cache=cache) is not None:
             return True
         entity, device, origin, model, vendor, _ = self.cap.metadata(source)
         return bool(

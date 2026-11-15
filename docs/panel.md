@@ -18,6 +18,10 @@ input leaves the saved selection unchanged. No second source selection is stored
 
 ## Panel screens
 
+Local development adds [separate maintenance messages, read-only group action
+examples and anonymized diagnosis](maintenance-tools.md) within the existing
+navigation. All new automatic delivery starts off; no existing setting is enabled.
+
 - **Overview** shows the shared current smoke result, usable/selected source
   counts, assigned room count, group count, attention items and room cards.
   Active smoke is prominent and names the reporting detector and assigned room.
@@ -156,8 +160,10 @@ in its form; cancelling discards that draft.
 source/control availability and the retained self-test request. The links must
 belong to the same device/provider/configuration; unrelated entities are never
 matched by their names. Missing, invalid and unsupported values remain Unknown.
-At or below **20%** is a clearly labelled display threshold only. It changes no
-smoke status, incident rule, command or notification. Off means no problem
+At or below **20%** is a maintenance threshold. The display changes no smoke
+status or incident rule. In this local build, separately enabled
+[maintenance messages](maintenance-tools.md) can use that same threshold;
+they default off. Off means no problem
 reported in the available value, not that a detector is healthy. HA timestamps
 do not establish radio contact. The retained self-test request, activity and
 explicit device result remain distinct; absence of a result never means success.
@@ -173,8 +179,9 @@ An old recovery receipt is not current smoke truth. No new history is stored and
 the existing retention period is unchanged. HA acceptance never confirms physical
 sound, delivery or external script effects.
 
-Current implementation evidence, the eight-combination visual checklist and the
-existing onboarded review URL are in the [usability review](usability-review.md).
+The [usability review](usability-review.md) records the published baseline's visual
+checks. The new maintenance/example/diagnosis screens have separate
+[current evidence and outstanding visual checks](maintenance-tools.md#local-review-and-evidence).
 
 
 ## Incident features in the current working tree

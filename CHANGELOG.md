@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.1.0-beta.6 — 2026-11-15
+
+- Complete the eight maintenance/example/diagnosis visual combinations and real
+  five-minute mock outage flow. Distinguish unassessed stop support for blocked
+  preview targets and label recovery receipts as requests, with EN/NL regressions
+  observed failing before correction. No physical outputs tested.
+
+- Add separate default-off maintenance phone settings, current device-bound
+  battery/fault/outage conditions, bounded durable receipts, quiet startup,
+  configurable observation delay, optional confirmed recovery and cleanup.
+- Add read-only group action examples sharing execution/receipt decisions, and
+  an admin-only allowlisted anonymized diagnosis preview/copy route. No example
+  can issue commands or grant authority. Existing branding/navigation retained.
+- Extend Dutch/English forms, mock fixtures, privacy/lifecycle tests and both
+  exact HA checks. See [behavior and evidence](docs/maintenance-tools.md).
+- Generate confirmation request IDs with cryptographically secure random bytes
+  supported on local HTTP, rather than secure-context-only randomUUID. Preserve
+  exact-target confirmation, request ownership and no automatic retries. Report
+  unavailable secure randomness explicitly and show test warnings only once.
+  The HTTP-like regression failed before correction; no physical outputs tested.
+
 ## 0.1.0-beta.5 — 2026-11-15
 
 - Complete the eight EN/NL light/dark phone/tablet visual checks for setup,

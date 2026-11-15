@@ -1,5 +1,6 @@
 """Additional scenarios in the existing image checker; no physical endpoints."""
 
+from copy import deepcopy
 from uuid import uuid4
 
 from homeassistant.exceptions import HomeAssistantError
@@ -28,6 +29,7 @@ async def check_features(hass, entry, registry, fixtures, ws_request, require, p
                 for t in (
                     panel.linking._task,
                     panel.effects._task,
+                    panel.maintenance.task,
                     *panel.selftests.tasks,
                 )
                 if t is not None
@@ -237,6 +239,103 @@ async def check_features(hass, entry, registry, fixtures, ws_request, require, p
 
         panel = entry.runtime_data.panel
         source = registry.async_get(a)
+        group_id = panel.groups.groups[-1]["id"]
+        before = (
+            len(calls),
+            list(actions),
+            deepcopy(panel.linking.active),
+            deepcopy(panel.linking.attempted),
+            deepcopy(panel.effects.episodes),
+        )
+        example = await ws_request(
+            {"id": 110, "type": "alarmmesh/preview", "group_id": group_id, "source": a}
+        )
+        diagnosis = await ws_request({"id": 111, "type": "alarmmesh/diagnostics"})
+        require(
+            example["readonly"] and not example["physical_confirmed"],
+            "Example could execute",
+        )
+        require(
+            before
+            == (
+                len(calls),
+                actions,
+                panel.linking.active,
+                panel.linking.attempted,
+                panel.effects.episodes,
+            ),
+            "Read-only example altered execution",
+        )
+        import json
+
+        serialized = json.dumps(diagnosis)
+        require(
+            a not in serialized
+            and b not in serialized
+            and "mobile_app_simulated_" not in serialized
+            and diagnosis["versions"]["home_assistant"],
+            "Support report leaked live identifiers",
+        )
+        passed("readonly_action_example_and_anonymized_diagnosis")
+
+        maintenance = panel.maintenance
+        require(not maintenance.value["enabled"], "Maintenance default enabled")
+        settings = {
+            **deepcopy(maintenance.value),
+            "enabled": True,
+            "recovery": True,
+            "recipients": [
+                {"service": "mobile_app_simulated_" + n, "enabled": True} for n in "ab"
+            ],
+        }
+        await ws_request(
+            {
+                "id": 112,
+                "type": "alarmmesh/maintenance_settings",
+                "revision": maintenance.revision,
+                "settings": settings,
+                "confirmed": True,
+            }
+        )
+        await settle()
+        before_calls = len(calls)
+        hass.states.async_set("input_boolean.catalog_battery_low", "on")
+        await settle()
+        require(
+            len(calls) == before_calls + 2, "Maintenance delivery or isolation missing"
+        )
+        maintenance.changed()
+        await settle()
+        require(len(calls) == before_calls + 2, "Maintenance duplicate event replay")
+        require(
+            await hass.config_entries.async_reload(entry.entry_id), "Maintenance reload"
+        )
+        await settle()
+        panel = entry.runtime_data.panel
+        maintenance = panel.maintenance
+        require(len(calls) == before_calls + 2, "Maintenance replay after load")
+        hass.states.async_set("input_boolean.catalog_battery_low", "off")
+        await settle()
+        require(
+            len(calls) == before_calls + 3,
+            "Only accepted recipient may receive maintenance recovery",
+        )
+        await ws_request(
+            {
+                "id": 113,
+                "type": "alarmmesh/maintenance_settings",
+                "revision": maintenance.revision,
+                "settings": {**settings, "enabled": False},
+                "confirmed": False,
+            }
+        )
+        await settle()
+        require(
+            maintenance.cancel_timer is None and maintenance.task is None,
+            "Disabled maintenance retained work",
+        )
+        passed("maintenance_default_off_dedup_recovery_reload_failure_isolation")
+
         button = registry.async_get_or_create(
             "button",
             "mqtt",
@@ -265,7 +364,7 @@ async def check_features(hass, entry, registry, fixtures, ws_request, require, p
         before = (len(calls), list(actions))
         await ws_request(
             {
-                "id": 102,
+                "id": 114,
                 "type": "alarmmesh/test",
                 "kind": "selftest",
                 "target": a,

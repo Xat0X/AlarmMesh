@@ -739,3 +739,144 @@ test("page navigation returns to the panel start while live updates preserve rea
     else delete HTMLElement.prototype.scrollIntoView;
   }
 });
+
+
+test("HTTP-compatible self-test confirmation uses secure random bytes without randomUUID", async () => {
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, "crypto");
+  const realCrypto = globalThis.crypto;
+  let randomCalls = 0;
+  Object.defineProperty(globalThis, "crypto", { configurable: true, value: {
+    getRandomValues(bytes) { randomCalls++; return realCrypto.getRandomValues(bytes); },
+  } });
+  let panel;
+  try {
+    const view = setup(); panel = view.panel;
+    view.transport.callbacks.at(-1)(featureData());
+    panel.openDialog({ kind: "test", actionKind: "selftest", target: source.entity_id, identity: "d".repeat(64), name: "HTTP SIMULATED self-test" });
+    view.root.querySelector(".confirm-execute").click(); await tick();
+    assert.equal(view.calls.length, 0, "explicit confirmation is still required");
+    view.root.querySelector('[name="confirm-request"]').checked = true;
+    view.root.querySelector(".confirm-execute").click(); await tick();
+    assert.equal(view.calls.length, 1, "one mock request must reach HA even without randomUUID");
+    assert.equal(randomCalls, 1);
+    assert.match(view.calls[0].request_id, /^[a-f0-9]{32}$/);
+    assert.equal(view.calls[0].target, source.entity_id);
+    assert.equal(view.calls[0].identity, "d".repeat(64));
+    assert.equal(view.root.querySelector(".form-error").textContent, "");
+    assert.equal(view.root.querySelector(".confirm-execute").disabled, true);
+    const text = view.root.querySelector("dialog").textContent;
+    assert.equal(text.split("Sound may occur").length - 1, 1, "show the warning once");
+  } finally {
+    panel?.remove();
+    Object.defineProperty(globalThis, "crypto", descriptor);
+  }
+});
+
+test("missing secure randomness blocks dispatch with an actionable message", async () => {
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, "crypto");
+  Object.defineProperty(globalThis, "crypto", { configurable: true, value: {} });
+  let panel;
+  try {
+    const view = setup("nl"); panel = view.panel;
+    view.transport.callbacks.at(-1)(featureData());
+    panel.openDialog({ kind: "test", actionKind: "selftest", target: source.entity_id, identity: "d".repeat(64), name: "SIMULATED" });
+    view.root.querySelector('[name="confirm-request"]').checked = true;
+    view.root.querySelector(".confirm-execute").click(); await tick();
+    assert.equal(view.calls.length, 0);
+    assert.match(view.root.querySelector(".form-error").textContent, /browser.*aanvraagnummer/i);
+  } finally {
+    panel?.remove();
+    Object.defineProperty(globalThis, "crypto", descriptor);
+  }
+});
+function maintenanceData() {
+  const data = featureData(); data.groups = guidedGroupData().groups;
+  data.maintenance = {settings:{revision:0,enabled:false,recovery:false,recipients:[],battery:true,fault:true,unavailable:true,delay:15},issues:[],missing_recipients:[],error:null,paused:false};
+  return data;
+}
+
+test("maintenance settings are opt-in, exact-confirmed and preserve draft through reconnect", async () => {
+  const {panel,root,transport,calls}=setup("nl"); const data=maintenanceData(); transport.callbacks.at(-1)(data);
+  panel.openDialog({kind:"maintenance"}); const form=root.querySelector("dialog form");
+  assert.equal(form.querySelector('[name="maintenance-enabled"]').checked,false);
+  assert.equal(form.querySelector('[name="maintenance-delay"]').value,"15");
+  form.querySelector('[name="maintenance-enabled"]').checked=true;
+  form.querySelector('[name="maintenance-recipient"]').checked=true;
+  form.querySelector('[name="maintenance-delay"] option[value="5"]').selected=true;
+  transport.event("disconnected"); assert.equal(root.querySelector("dialog form"),form);
+  assert.equal(form.querySelector('[type="submit"]').disabled,true);
+  transport.event("ready"); await tick(); transport.callbacks.at(-1)(data);
+  assert.equal(form.querySelector('[name="maintenance-delay"]').value,"5");
+  form.dispatchEvent(new Event("submit",{cancelable:true})); await tick();
+  assert.deepEqual(calls,[]); assert.ok(root.querySelector(".request-confirmation").textContent.includes("mobile_app_simulated_phone"));
+  assert.equal(form.querySelector('[name="maintenance-delay"]').disabled,true);
+  root.querySelector('[name="confirm-request"]').checked=true; root.querySelector(".confirm-execute").click(); await tick();
+  assert.equal(calls[0].type,"alarmmesh/maintenance_settings"); assert.equal(calls[0].settings.delay,5); assert.equal(calls[0].confirmed,true);
+  assert.equal(calls[0].settings.recovery,false); panel.remove();
+});
+
+test("maintenance cancel does not change stored choices or send a test request", async () => {
+  const {panel,root,transport,calls}=setup(); const data=maintenanceData(); transport.callbacks.at(-1)(data);
+  panel.openDialog({kind:"maintenance"}); root.querySelector('[name="maintenance-enabled"]').checked=true;
+  [...root.querySelectorAll("dialog button")].find(b=>b.textContent==="Cancel").click();
+  assert.deepEqual(calls,[]); assert.equal(data.maintenance.settings.enabled,false); panel.remove();
+});
+
+test("group action example only reads and never creates executable confirmations", async () => {
+  const {panel,root,transport,calls}=setup(); const data=maintenanceData(); transport.callbacks.at(-1)(data);
+  panel._hass.callWS=async command=>{calls.push(command);return {readonly:true,revision:data.revision,groups:[{id:data.groups[0].id,can_start:true}],targets:[{source:data.sources[1].entity_id,reason:"control_missing",safe_stop:false}],phones:[],scripts:[],linking_enabled:true,notifications_enabled:false,actions_enabled:false,recovery_sources:[source.entity_id],notification_recovery:false};};
+  panel.openDialog({kind:"preview",id:data.groups[0].id}); await tick();
+  assert.ok(root.querySelector("dialog").textContent.includes("Example — no commands are sent."));
+  assert.ok(root.querySelector("dialog").textContent.includes("missing or disabled"));
+  assert.equal(root.querySelectorAll("dialog form,.confirm-execute,.confirm-linking").length,0);
+  assert.deepEqual(calls.map(c=>c.type),["alarmmesh/preview"]);
+  transport.event("disconnected"); assert.equal(root.querySelector("dialog"),null); panel.remove();
+});
+
+test("diagnostic preview and copy use server aliases without private header or live names", async () => {
+  const {panel,root,transport,calls}=setup(); const data=maintenanceData(); data.title="PRIVATE_LOCATION"; data.sources[0].name="PRIVATE_DETECTOR";
+  const report={schema:1,versions:{alarmmesh:"0.1.0-beta.5",home_assistant:"2026.11.1"},counts:{sources:2,groups:1,valid_assignments:0,invalid_assignments:1},result:{availability:"INCOMPLETE"},sources:[{alias:"Detector 1",provider:"zha",model:"unknown",assessment:"not_confirmed"}],problems:[{source:"Detector 1",reason:"control_missing",setting:"groups"}],recipients:[],recorded_errors:[],physical_confirmed:false};
+  panel._hass.callWS=async command=>{calls.push(command);return report;};
+  transport.callbacks.at(-1)(data); await panel.go("diagnostics"); await tick();
+  assert.ok(![...root.childNodes].map(n=>n.textContent).join("").includes("PRIVATE_")); assert.ok(root.querySelector("textarea").value.includes("Detector 1"));
+  const descriptor=Object.getOwnPropertyDescriptor(globalThis,"navigator"); const copied=[];
+  Object.defineProperty(globalThis,"navigator",{configurable:true,value:{clipboard:{async writeText(value){copied.push(value);}}}});
+  try { [...root.querySelectorAll("main button")].find(b=>b.textContent==="Copy this report").click(); await tick(); assert.deepEqual(copied,[JSON.stringify(report,null,2)]); }
+  finally { if(descriptor) Object.defineProperty(globalThis,"navigator",descriptor); else delete globalThis.navigator; }
+  transport.event("disconnected"); assert.equal(root.querySelector("textarea"),null); assert.deepEqual(calls.map(c=>c.type),["alarmmesh/diagnostics"]); panel.remove();
+});
+
+
+test("a blocked preview target does not become an activation-only capability claim", async () => {
+  for (const language of ["en", "nl"]) {
+    const { panel, root, transport, calls } = setup(language);
+    try {
+      const data = maintenanceData(); transport.callbacks.at(-1)(data);
+      panel._hass.callWS = async command => {
+        calls.push(command);
+        return { readonly: true, revision: data.revision, groups: [], targets: [{ source: source.entity_id, reason: "disabled", eligible: false, safe_stop: false }], phones: [], scripts: [], recovery_sources: [source.entity_id] };
+      };
+      panel.openDialog({ kind: "preview", id: data.groups[0].id }); await tick();
+      const text = root.querySelector("dialog").textContent;
+      assert.ok(!text.includes(panel.t.no_safe_stop), "blocked does not establish activation-only support");
+      assert.equal(typeof panel.t.preview_stop_unassessed, "string");
+      assert.ok(text.includes(panel.t.preview_stop_unassessed));
+      assert.deepEqual(calls.map(c => c.type), ["alarmmesh/preview"]);
+      assert.equal(root.querySelectorAll(".confirm-execute,.confirm-linking").length, 0);
+    } finally { panel.remove(); }
+  }
+});
+
+test("maintenance recovery receipts are labelled as requests, not future conditions", () => {
+  for (const [language, expected] of [["nl", "Herstelaanvraag"], ["en", "Recovery request"]]) {
+    const { panel, root, transport } = setup(language);
+    try {
+      const data = maintenanceData();
+      data.maintenance.issues = [{ sources: [source.entity_id], kind: "battery", active: false, reason: "maintenance_current", receipts: { mobile_app_simulated_phone_a: { problem: "accepted", recovery: "accepted" } } }];
+      transport.callbacks.at(-1)(data); panel.go("maintenance");
+      const text = root.querySelector("main").textContent;
+      assert.ok(text.includes(expected + ":"));
+      assert.ok(!text.includes(panel.t.maintenanceRecovery + ":"));
+    } finally { panel.remove(); }
+  }
+});

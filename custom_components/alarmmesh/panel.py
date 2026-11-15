@@ -1,5 +1,6 @@
 """Authenticated push presentation, HA registry metadata and panel lifecycle."""
 
+import json
 import re
 from collections.abc import Callable
 from copy import deepcopy
@@ -9,7 +10,11 @@ import voluptuous as vol
 
 from homeassistant.components import frontend, panel_custom, websocket_api
 from homeassistant.components.http import StaticPathConfig
-from homeassistant.const import EVENT_SERVICE_REGISTERED, EVENT_SERVICE_REMOVED
+from homeassistant.const import (
+    EVENT_SERVICE_REGISTERED,
+    EVENT_SERVICE_REMOVED,
+    __version__,
+)
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import area_registry as ar
 from homeassistant.helpers import device_registry as dr
@@ -18,9 +23,12 @@ from homeassistant.helpers.event import async_track_state_change_event
 
 from .automation import AutomationError
 from .catalog import CATALOG
+from .diagnostics import support_report
 from .effects import IncidentEffects
 from .groups import GroupError, GroupStore
 from .linking_runtime import LinkingRuntime
+from .maintenance import Maintenance
+from .preview import group_preview
 from .runtime import AlarmMeshConfigEntry
 from .self_test import SelfTests
 from .status import SourceStatus, StatusResult, evaluate_status
@@ -204,15 +212,23 @@ class PanelController:
             hass, entry, self.linking, self.groups, hub.publish
         )
         self.selftests = SelfTests(hass, entry, self.linking, hub.publish)
-        self.linking.effects_changed = self.effects.changed
+        self.maintenance = Maintenance(hass, entry, self.linking, hub.publish)
+        self.integration_version = "unknown"
+        self.linking.effects_changed = self._outputs_changed
         self.linking.independent_test_source = self.selftests.independent_source
         self.unsubscribers: list[Callable] = []
         self.script_unsubscribe = None
 
     async def async_start(self) -> None:
+        self.integration_version = await self.hass.async_add_executor_job(
+            lambda: json.loads((Path(__file__).parent / "manifest.json").read_text())[
+                "version"
+            ]
+        )
         await self.groups.async_load()
         await self.effects.load()
         await self.selftests.load()
+        await self.maintenance.load()
         self.unsubscribers.append(self.runtime.async_add_observer(self.hub.publish))
         for event in (
             er.EVENT_ENTITY_REGISTRY_UPDATED,
@@ -230,13 +246,19 @@ class PanelController:
             "alarmmesh-panel",
             sidebar_title="AlarmMesh",
             sidebar_icon="mdi:smoke-detector",
-            module_url=f"{ASSET_URL}/panel.js?v=20261115-usability-visual-1",
+            module_url=f"{ASSET_URL}/panel.js?v=20261115-maintenance-visual-1",
             require_admin=True,
         )
         self.hub.controller = self
         self._watch_scripts()
         self.linking.start()
+        self.maintenance.start()
         self.hub.publish()
+
+    @callback
+    def _outputs_changed(self):
+        self.effects.changed()
+        self.maintenance.changed()
 
     @callback
     def _registry_changed(self, *_args):
@@ -262,6 +284,7 @@ class PanelController:
     async def async_close(self) -> None:
         await self.async_pause()
         await self.selftests.close()
+        await self.maintenance.close()
         await self.effects.close()
         await self.linking.close()
         await self.groups.async_close()
@@ -277,6 +300,7 @@ class PanelController:
             self.hub.publish()
 
     async def async_pause(self):
+        await self.maintenance.pause()
         await self.linking.pause()
         await self.effects.pause()
         await self.selftests.pause()
@@ -404,6 +428,30 @@ class PanelController:
                 for phase in ("start", "recovery")
                 for binding in group.get("actions", {}).get(phase, [])
             ]
+        maintenance = self.maintenance.snapshot()
+        review = configuration_review(sources, groups, automation)
+        maintenance_problems = []
+        if maintenance["error"]:
+            maintenance_problems.append(
+                {"code": maintenance["error"], "purpose": "maintenance"}
+            )
+        for target in maintenance["missing_recipients"]:
+            if maintenance["settings"]["enabled"] and any(
+                r["service"] == target and r["enabled"]
+                for r in maintenance["settings"]["recipients"]
+            ):
+                maintenance_problems.append(
+                    {
+                        "code": "recipient_unavailable",
+                        "target": target,
+                        "purpose": "maintenance",
+                    }
+                )
+        if maintenance_problems:
+            review["issues"].extend(maintenance_problems)
+            review["steps"][-1].update(
+                status="needs_attention", count=len(review["issues"])
+            )
         return {
             "available": True,
             "entry_id": self.entry.entry_id,
@@ -419,7 +467,8 @@ class PanelController:
             "incident": self.linking.snapshot(),
             "automation": automation,
             "selftest": deepcopy(self.selftests.record),
-            "review": configuration_review(sources, groups, automation),
+            "maintenance": maintenance,
+            "review": review,
         }
 
 
@@ -442,6 +491,9 @@ async def async_prepare(hass: HomeAssistant) -> PanelHub:
         websocket_api.async_register_command(hass, ws_catalog)
         websocket_api.async_register_command(hass, ws_settings)
         websocket_api.async_register_command(hass, ws_test)
+        websocket_api.async_register_command(hass, ws_maintenance)
+        websocket_api.async_register_command(hass, ws_preview)
+        websocket_api.async_register_command(hass, ws_diagnostics)
     return hass.data[DATA_HUB]
 
 
@@ -587,3 +639,72 @@ async def ws_test(hass, connection, msg):
         connection.send_error(msg["id"], code, code)
         return
     connection.send_result(msg["id"], result)
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "alarmmesh/maintenance_settings",
+        vol.Required("revision"): int,
+        vol.Required("settings"): dict,
+        vol.Required("confirmed"): bool,
+    }
+)
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_maintenance(hass, connection, msg):
+    controller = hass.data[DATA_HUB].controller
+    if controller is None:
+        connection.send_error(msg["id"], "not_loaded", "AlarmMesh is not loaded")
+        return
+    try:
+        await controller.maintenance.save(
+            msg["settings"], msg["revision"], msg["confirmed"]
+        )
+    except (AutomationError, OSError) as err:
+        code = (
+            str(err)
+            if isinstance(err, AutomationError)
+            else "maintenance_storage_error"
+        )
+        connection.send_error(msg["id"], code, code)
+        return
+    connection.send_result(msg["id"], {"revision": controller.maintenance.revision})
+    controller.hub.publish()
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "alarmmesh/preview",
+        vol.Required("group_id"): str,
+        vol.Required("source"): str,
+    }
+)
+@websocket_api.require_admin
+@callback
+def ws_preview(hass, connection, msg):
+    controller = hass.data[DATA_HUB].controller
+    if controller is None:
+        connection.send_error(msg["id"], "not_loaded", "AlarmMesh is not loaded")
+        return
+    try:
+        result = group_preview(controller, msg["group_id"], msg["source"])
+    except AutomationError as err:
+        connection.send_error(msg["id"], str(err), str(err))
+        return
+    connection.send_result(msg["id"], result)
+
+
+@websocket_api.websocket_command({vol.Required("type"): "alarmmesh/diagnostics"})
+@websocket_api.require_admin
+@callback
+def ws_diagnostics(hass, connection, msg):
+    controller = hass.data[DATA_HUB].controller
+    if controller is None:
+        connection.send_error(msg["id"], "not_loaded", "AlarmMesh is not loaded")
+        return
+    connection.send_result(
+        msg["id"],
+        support_report(
+            controller.snapshot(), controller.integration_version, __version__
+        ),
+    )

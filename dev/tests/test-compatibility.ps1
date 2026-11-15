@@ -38,7 +38,7 @@ function docker {
         run_id = $context.run_id; git_commit = $context.git_commit; scenarios = [ordered]@{}
     }
     if ($global:AlarmMeshToolingFault -eq 'stale') { $technical.run_id = 'previous-run' }
-    foreach ($i in 1..25) { $technical.scenarios["scenario-$i"] = 'PASS' }
+    foreach ($i in 1..27) { $technical.scenarios["scenario-$i"] = 'PASS' }
     [System.IO.File]::WriteAllText((Join-Path $configDir 'technical-result.json'), ($technical | ConvertTo-Json -Depth 5), $utf8)
 }
 

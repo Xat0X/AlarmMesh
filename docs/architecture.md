@@ -1,5 +1,25 @@
 # Architecture and scope
 
+## Local maintenance/analysis extension
+
+`maintenance.py` adds an independent opt-in version-1/schema-1 Store and one
+bounded delivery worker, using `automation.send_notification` shared with smoke
+notifications. Device-bound current HA evidence produces maintenance conditions;
+receipts are committed before requests, bounded and not replayed. Startup waits
+for `EVENT_HOMEASSISTANT_STARTED`, takes a quiet baseline, and restarts pending
+availability observation. One nearest-deadline timer and the startup listener are
+owned/cancelled on pause/unload. Corrupt optional storage pauses maintenance only.
+No maintenance condition feeds `evaluate_status` or the incident engine.
+
+`preview.py` uses the existing pure group planner, shared executor assessment/
+idle checks and the same script/notification receipt decisions. Its admin-only
+read command cannot dispatch or persist. Self-test contract resolution has a
+read-only cache mode for this path; normal request ownership is unchanged.
+`diagnostics.py` constructs a support report from an explicit field allowlist,
+with aliases and canonical model assessments. No raw registry/config/provider
+objects are serialized. Both read commands add no execution rights. Settings and
+exact confirmation remain separate. See [behavior and evidence](maintenance-tools.md).
+
 ## Optional linked sounding — local extension
 
 The [linking contract and reviewed profiles](linked-sounding.md) extend the panel
@@ -443,7 +463,7 @@ Reviewed separate-smoke contract evidence is cached against the source registry/
 identity within the runtime. Test-control loss cannot turn an independently reported
 smoke value into a test echo. This cache stores no source state or device ownership.
 
-## Derived setup and maintenance presentation
+## Derived setup and maintenance presentation (beta.5 baseline)
 
 The existing authenticated panel snapshot now includes `review`: seven setup
 step states/counts and contextual configuration issues. `PanelController` uses
@@ -455,10 +475,12 @@ stores until explicit edits; there is no automatic replacement.
 
 `Capabilities.details` additionally normalizes known same-device battery and
 binary fault/low-battery values for maintenance display. Invalid/out-of-range
-percentages and absent information stay unknown. The frontend's 20% warning is
+percentages and absent information stay unknown. This baseline's 20% warning is
 presentation only. Existing related-entity subscriptions publish these changes
-and existing unload cleanup removes them; no polling, network, timers,
-notifications or health/last-contact inference is added. Smoke calculation,
+and existing unload cleanup removes them. This presentation layer adds no polling,
+network, timers, notifications or health/last-contact inference. The separate local
+maintenance extension above can use the same evidence for opt-in messages.
+Smoke calculation,
 incident execution, self-test ownership, storage schemas and identities are
 unchanged. Incident details use the existing ledger only and explicitly label its
 missing chronology. See [current evidence](usability-review.md).

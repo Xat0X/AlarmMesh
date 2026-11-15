@@ -1,4 +1,4 @@
-import { TEXT } from "./translations.js?v=20261115-usability-visual-1";
+import { TEXT } from "./translations.js?v=20261115-maintenance-visual-1";
 
 // Safe DOM construction: names, labels and registry data are always text nodes.
 const el = (tag, text, cls) => {
@@ -29,7 +29,7 @@ export class AlarmMeshPanel extends HTMLElement {
     this.transport = "loading";
     this.generation = 0;
     this.detail = null;
-    this.onDisconnected = () => { this.generation++; this.unsubscribe?.()?.catch?.(() => {}); this.unsubscribe = null; this.data = null; this.transport = "offline"; this.offlineDraft(); this.render(); };
+    this.onDisconnected = () => { this.generation++; this.unsubscribe?.()?.catch?.(() => {}); this.unsubscribe = null; this.data = null; this.diagnostics = null; this.transport = "offline"; this.offlineDraft(); this.render(); };
     this.onReady = () => this.subscribe();
   }
   set hass(value) {
@@ -42,14 +42,14 @@ export class AlarmMeshPanel extends HTMLElement {
   set narrow(value) { this._narrow = value; }
   set panel(value) { this._panel = value; }
   get t() { return TEXT[this._hass?.language?.startsWith("nl") ? "nl" : "en"]; }
-  connectedCallback() { if (new URLSearchParams(window.location?.search || "").has("incident") || new URLSearchParams(window.location?.search || "").get("view") === "incidents") this.page = "incidents"; if (this._hass) this.bindConnection(); this.render(); }
+  connectedCallback() { const query=new URLSearchParams(window.location?.search || ""); if(query.has("incident")) this.page="incidents"; else if(["incidents","maintenance"].includes(query.get("view"))) this.page=query.get("view"); if (this._hass) this.bindConnection(); this.render(); }
   disconnectedCallback() { this.unbindConnection(); this.closeDialog(); }
   unbindConnection() {
     this.generation++;
     this.unsubscribe?.()?.catch?.(() => {}); this.unsubscribe = null;
     this.connection?.removeEventListener("disconnected", this.onDisconnected);
     this.connection?.removeEventListener("ready", this.onReady);
-    this.connection = null; this.catalog = null; this.catalogError = false;
+    this.connection = null; this.catalog = null; this.catalogError = false; this.diagnostics = null;
     this.data = null;
   }
   bindConnection() {
@@ -73,7 +73,7 @@ export class AlarmMeshPanel extends HTMLElement {
         else if (this.shadowRoot.querySelector(".offline-draft")) { this.shadowRoot.querySelector(".offline-draft").remove(); for (const b of this.shadowRoot.querySelectorAll('dialog button[type="submit"],dialog .confirm-execute,dialog .confirm-linking')) if (!b.dataset.started && !b.dataset.confirmLocked) b.disabled = false; }
         this.updateTestResult();
         if (!data.available || this.page !== "catalog" || !this.shadowRoot.querySelector(".catalog-filters")) this.render();
-        if (this.detail && !["edit", "delete", "settings", "test"].includes(this.detail.kind)) this.renderDialog();
+        if (this.detail && !["edit", "delete", "settings", "maintenance", "test"].includes(this.detail.kind)) this.renderDialog();
       }, { type: "alarmmesh/subscribe" }, { resubscribe: false });
       if (generation !== this.generation || !this.isConnected) unsubscribe()?.catch?.(() => {});
       else this.unsubscribe = unsubscribe;
@@ -81,6 +81,7 @@ export class AlarmMeshPanel extends HTMLElement {
   }
   async go(page) {
     this.closeDialog(); this.page = page; this.render();
+    if (page === "diagnostics") this.loadDiagnostics();
     this.shadowRoot.querySelector(".shell")?.scrollIntoView?.({ block: "start", behavior: "instant" });
     if (page === "catalog" && !this.catalog && this._hass?.user?.is_admin) {
       const connection = this.connection;
@@ -108,7 +109,7 @@ export class AlarmMeshPanel extends HTMLElement {
     if (!this.shadowRoot) return;
     this.shadowRoot.querySelector("dialog")?.classList.toggle("dark", Boolean(this._hass?.themes?.darkMode));
     const t = this.t;
-    const link = el("link"); link.rel = "stylesheet"; link.href = "/alarmmesh-assets/panel.css?v=20261115-usability-visual-1";
+    const link = el("link"); link.rel = "stylesheet"; link.href = "/alarmmesh-assets/panel.css?v=20261115-maintenance-visual-1";
     const shell = el("div", undefined, "shell");
     shell.classList.toggle("dark", Boolean(this._hass?.themes?.darkMode));
     const side = el("aside");
@@ -127,7 +128,7 @@ export class AlarmMeshPanel extends HTMLElement {
     const header = el("header");
     const menu = button("☰", () => this.dispatchEvent(new CustomEvent("hass-toggle-menu", { bubbles: true, composed: true })), "menu-button");
     menu.setAttribute("aria-label", "Home Assistant menu");
-    header.append(menu, icon("home-outline"), el("span", this.data?.title || "AlarmMesh"), el("span", ` / ${t[this.page]}`, "muted"));
+    header.append(menu, icon("home-outline"), el("span", this.page === "diagnostics" ? "AlarmMesh" : this.data?.title || "AlarmMesh"), el("span", ` / ${t[this.page]}`, "muted"));
     const main = el("main");
     main.append(el("div", "ALARMMESH", "eyebrow"), el("h1", this.page === "overview" ? t.title : t[this.page]), el("p", this.page === "groups" ? t.groupIntro : t.subtitle, "subtitle"));
     if (!this._hass?.user?.is_admin) main.append(el("p", t.restricted, "notice"));
@@ -143,6 +144,7 @@ export class AlarmMeshPanel extends HTMLElement {
       if (this.page === "settings") this.renderSettings(main);
       if (this.page === "incidents") this.renderIncidents(main);
       if (this.page === "maintenance") this.renderMaintenance(main);
+      if (this.page === "diagnostics") this.renderDiagnostics(main);
       if (this.page === "devices") {
         main.append(this.section(t.selected, button(t.choose, () => this.choose())));
         this.sourceList(main, data.sources);
@@ -221,6 +223,10 @@ export class AlarmMeshPanel extends HTMLElement {
       const copy = el("div"); copy.append(el("h3", title), el("span", t['guide_' + state], `guide-state ${state}`), el("p", `${note}${step ? ` · ${t.savedCount}: ${step.count}` : ''}`));
       item.dataset.status = state;
       item.append(copy, button(label, action)); steps.append(item);
+      if (key === "notifications" && data.maintenance) {
+        copy.append(el("p", `${t.maintenanceNotifications}: ${t[data.maintenance.settings.enabled ? "enabled" : "disabled"]}`));
+        item.append(button(t.configureMaintenance, () => this.openDialog({kind: "maintenance"})));
+      }
     };
     add(t.setupSources, data.sources.length ? `${data.sources.length} · ${t.selected}` : t.setupNoSources,
       t.choose, () => this.choose(), "sources");
@@ -234,6 +240,7 @@ export class AlarmMeshPanel extends HTMLElement {
     guide.append(steps); parent.append(guide);
   }
   issueAction(issue) {
+    if (issue.purpose === "maintenance") return this.openDialog({kind:"maintenance"});
     if (issue.group) return this.openDialog({ kind: "edit", group: this.data.groups.find(g => g.id === issue.group) });
     if (issue.source && this.data.sources.some(s => s.entity_id === issue.source)) return this.openDialog({ kind: "source", id: issue.source });
     if (issue.code === "recipient_unavailable") return this.openDialog({ kind: "settings" });
@@ -242,6 +249,18 @@ export class AlarmMeshPanel extends HTMLElement {
   renderMaintenance(parent) {
     const t = this.t, data = this.data;
     parent.append(el("p", t.maintenanceNote, "notice"));
+    if (data.maintenance) {
+      const section = el("section", undefined, "notice maintenance-delivery");
+      section.append(el("h2", t.maintenanceNotifications), el("p", t[data.maintenance.settings.enabled ? "enabled" : "disabled"]), button(t.configureMaintenance, () => this.openDialog({kind: "maintenance"})));
+      if (data.maintenance.error) section.append(el("p", t[data.maintenance.error] || t.error, "warning-text"));
+      for (const issue of data.maintenance.issues) {
+        const row = el("section", undefined, "maintenance-receipt");
+        row.append(el("h3", `${issue.sources.map(id => data.sources.find(s => s.entity_id === id)?.name || id).join(", ")} · ${t['maintenance_' + issue.kind]}`), el("p", t[issue.reason] || t.guide_unknown));
+        for (const [recipient, receipt] of Object.entries(issue.receipts)) for (const [phase, status] of Object.entries(receipt)) row.append(el("p", `${recipient.replace(/^mobile_app_/, "")} · ${t[phase === "problem" ? "maintenanceProblem" : "maintenanceRecoveryReceipt"]}: ${t['delivery_' + status] || t.guide_unknown}`));
+        section.append(row);
+      }
+      section.append(el("small", t.maintenanceDeliveryNote)); parent.append(section);
+    }
     const config = el("section", undefined, "notice configuration-issues");
     config.append(el("h2", t.configurationIssues));
     const issues = data.review?.issues;
@@ -419,12 +438,14 @@ export class AlarmMeshPanel extends HTMLElement {
       if (detail.kind === "group") {
         if (!group.members.length) dialog.append(el("p", t.emptyGroup));
         for (const member of group.unselected) dialog.append(el("p", `${member} · ${t.stale}`, "warning-text"));
-        dialog.append(el("p", t.groupNote), button(t.edit, () => this.openDialog({ kind: "edit", group })), button(t.remove, () => this.openDialog({ kind: "delete", group }), "button destructive"));
+        dialog.append(el("p", t.groupNote), button(t.actionExample, () => this.openDialog({kind: "preview", id: group.id})), button(t.edit, () => this.openDialog({ kind: "edit", group })), button(t.remove, () => this.openDialog({ kind: "delete", group }), "button destructive"));
       }
     } else if (detail.kind === "edit") this.groupForm(dialog, detail.group);
     else if (detail.kind === "settings") this.notificationForm(dialog);
+    else if (detail.kind === "maintenance") this.maintenanceForm(dialog);
+    else if (detail.kind === "preview") this.previewForm(dialog, detail);
     else if (detail.kind === "test") {
-      dialog.append(el("h2", detail.actionKind === "selftest" ? t.startSelfTest : t.explicitTest), el("p", detail.name), el("p", detail.actionKind === "selftest" ? t.selfTestWarning : detail.actionKind === "script" ? t.scriptConsequences : t.notifyTestWarning));
+      dialog.append(el("h2", detail.actionKind === "selftest" ? t.startSelfTest : t.explicitTest));
       this.confirmRequest(dialog, detail);
     }
     else if (detail.kind === "delete") {
@@ -613,7 +634,7 @@ export class AlarmMeshPanel extends HTMLElement {
     filters.append(search, provider, capability); parent.append(filters, count, results); update();
   }
   offlineDraft() {
-    if (!["edit", "settings"].includes(this.detail?.kind)) { this.closeDialog(); return; }
+    if (!["edit", "settings", "maintenance"].includes(this.detail?.kind)) { this.closeDialog(); return; }
     const dialog = this.shadowRoot.querySelector("dialog");
     if (!dialog) return;
     if (!dialog.querySelector(".offline-draft")) dialog.prepend(el("p", this.t.offlineDraft, "notice offline-draft"));
@@ -621,7 +642,7 @@ export class AlarmMeshPanel extends HTMLElement {
   }
   renderSettings(parent) {
     const t = this.t, automation = this.data.automation;
-    parent.append(button(t.catalog, () => this.go("catalog")), button(t.viewIncidents, () => this.go("incidents")), button(t.maintenance, () => this.go("maintenance")));
+    parent.append(button(t.catalog, () => this.go("catalog")), button(t.viewIncidents, () => this.go("incidents")), button(t.maintenance, () => this.go("maintenance")), button(t.diagnostics, () => this.go("diagnostics")));
     this.renderSetupGuide(parent);
     if (!automation) return;
     const section = el("section", undefined, "notice");
@@ -630,6 +651,7 @@ export class AlarmMeshPanel extends HTMLElement {
     section.append(button(t.configureNotifications, () => this.openDialog({ kind: "settings" }), "button primary"));
     if (automation.error) section.append(el("p", t[automation.error] || t.error, "warning-text"));
     parent.append(section, el("p", t.actionsLocation, "notice"));
+    if (this.data.maintenance) parent.append(button(t.configureMaintenance, () => this.openDialog({kind: "maintenance"})));
   }
   notificationForm(dialog) {
     const t = this.t, a = this.data.automation;
@@ -670,6 +692,101 @@ export class AlarmMeshPanel extends HTMLElement {
     });
     dialog.append(form);
   }
+  maintenanceForm(dialog) {
+    const t = this.t, m = this.data.maintenance, a = this.data.automation;
+    if (!m || !a) return;
+    const cfg = m.settings, revision = cfg.revision, form = el("form");
+    dialog.append(el("h2", t.maintenanceNotifications), el("p", t.maintenanceDeliveryNote));
+    const enabled = this.checkField(form, t.enableMaintenance, cfg.enabled, "maintenance-enabled"), fields = {};
+    for (const kind of ["battery", "fault", "unavailable", "recovery"]) fields[kind] = this.checkField(form, t['maintenance_' + kind], cfg[kind], 'maintenance-' + kind);
+    const label = el("label", t.maintenanceDelay); label.htmlFor = "maintenance-delay";
+    const delay = el("select"); delay.id = "maintenance-delay"; delay.name = "maintenance-delay";
+    for (const minutes of [5,15,30,60]) { const option = el("option", `${minutes} ${t.minutes}`); option.value = String(minutes); option.selected = cfg.delay === minutes; delay.append(option); }
+    form.append(label, delay, el("p", t.maintenanceDelayNote), el("h3", t.maintenanceRecipients));
+    const stored = new Map(cfg.recipients.map(r => [r.service, r])), removed = new Set(), inputs = [];
+    const choices = [...a.recipients, ...cfg.recipients.filter(r => !a.recipients.some(n => n.service === r.service)).map(r => ({...r, name:r.service, missing:true}))];
+    if (!choices.length) form.append(el("p", t.noRecipients));
+    for (const recipient of choices) {
+      const row = el("div", undefined, "recipient-row");
+      const input = this.checkField(row, `${recipient.name}${recipient.missing ? ' · ' + t.recipient_unavailable : ''}`, stored.get(recipient.service)?.enabled, "maintenance-recipient");
+      input.value = recipient.service; inputs.push(input);
+      if (stored.has(recipient.service)) row.append(button(t.forgetRecipient, () => { removed.add(recipient.service); row.remove(); }, "button destructive"));
+      form.append(row);
+    }
+    const error = el("p", "", "form-error"); error.setAttribute("role", "alert");
+    const save = el("button", t.saveSettings, "button primary"); save.type = "submit";
+    form.append(error, save, button(t.cancel, () => this.closeDialog()));
+    form.addEventListener("submit", async event => {
+      event.preventDefault();
+      if (form.querySelector(".request-confirmation")) { error.textContent = t.finishConfirmation; return; }
+      if (!this.data) { error.textContent = t.offline; return; }
+      const settings = {enabled:enabled.checked, delay:Number(delay.value), recipients:inputs.filter(r => !removed.has(r.value) && (r.checked || stored.has(r.value))).map(r=>({service:r.value,enabled:r.checked})), ...Object.fromEntries(Object.entries(fields).map(([key,input])=>[key,input.checked]))};
+      if (settings.enabled && (!settings.recipients.some(r=>r.enabled) || !["battery","fault","unavailable"].some(k=>settings[k]))) { error.textContent = t.invalid_maintenance; return; }
+      const send = async confirmed => {
+        save.disabled = true;
+        try { await this._hass.callWS({type:"alarmmesh/maintenance_settings",revision,settings,confirmed}); this.closeDialog(); }
+        catch (e) { error.textContent = t[e.code] || t.error; save.disabled = Boolean(save.dataset.confirmLocked); }
+      };
+      if (!settings.enabled) { await send(false); return; }
+      this.confirmRequest(form, {name:t.maintenanceNotifications, confirmationOnly:true, note:`${t.maintenanceDeliveryNote}\n${["battery","fault","unavailable"].filter(k=>settings[k]).map(k=>t['maintenance_'+k]).join(', ')}\n${settings.delay} ${t.minutes}\n${t.maintenance_recovery}: ${t[settings.recovery ? 'enabled' : 'disabled']}\n${settings.recipients.filter(r=>r.enabled).map(r=>r.service).join(', ')}`, execute:()=>send(true)});
+    });
+    dialog.append(form);
+  }
+  previewForm(dialog, detail) {
+    const t = this.t, group = this.data.groups.find(g=>g.id===detail.id);
+    if (!group) { dialog.append(el("p", t.not_found)); return; }
+    dialog.append(el("h2", t.actionExample), el("p", t.exampleNoOutput, "notice"), el("p", t.previewNote));
+    if (!group.members.length) { dialog.append(el("p", t.emptyGroup)); return; }
+    const label = el("label", t.previewSource); label.htmlFor = "preview-source";
+    const select = el("select"); select.id = "preview-source";
+    for (const id of group.members) { const option=el("option",this.data.sources.find(s=>s.entity_id===id)?.name || id); option.value=id; option.selected=id===(detail.source || group.members[0]); select.append(option); }
+    const output=el("div",undefined,"preview-output"); output.setAttribute("role","status");
+    const load = async () => {
+      const source=select.value; detail.source=source; output.replaceChildren(el("p",t.loading));
+      try {
+        const result=await this._hass.callWS({type:"alarmmesh/preview",group_id:group.id,source});
+        if (!output.isConnected || this.detail!==detail || detail.source!==source || !this.data) return;
+        if (result.revision !== this.data.revision || result.readonly !== true) { output.replaceChildren(el("p",t.previewStale)); return; }
+        output.replaceChildren(el("h3", t.groups));
+        if (result.paused) output.append(el("p",t.execution_paused,"notice"));
+        for (const row of result.groups) output.append(el("p",`${this.data.groups.find(g=>g.id===row.id)?.name || t.groups}: ${t[row.can_start ? 'preview_can_start' : 'preview_origin_blocked']}`));
+        output.append(el("h3", t.linkTogether), el("p",t[result.linking_enabled ? 'enabled':'disabled']));
+        if (!result.targets.length) output.append(el("p",t.checkNoTargets));
+        for (const row of result.targets) output.append(el("p",`${this.data.sources.find(s=>s.entity_id===row.source)?.name || row.source}: ${t[row.reason] || t.guide_unknown}`),el("small",t[row.eligible !== true ? 'preview_stop_unassessed' : row.safe_stop ? 'automation_stop_separate' : 'no_safe_stop']));
+        output.append(el("h3",t.notifications),el("p",t[result.notifications_enabled ? 'enabled':'disabled']));
+        for (const row of result.phones) output.append(el("p",`${row.target.replace(/^mobile_app_/, '')}: ${t[row.reason] || t.guide_unknown}`));
+        output.append(el("h3",t.incidentActions),el("p",t[result.actions_enabled ? 'enabled':'disabled']));
+        for (const row of result.scripts) output.append(el("p",`${t['phase_'+row.phase]} ${row.order} · ${row.name}: ${t[row.reason] || t.guide_unknown}`));
+        output.append(el("h3",t.maintenanceRecovery),el("p",t.previewRecovery),el("p",result.recovery_sources.map(id=>this.data.sources.find(s=>s.entity_id===id)?.name || id).join(', ')),el("p",`${t.recoveryNotification}: ${t[result.notification_recovery ? 'enabled':'disabled']}`),el("p",t.physicalNotTested));
+      } catch(e) { if(output.isConnected) output.replaceChildren(el("p",t[e.code] || t.error)); }
+    };
+    select.addEventListener("change",load); dialog.append(label,select,output); load();
+  }
+  async loadDiagnostics() {
+    if (!this.data || !this._hass.user?.is_admin) return;
+    this.diagnostics=null; this.diagnosticError=false;
+    const connection=this.connection, generation=this.generation;
+    try { const report=await this._hass.callWS({type:"alarmmesh/diagnostics"}); if(this.isConnected && this.connection===connection && generation===this.generation && this.data && this._hass.user?.is_admin) this.diagnostics=report; }
+    catch { this.diagnosticError=true; }
+    if(this.page==="diagnostics") this.render();
+  }
+  renderDiagnostics(parent) {
+    const t=this.t, report=this.diagnostics;
+    parent.append(el("p",t.diagnosticNote,"notice"),button(t.refreshReport,()=>this.loadDiagnostics()));
+    if(!report) { parent.append(el("p",this.diagnosticError ? t.error : t.loading)); return; }
+    const table=el("dl");
+    for(const [key,value] of Object.entries(report.versions || {})) table.append(el("dt",key==="alarmmesh" ? "AlarmMesh" : "Home Assistant"),el("dd",value));
+    for(const [key,value] of Object.entries(report.counts || {})) table.append(el("dt",t['count_'+key] || t.guide_unknown),el("dd",String(value)));
+    table.append(el("dt",t.sources),el("dd",t[report.result.availability] || t.guide_unknown)); parent.append(table);
+    for(const source of report.sources || []) parent.append(el("p",`${source.alias} · ${t[source.provider] || t.guide_unknown} · ${source.model === "unknown" ? t.guide_unknown : source.model} · ${t[source.assessment] || t.guide_unknown}`));
+    for(const problem of report.problems || []) { const row=el("section",undefined,"notice"); row.append(el("h3",problem.source || problem.group || "AlarmMesh"),el("p",t[problem.reason] || t.guide_unknown),el("p",t['diagnose_'+problem.setting] || t.diagnosticConsequence),button(t.reviewAssignment,()=>problem.setting==="maintenance" ? this.openDialog({kind:"maintenance"}) : problem.setting==="groups" ? this.go("groups") : problem.setting==="notifications" ? this.go("settings") : this.choose())); parent.append(row); }
+    for(const recipient of report.recipients || []) if(!recipient.available) parent.append(el("p",`${recipient.alias}: ${t.recipient_unavailable}`));
+    for(const error of report.recorded_errors || []) parent.append(el("p",`${error.target}: ${t['delivery_'+error.status] || t[error.status] || t.guide_unknown}`));
+    const label=el("label",t.reportPreview); label.htmlFor="support-report";
+    const area=el("textarea"); area.id="support-report"; area.readOnly=true; area.value=JSON.stringify(report,null,2); area.rows=16;
+    const status=el("p", ""); status.setAttribute("role","status");
+    parent.append(label,area,button(t.copyReport,async()=>{ try { await navigator.clipboard.writeText(area.value); status.textContent=t.reportCopied; } catch { area.focus(); area.select?.(); status.textContent=t.copyManually; } }),status);
+  }
   checkField(parent, text, checked, name) {
     const label = el("label", undefined, "check"), input = el("input");
     input.type = "checkbox"; input.checked = Boolean(checked); input.name = name;
@@ -701,7 +818,9 @@ export class AlarmMeshPanel extends HTMLElement {
       execute.dataset.started = "true";
       if (detail.execute) { await detail.execute(); return; }
       try {
-        const request = globalThis.crypto.randomUUID().replaceAll("-", "");
+        if (typeof globalThis.crypto?.getRandomValues !== "function") throw Object.assign(new Error("Secure random values unavailable"), { code: "request_random_unavailable" });
+        // getRandomValues also works on local HTTP; randomUUID requires a secure context.
+        const request = Array.from(globalThis.crypto.getRandomValues(new Uint8Array(16)), byte => byte.toString(16).padStart(2, "0")).join("");
         if (detail.actionKind === "selftest") box.dataset.selftestRequest = request;
         const result = await this._hass.callWS({ type: "alarmmesh/test", kind: detail.actionKind, target: detail.target, identity: detail.identity || "", confirmed: true, request_id: request });
         status.textContent = t[(detail.actionKind === "selftest" ? "test_" : "delivery_") + result.status] || t.error;

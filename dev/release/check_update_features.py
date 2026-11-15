@@ -10,7 +10,15 @@ async def settle(hass, entry):
     for _ in range(12):
         await hass.async_block_till_done()
         panel = entry.runtime_data.panel
-        tasks = [t for t in (panel.linking._task, panel.effects._task) if t is not None]
+        tasks = [
+            t
+            for t in (
+                panel.linking._task,
+                panel.effects._task,
+                getattr(getattr(panel, "maintenance", None), "task", None),
+            )
+            if t is not None
+        ]
         if not tasks:
             return
         for task in tasks:
@@ -118,6 +126,32 @@ async def check_features(hass, entry, phase, root, helper, require, checks):
             True,
         )
         checkpoint = json.loads((root / "checkpoint.json").read_text())
+        maintenance = panel.maintenance
+        require(not maintenance.value["enabled"], "Maintenance enabled by upgrade")
+        await maintenance.save(
+            {
+                **deepcopy(maintenance.value),
+                "enabled": True,
+                "fault": False,
+                "unavailable": False,
+                "recipients": [
+                    {"service": "mobile_app_simulated_phone_a", "enabled": True}
+                ],
+            },
+            maintenance.revision,
+            True,
+        )
+        await helper("mvp_battery_low", True)
+        await settle(hass, entry)
+        require(
+            any(
+                row["receipts"].get("mobile_app_simulated_phone_a", {}).get("problem")
+                == "accepted"
+                for row in maintenance.snapshot()["issues"]
+            ),
+            "Maintenance checkpoint receipt missing",
+        )
+        checkpoint["maintenance"] = deepcopy(maintenance.value)
         checkpoint.update(
             smoke="off",
             availability="complete",
@@ -142,6 +176,22 @@ async def check_features(hass, entry, phase, root, helper, require, checks):
         "Receivers changed after new process",
     )
     require(not panel.effects.episodes, "Idle restart invented an incident")
+    require(
+        panel.maintenance.value == checkpoint["maintenance"],
+        "Maintenance settings changed after process restart",
+    )
+    await settle(hass, entry)
+    require(
+        hass.states.get("sensor.incident_simulated_requests").state == "0",
+        "Process restart replayed maintenance",
+    )
+    checks.append("real_process_restart_preserves_maintenance_receipts_without_replay")
+    await panel.maintenance.save(
+        {**deepcopy(panel.maintenance.value), "enabled": False},
+        panel.maintenance.revision,
+        False,
+    )
+    await helper("mvp_battery_low", False)
     checks.append(
         "real_process_restart_preserves_origins_linking_receivers_and_script_order"
     )

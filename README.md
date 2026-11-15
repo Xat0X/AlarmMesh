@@ -8,9 +8,11 @@
 
 Smoke reports and source availability from existing Home Assistant smoke detector
 entities, with a local panel for detectors, rooms and groups. This test release adds [optional linked sounding](docs/linked-sounding.md), off by default.
-Version 0.1.0-beta.4 also offers [Companion notifications, group
+Version 0.1.0-beta.6 also offers [Companion notifications, group
 script actions, incident details and reviewed built-in self-test requests](docs/incident-features.md).
 New automatic behavior defaults off; existing explicit choices are preserved.
+The local working tree adds [opt-in maintenance messages, non-executing action
+examples and anonymized support diagnosis](docs/maintenance-tools.md).
 The local review build improves [guided setup, maintenance and incident details](docs/usability-review.md).
 Earlier [finishing checks](docs/finish-review.md) remain dated historical evidence.
 
@@ -27,11 +29,11 @@ BSD-2 activation requires its broadcast setting to explicitly report off;
 AlarmMesh never changes that setting. The original branding, two overview
 entities, source-selection schema and smoke rules remain unchanged.
 
-## Test release: 0.1.0-beta.4
+## Test release: 0.1.0-beta.6
 
 For opt-in testing, enable **Pre-release** in the AlarmMesh Marketplace page and
-choose **0.1.0-beta.4**. Back up before updating and follow the restart prompt.
-Read the [release notes](docs/releases/0.1.0-beta.4.md) before installing.
+choose **0.1.0-beta.6**. Back up before updating and follow the restart prompt.
+Read the [release notes](docs/releases/0.1.0-beta.6.md) before installing.
 
 ## Current status: local panel and two read-only overviews
 

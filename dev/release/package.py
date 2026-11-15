@@ -41,12 +41,22 @@ REQUIRED_FILES = FOUNDATION_FILES | {
     "automation.py",
     "effects.py",
     "self_test.py",
+    "maintenance.py",
+    "preview.py",
+    "diagnostics.py",
     "panel.py",
     "frontend/panel.js",
     "frontend/panel.css",
     "frontend/translations.js",
 }
-CATALOG_FILES = REQUIRED_FILES - {"automation.py", "effects.py", "self_test.py"}
+CATALOG_FILES = REQUIRED_FILES - {
+    "automation.py",
+    "effects.py",
+    "self_test.py",
+    "maintenance.py",
+    "preview.py",
+    "diagnostics.py",
+}
 CATALOG_REVISION = "b2f3d719a86cffb0a533fa5650dce624fd2275f2"
 
 

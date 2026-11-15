@@ -444,3 +444,8 @@ class Capabilities:
             if control.binding() == binding:
                 return control
         return None
+
+    def is_idle(self, control: Control) -> bool:
+        """Shared read-only idle test; never adopt manual/external sounding."""
+        state = self.hass.states.get(control.target)
+        return state is not None and state.state in control.idle_states

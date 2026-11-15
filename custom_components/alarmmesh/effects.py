@@ -18,9 +18,12 @@ from .automation import (
     DEFAULT_ACTIONS,
     AutomationError,
     NotificationStore,
+    notification_plan,
     recipients,
+    script_receipt_key,
     script_target,
     scripts,
+    send_notification,
 )
 from .status import SourceStatus
 
@@ -355,11 +358,8 @@ class IncidentEffects:
             try:
                 async with asyncio.timeout(10):
                     if receipt["kind"] == "notification":
-                        await self.hass.services.async_call(
-                            "notify",
-                            receipt["target"],
-                            self.message(episode),
-                            blocking=True,
+                        await send_notification(
+                            self.hass, receipt["target"], self.message(episode)
                         )
                     else:
                         # One script per call preserves configured start order. This
@@ -399,22 +399,21 @@ class IncidentEffects:
                 # Release suppression only on explicit off, never on unknown or
                 # an empty newly loaded active set. A fresh independent origin
                 # lifetime can therefore produce one meaningful update.
-                old["seen"] = [
-                    s
-                    for s in old["seen"]
-                    if not (
+                _, old["seen"] = notification_plan(
+                    old,
+                    "start",
+                    active,
+                    episode["origins"],
+                    lambda s: (
                         self.entry.runtime_data.source_statuses.get(s)
                         is SourceStatus.NO_SMOKE_REPORTED
                         and not self.linking.capabilities.source_identity_changed(s)
-                    )
-                ]
-            if old and (
-                old["phase"] == episode["phase"]
-                and (active if episode["phase"] == "start" else set(episode["origins"]))
-                <= set(old["seen"])
-            ):
-                continue
-            if episode["phase"] == "recovery" and old is None:
+                    ),
+                )
+            needed, _ = notification_plan(
+                old, episode["phase"], active, episode["origins"], lambda s: False
+            )
+            if not needed:
                 continue  # Never send recovery to a recipient with no first attempt.
             row = {
                 "kind": "notification",
@@ -435,7 +434,7 @@ class IncidentEffects:
         if not cfg["enabled"]:
             return
         for binding in cfg[episode["phase"]]:
-            key = f"{episode['phase']}:{binding['entity_id']}:{binding['identity']}"
+            key = script_receipt_key(episode["phase"], binding)
             if key in episode["receipts"]:
                 continue
             row = {
@@ -548,9 +547,7 @@ class IncidentEffects:
                 if kind == "notification":
                     if target not in {r["service"] for r in recipients(self.hass)}:
                         raise AutomationError("recipient_unavailable")
-                    await self.hass.services.async_call(
-                        "notify", target, self.message(test=True), blocking=True
-                    )
+                    await send_notification(self.hass, target, self.message(test=True))
                 else:
                     current = script_target(self.hass, target)
                     if current is None or current["identity"] != identity:

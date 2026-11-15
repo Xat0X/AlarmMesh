@@ -20,6 +20,29 @@ class AutomationError(ValueError):
     """Public translated rejection code; provider exception text stays private."""
 
 
+def script_receipt_key(phase: str, binding: dict) -> str:
+    return f"{phase}:{binding['entity_id']}:{binding['identity']}"
+
+
+def notification_plan(old, phase, active, origins, explicitly_clear):
+    """Pure receipt decision, shared with the non-executing action example."""
+    seen = (
+        [
+            source
+            for source in old["seen"]
+            if phase != "start" or not explicitly_clear(source)
+        ]
+        if old
+        else []
+    )
+    needed = not (
+        old
+        and old["phase"] == phase
+        and (active if phase == "start" else set(origins)) <= set(seen)
+    ) and not (phase == "recovery" and old is None)
+    return needed, seen
+
+
 def recipients(hass: HomeAssistant) -> list[dict]:
     """Companion's documented legacy notify services, actually registered now."""
     return [
@@ -27,6 +50,13 @@ def recipients(hass: HomeAssistant) -> list[dict]:
         for name in sorted(hass.services.async_services().get("notify", {}))
         if re.fullmatch(r"mobile_app_[a-z0-9_]+", name)
     ]
+
+
+async def send_notification(hass: HomeAssistant, target: str, message: dict) -> None:
+    """Shared Companion route; callers construct bounded messages server-side."""
+    if target not in {row["service"] for row in recipients(hass)}:
+        raise AutomationError("recipient_unavailable")
+    await hass.services.async_call("notify", target, message, blocking=True)
 
 
 def script_target(hass: HomeAssistant, entity_id: str) -> dict | None:

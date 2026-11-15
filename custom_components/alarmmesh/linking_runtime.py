@@ -124,13 +124,19 @@ class LinkingRuntime:
 
     def _current(self, activation: Activation) -> Control | None:
         """Last gate immediately before dispatch, even after waiting for a slot."""
+        return self.assess(activation)[0]
+
+    def assess(
+        self, activation: Activation, active=None, *, independent=None
+    ) -> tuple[Control | None, str]:
+        """Read-only gates shared by dispatch and hypothetical configuration review."""
         if self._closed or self._paused:
-            return None
+            return None, "execution_paused"
         current = next(
-            (a for a in self._plan() if a.binding == activation.binding), None
+            (a for a in self._plan(active) if a.binding == activation.binding), None
         )
         if current is None:
-            return None
+            return None, "preview_not_planned"
         source = activation.binding["source"]
         state = self.hass.states.get(source)
         if (
@@ -139,22 +145,31 @@ class LinkingRuntime:
             or self.runtime.source_statuses.get(source)
             is not SourceStatus.NO_SMOKE_REPORTED
         ):
-            return None
+            return None, "preview_source_not_clear"
         if not any(
             (
                 not self.capabilities.test_blocked(origin)
-                or self.independent_test_source(origin)
+                or (independent or self.independent_test_source)(origin)
             )
             and not self.capabilities.source_identity_changed(origin)
             for origin in current.origins
         ):
-            return None
-        return self.capabilities.resolve(activation.binding)
+            return None, "preview_origin_blocked"
+        control = self.capabilities.resolve(activation.binding)
+        reason = (
+            self.capabilities.describe(source)["reason"]
+            if control is None
+            else "preview_eligible"
+        )
+        return control, reason if control is None and reason not in {
+            "no_safe_stop",
+            "automation_stop_separate",
+        } else "control_changed" if control is None else reason
 
-    def _plan(self):
+    def _plan(self, active=None):
         selected = set(self.runtime.source_entity_ids)
         return plan_activations(
-            self.active,
+            self.active if active is None else active,
             [g for g in self.groups.groups if set(g["members"]) <= selected],
         )
 
@@ -176,8 +191,7 @@ class LinkingRuntime:
             current = next(a for a in self._plan() if a.binding == activation.binding)
             self.attempted[target] = set(current.origins)
             record["origins"] = sorted(current.origins)
-            state = self.hass.states.get(target)
-            if not state or state.state not in control.idle_states:
+            if not self.capabilities.is_idle(control):
                 record["status"] = "already_active"
                 return  # An existing/manual action is never adopted as ours.
             data = {"entity_id": target}
