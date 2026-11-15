@@ -84,6 +84,69 @@ async def check_features(hass, entry, registry, fixtures, ws_request, require, p
         )
         await settle()
         panel = entry.runtime_data.panel
+        snapshot = panel.snapshot()
+        require(
+            [s["id"] for s in snapshot["review"]["steps"]]
+            == [
+                "sources",
+                "rooms",
+                "groups",
+                "sounders",
+                "notifications",
+                "scripts",
+                "check",
+            ],
+            "Seven-step current configuration guide missing",
+        )
+        require(
+            all(
+                s["status"] == "disabled"
+                for s in snapshot["review"]["steps"]
+                if s["id"] in {"notifications", "scripts"}
+            ),
+            "Disabled optional functions misreported",
+        )
+        result = snapshot["result"]
+        hass.states.async_set("input_boolean.catalog_battery_low", "on")
+        await settle()
+        snapshot = panel.snapshot()
+        require(
+            next(s for s in snapshot["sources"] if s["entity_id"] == b)["capability"][
+                "details"
+            ]["maintenance"]["battery_percent"]
+            == 14.0
+            and snapshot["result"] == result,
+            "Maintenance display changed smoke semantics or lost bound battery",
+        )
+        hass.states.async_set("input_boolean.catalog_battery_low", "off")
+        await settle()
+        battery = hass.states.get(fixtures["b"]["battery"])
+        hass.states.async_set(battery.entity_id, "95", {"unit_of_measurement": "V"})
+        await settle()
+        require(
+            next(s for s in panel.snapshot()["sources"] if s["entity_id"] == b)[
+                "capability"
+            ]["details"]["maintenance"]["battery_percent"]
+            is None,
+            "Contradictory battery unit presented as percentage",
+        )
+        hass.states.async_set(
+            battery.entity_id, battery.state, dict(battery.attributes)
+        )
+        old_class = registry.async_get(a).device_class
+        registry.async_update_entity(a, device_class="opening")
+        await settle()
+        require(
+            next(
+                s for s in panel.snapshot()["review"]["steps"] if s["id"] == "sources"
+            )["status"]
+            == "needs_attention"
+            and panel.snapshot()["result"] == result,
+            "Changed source identity: incorrect guide or altered smoke result",
+        )
+        registry.async_update_entity(a, device_class=old_class)
+        await settle()
+        passed("derived_setup_and_passive_maintenance")
 
         def script(name):
             target = script_target(hass, "script.alarmmesh_simulated_" + name)

@@ -16,6 +16,15 @@ lovelace:
 alarmmesh_simulation:
   incidents: true
 input_boolean:
+  catalog_battery_low:
+    name: SIMULATION B battery 14 percent
+    initial: false
+  catalog_battery_unknown:
+    name: SIMULATION D battery unknown
+    initial: false
+  catalog_control_missing:
+    name: SIMULATION B control missing
+    initial: false
   catalog_a_smoke:
     name: SIMULATION A smoke
     initial: false

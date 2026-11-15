@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.1.0-beta.5 — 2026-11-15
+
+- Complete the eight EN/NL light/dark phone/tablet visual checks for setup,
+  maintenance, long-name dialogs and incident details. Reset reading position
+  when navigating between panel pages while preserving it on live state updates;
+  add a regression observed failing before correction. Simulation only.
+
+- Correct review findings: changed smoke-source identity now prevents a misleading
+  configured setup state; conflicting battery units stay unknown as percentages.
+  Preserve raw diagnostics, smoke rules and existing execution behavior.
+- Expand the existing setup guide to seven resumable steps derived from actual
+  configuration, with configured, optional-off, unsupported and attention states.
+  Keep all target confirmations and automation defaults unchanged.
+- Add a compact maintenance view using proven same-device HA metadata, explicit
+  unknown values, a display-only 20% battery warning, configuration issues and the
+  retained self-test request. No maintenance notifications or device queries.
+- Explain incident origins, pending explicit clearance, request types and recorded
+  recovery without inventing event order or timestamps. Allow explicit removal of
+  saved notification recipients; cancellation preserves the stored configuration.
+- Extend Dutch/English text, touch targets, wrapping and existing simulation
+  controls. See [current checks and completed visual review](docs/usability-review.md).
+
 ## 0.1.0-beta.4 — 2026-11-15
 
 - Complete visual simulation checks for group actions, smoke/outage/recovery and

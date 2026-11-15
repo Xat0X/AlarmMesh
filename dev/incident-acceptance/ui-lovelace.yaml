@@ -26,6 +26,9 @@ views:
           - input_boolean.catalog_c_failure
           - input_boolean.catalog_test
           - input_boolean.catalog_fault
+          - input_boolean.catalog_battery_low
+          - input_boolean.catalog_battery_unknown
+          - input_boolean.catalog_control_missing
       - type: entities
         entities:
           - sensor.catalog_requests

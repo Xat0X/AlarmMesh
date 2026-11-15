@@ -159,6 +159,7 @@ class Capabilities:
         """Cached HA values, with change times; never infer last radio contact."""
         _, device, origin, _, _, catalog = self.metadata(source)
         values = []
+        maintenance = {"battery_percent": None, "battery_low": None, "fault": None}
         expected = {
             "battery",
             "battery_low",
@@ -218,6 +219,26 @@ class Capabilities:
                         value = None
                 except ValueError, TypeError:
                     value = None
+                if (
+                    value is not None
+                    and e.domain == "sensor"
+                    and state.attributes.get("unit_of_measurement") in (None, "%")
+                ):
+                    old = maintenance["battery_percent"]
+                    maintenance["battery_percent"] = (
+                        min(old, value) if old is not None else value
+                    )
+            # Only documented same-device binary entities can supply flags.
+            # Missing/invalid values stay unknown; one positive flag wins over off.
+            flag = (
+                "battery_low"
+                if key == "battery_low"
+                else "fault"
+                if key in {"fault", "fault_state", "trouble"}
+                else None
+            )
+            if flag and e.domain == "binary_sensor" and value in {"on", "off"}:
+                maintenance[flag] = maintenance[flag] is True or value == "on"
             values.append(
                 {
                     "key": key,
@@ -233,6 +254,7 @@ class Capabilities:
             "firmware": device.sw_version if device else None,
             "values": values,
             "recent_contact": None,
+            "maintenance": maintenance,
         }
 
     def describe(self, source: str) -> dict:

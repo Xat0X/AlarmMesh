@@ -6,7 +6,7 @@ export const TEXT = {
     enableLink: "Enable linked sounding", smokeSource: "Smoke source", proposedControl: "Proposed control",
     detection_only: "Smoke detection only", linkable: "Linkable", setting_needed: "Setting needed", not_confirmed: "Not yet confirmed",
     zigbee2mqtt: "Zigbee2MQTT / MQTT", mqtt: "MQTT", zha: "ZHA", unknown_origin: "Origin unknown",
-    no_verified_profile: "No verified external sounder profile for this device.", source_identity_changed: "The source is no longer identified as a smoke detector.",
+    no_verified_profile: "This device can report smoke, but has no supported external sounder control for this model/provider.", source_identity_changed: "The source is no longer identified as a smoke detector.",
     aqara_linkage_required: "Enable linkage_alarm yourself on this Aqara device first. AlarmMesh never changes that setting.", aqara_firmware_21: "Aqara firmware 21 has a documented alarm regression. This profile is blocked.",
     zha_route_unconfirmed: "Smoke reports work; an equivalent ZHA external sounder route is not confirmed for this model.",
     control_missing: "The required control is missing or disabled in this HA installation.", ambiguous_control: "More than one possible control exists. No automatic choice is made.",
@@ -61,7 +61,7 @@ export const TEXT = {
     enableLink: "Samen afgaan inschakelen", smokeSource: "Rookbron", proposedControl: "Voorgestelde bediening",
     detection_only: "Alleen rookdetectie", linkable: "Koppelbaar", setting_needed: "Instelling nodig", not_confirmed: "Nog niet bevestigd",
     zigbee2mqtt: "Zigbee2MQTT / MQTT", mqtt: "MQTT", zha: "ZHA", unknown_origin: "Herkomst onbekend",
-    no_verified_profile: "Geen bevestigd extern zoemerprofiel voor dit apparaat.", source_identity_changed: "De bron wordt niet meer als rookmelder herkend.",
+    no_verified_profile: "Deze melder kan rook melden, maar heeft geen ondersteunde externe zoemerbediening voor dit model/deze provider.", source_identity_changed: "De bron wordt niet meer als rookmelder herkend.",
     aqara_linkage_required: "Schakel linkage_alarm eerst zelf in op deze Aqara. AlarmMesh wijzigt die instelling nooit.", aqara_firmware_21: "Aqara-firmware 21 heeft een gedocumenteerd alarmprobleem. Dit profiel is geblokkeerd.",
     zha_route_unconfirmed: "Rookmeldingen werken; een gelijkwaardige externe ZHA-zoemerroute is voor dit model nog niet bevestigd.",
     control_missing: "De vereiste bediening ontbreekt of is uitgeschakeld in deze HA-installatie.", ambiguous_control: "Er zijn meerdere mogelijke bedieningen. Er wordt niet automatisch gekozen.",
@@ -111,6 +111,39 @@ export const TEXT = {
     alarmFrom: "Gemeld door", noEvents: "Actuele meldingen · optioneel samen afgaan",
   },
 };
+
+Object.assign(TEXT.en, {
+  maintenance: "Maintenance", configurationIssues: "Configuration to review", deviceReports: "Device reports",
+  detectors: "detectors", usableSource: "usable source", forgetRecipient: "Remove saved recipient",
+  guidanceNote: "Work through these steps in any order. You can skip optional functions and return later. Progress follows saved settings, not a separate checklist. No finish button enables actions.",
+  guide_configured: "Configured", guide_disabled: "Off · optional", guide_needs_attention: "Needs attention", guide_not_supported: "Not supported", guide_unknown: "Unknown",
+  savedCount: "Recorded", setupRooms: "Check rooms", setupRoomsNote: "Rooms come from HA. Open a detector's Home Assistant details to review its room assignment.",
+  setupSounders: "Review sounder targets", setupSoundersNote: "Choose exact verified controls in each group. Detection-only devices remain valid smoke sources. Off is a valid choice.",
+  setupNotificationsNote: "Choose existing Companion App recipients. Automatic delivery remains off unless separately confirmed.",
+  maintenanceNote: "Cached HA information only. Battery at or below 20% is a display warning, not an alarm rule. Unknown is not healthy. No maintenance messages, device queries or last-radio-contact claims.",
+  noConfigurationIssues: "No configuration issue found in the available metadata. This is not a detector health check.",
+  reviewAssignment: "Review setting", lowBatteryPresentation: "Low battery reported / 20% display threshold", noLowBatteryReport: "No low-battery indication in available values",
+  faultReported: "Problem reported by device", noFaultReport: "No problem reported in available values", noTestRequest: "No retained request",
+  recordedOrigins: "Recorded smoke sources (order not recorded)", incidentStarted: "Incident recorded", recoveryRecorded: "Explicit smoke-free recovery recorded",
+  recoveryNotRecorded: "Recovery not yet recorded", phoneRequest: "Phone request", scriptRequest: "Script request",
+  incidentEvidenceLimit: "This is a bounded request summary, not a full event history. Arrival times for extra sources and individual command timestamps are not recorded. HA acceptance does not confirm physical operation. Self-tests are separate."
+});
+Object.assign(TEXT.nl, {
+  maintenance: "Onderhoud", configurationIssues: "Instellingen controleren", deviceReports: "Apparaatmeldingen",
+  detectors: "melders", usableSource: "bruikbare bron", forgetRecipient: "Bewaarde ontvanger verwijderen",
+  guidanceNote: "Doorloop deze stappen in je eigen volgorde. Sla optionele functies gerust over en kom later terug. Voortgang volgt bewaarde instellingen, geen tweede checklist. Er is geen afrondknop die acties inschakelt.",
+  guide_configured: "Ingesteld", guide_disabled: "Uit · optioneel", guide_needs_attention: "Aandacht nodig", guide_not_supported: "Niet ondersteund", guide_unknown: "Onbekend",
+  savedCount: "Vastgelegd", setupRooms: "Ruimtes controleren", setupRoomsNote: "Ruimtes komen uit HA. Open de Home Assistant-details van een melder om de ruimtetoewijzing te bekijken.",
+  setupSounders: "Zoemerdoelen beoordelen", setupSoundersNote: "Kies per groep exacte, bevestigde bedieningen. Niet-bedienbare melders blijven geldige rookbronnen. Uit is een geldige keuze.",
+  setupNotificationsNote: "Kies bestaande Companion App-ontvangers. Automatische verzending blijft uit zonder afzonderlijke bevestiging.",
+  maintenanceNote: "Alleen beschikbare HA-informatie. Batterij van 20% of lager geeft een presentatiewaarschuwing, geen alarmregel. Onbekend betekent niet gezond. Geen onderhoudsmeldingen, apparaatbevragingen of claims over laatste radiocontact.",
+  noConfigurationIssues: "Geen configuratieprobleem gevonden in de beschikbare metadata. Dit is geen gezondheidscontrole van melders.",
+  reviewAssignment: "Instelling bekijken", lowBatteryPresentation: "Lage batterij gemeld / presentatiedrempel 20%", noLowBatteryReport: "Geen lage-batterijmelding in beschikbare waarden",
+  faultReported: "Apparaat meldt een storing", noFaultReport: "Geen storing gemeld in beschikbare waarden", noTestRequest: "Geen bewaarde aanvraag",
+  recordedOrigins: "Vastgelegde rookbronnen (volgorde niet bewaard)", incidentStarted: "Incident vastgelegd", recoveryRecorded: "Expliciet rookvrij herstel vastgelegd",
+  recoveryNotRecorded: "Herstel nog niet vastgelegd", phoneRequest: "Gsm-aanvraag", scriptRequest: "Scriptaanvraag",
+  incidentEvidenceLimit: "Dit is een begrensd opdrachtoverzicht, geen volledige gebeurtenishistorie. Aansluittijden van extra bronnen en individuele opdrachttijden worden niet bewaard. HA-acceptatie bevestigt geen fysieke werking. Zelftests staan apart."
+});
 
 // Catalog and cached diagnostics share the same HA-profile language.
 Object.assign(TEXT.en, {
@@ -261,7 +294,7 @@ Object.assign(TEXT.en, {
   "setupGroups": "Organize by floor or zone",
   "setupNoGroups": "Groups organize detectors. Sounding together is optional and stays off unless explicitly enabled.",
   "setupCheck": "Understand the configuration",
-  "setupCheckNote": "Open a group to inspect assigned sounders, prerequisites and limitations.",
+  "setupCheckNote": "Review missing assignments and available device reports. Configured does not mean physically tested.",
   "inspectGroups": "View groups",
   "groupCheckTitle": "Configuration check",
   "groupCheckNote": "This reads current HA configuration and values. It sends no commands and does not test sound, radio contact or smoke detection.",
@@ -285,7 +318,7 @@ Object.assign(TEXT.nl, {
   "setupGroups": "Deel in per verdieping of zone",
   "setupNoGroups": "Groepen ordenen melders. Samen afgaan is optioneel en blijft uit tot je dat expliciet inschakelt.",
   "setupCheck": "Begrijp je configuratie",
-  "setupCheckNote": "Open een groep om toegewezen zoemers, voorwaarden en beperkingen te bekijken.",
+  "setupCheckNote": "Controleer ontbrekende toewijzingen en beschikbare apparaatmeldingen. Ingesteld betekent niet fysiek getest.",
   "inspectGroups": "Groepen bekijken",
   "groupCheckTitle": "Configuratiecontrole",
   "groupCheckNote": "Deze controle leest actuele HA-instellingen en waarden. Ze stuurt geen opdrachten en test geen geluid, radiocontact of rookdetectie.",

@@ -37,6 +37,143 @@ def result_dict(result: StatusResult) -> dict:
     }
 
 
+def configuration_review(
+    sources: list[dict], groups: list[dict], automation: dict
+) -> dict:
+    """Derive guidance from current validated metadata; never persist progress."""
+    issues = []
+
+    def issue(code, *, source=None, group=None, target=None, phase=None):
+        issues.append(
+            {
+                "code": code,
+                "source": source,
+                "group": group,
+                "target": target,
+                "phase": phase,
+            }
+        )
+
+    if not sources:
+        issue("setupNoSources")
+    for source in sources:
+        if source["identity_changed"]:
+            issue("source_identity_changed", source=source["entity_id"])
+        if source["status"] not in {"SMOKE_REPORTED", "NO_SMOKE_REPORTED"}:
+            issue("checkSourceUnavailable", source=source["entity_id"])
+        if not source["area_id"]:
+            issue("noRoom", source=source["entity_id"])
+    for group in groups:
+        for source in group["unselected"]:
+            issue("storedSourceMissing", source=source, group=group["id"])
+        for row in group["binding_checks"]:
+            if not row["valid"]:
+                issue(
+                    row["reason"],
+                    source=row["source"],
+                    group=group["id"],
+                    target=row["target"],
+                )
+        for row in group["script_checks"]:
+            if not row["valid"]:
+                issue(
+                    "script_changed",
+                    group=group["id"],
+                    target=row["entity_id"],
+                    phase=row["phase"],
+                )
+    for target in automation["missing_recipients"]:
+        issue("recipient_unavailable", target=target)
+    if automation["error"]:
+        issue(automation["error"])
+    bindings = [row for group in groups for row in group["binding_checks"]]
+    actions = [row for group in groups for row in group["script_checks"]]
+    enabled_linking = any(group["linking"]["enabled"] for group in groups)
+    enabled_actions = any(group.get("actions", {}).get("enabled") for group in groups)
+    notifications = automation["settings"]
+    steps = [
+        (
+            "sources",
+            "configured"
+            if sources
+            and all(
+                s["status"] in {"SMOKE_REPORTED", "NO_SMOKE_REPORTED"}
+                and not s["identity_changed"]
+                for s in sources
+            )
+            else "needs_attention",
+            len(sources),
+        ),
+        (
+            "rooms",
+            "configured"
+            if sources and all(s["area_id"] for s in sources)
+            else "needs_attention",
+            sum(bool(s["area_id"]) for s in sources),
+        ),
+        (
+            "groups",
+            "needs_attention"
+            if any(
+                g["unselected"]
+                or (g["linking"]["enabled"] or g.get("actions", {}).get("enabled"))
+                and not g.get("origins", g["members"])
+                for g in groups
+            )
+            else "configured"
+            if groups
+            else "disabled",
+            len(groups),
+        ),
+        (
+            "sounders",
+            "needs_attention"
+            if any(
+                g["linking"]["enabled"]
+                and any(not r["valid"] for r in g["binding_checks"])
+                for g in groups
+            )
+            else "configured"
+            if enabled_linking
+            else "disabled"
+            if bindings
+            or any(s["capability"]["status"] != "detection_only" for s in sources)
+            else "not_supported",
+            len(bindings),
+        ),
+        (
+            "notifications",
+            "needs_attention"
+            if notifications["enabled"]
+            and any(
+                r["enabled"] and r["service"] in automation["missing_recipients"]
+                for r in notifications["recipients"]
+            )
+            else "configured"
+            if notifications["enabled"]
+            else "disabled",
+            len(notifications["recipients"]),
+        ),
+        (
+            "scripts",
+            "needs_attention"
+            if enabled_actions and any(not r["valid"] for r in actions if r["enabled"])
+            else "configured"
+            if enabled_actions
+            else "disabled",
+            len(actions),
+        ),
+        ("check", "needs_attention" if issues else "configured", len(issues)),
+    ]
+    return {
+        "steps": [
+            {"id": key, "status": status, "count": count}
+            for key, status, count in steps
+        ],
+        "issues": issues,
+    }
+
+
 class PanelHub:
     """One HA-process transport; subscribers survive entry reload, not stale data."""
 
@@ -93,7 +230,7 @@ class PanelController:
             "alarmmesh-panel",
             sidebar_title="AlarmMesh",
             sidebar_icon="mdi:smoke-detector",
-            module_url=f"{ASSET_URL}/panel.js?v=20261115-flows-1",
+            module_url=f"{ASSET_URL}/panel.js?v=20261115-usability-visual-1",
             require_admin=True,
         )
         self.hub.controller = self
@@ -179,6 +316,9 @@ class PanelController:
                 "entity_id": entity_id,
                 "name": name,
                 "status": status.name,
+                "identity_changed": self.linking.capabilities.source_identity_changed(
+                    entity_id
+                ),
                 "ha_state": state.state if state else None,
                 "area_id": room_id,
                 "area_name": area.name if area else None,
@@ -209,6 +349,7 @@ class PanelController:
 
         for room in rooms.values():
             room["result"] = summary(room["members"])
+        automation = self.effects.snapshot()
         groups = [
             {
                 **group,
@@ -230,6 +371,39 @@ class PanelController:
             }
             for group in self.groups.groups
         ]
+        for group in groups:
+            group["binding_checks"] = []
+            for binding in group["linking"]["bindings"]:
+                source = next(
+                    (s for s in sources if s["entity_id"] == binding["source"]), None
+                )
+                valid = (
+                    binding["source"] in group["members"]
+                    and source is not None
+                    and self.linking.capabilities.resolve(binding) is not None
+                )
+                reason = (
+                    source["capability"]["reason"]
+                    if source and source["capability"]["status"] != "linkable"
+                    else "control_changed"
+                )
+                group["binding_checks"].append(
+                    {**binding, "valid": valid, "reason": None if valid else reason}
+                )
+            group["script_checks"] = [
+                {
+                    **binding,
+                    "phase": phase,
+                    "enabled": group["actions"]["enabled"],
+                    "valid": any(
+                        s["entity_id"] == binding["entity_id"]
+                        and s["identity"] == binding["identity"]
+                        for s in automation["scripts"]
+                    ),
+                }
+                for phase in ("start", "recovery")
+                for binding in group.get("actions", {}).get(phase, [])
+            ]
         return {
             "available": True,
             "entry_id": self.entry.entry_id,
@@ -243,8 +417,9 @@ class PanelController:
             "groups": groups,
             "revision": self.groups.revision,
             "incident": self.linking.snapshot(),
-            "automation": self.effects.snapshot(),
+            "automation": automation,
             "selftest": deepcopy(self.selftests.record),
+            "review": configuration_review(sources, groups, automation),
         }
 
 

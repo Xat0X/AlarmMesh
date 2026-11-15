@@ -219,7 +219,11 @@ async def async_setup_catalog(hass, entry):
             )
             hass.states.async_set(
                 item["battery"],
-                "72",
+                "unknown"
+                if name == "d" and enabled("battery_unknown")
+                else "14"
+                if name == "b" and enabled("battery_low")
+                else "72",
                 {"device_class": "battery", "unit_of_measurement": "%"},
             )
             hass.states.async_set(
@@ -233,6 +237,9 @@ async def async_setup_catalog(hass, entry):
                     item["setting"], "on" if enabled(f"{name}_permission") else "off"
                 )
             if item["target"]:
+                if name == "b" and enabled("control_missing"):
+                    hass.states.async_remove(item["target"])
+                    continue
                 attrs = {
                     "supported_features": item["features"],
                     "available_tones": item["tones"],
@@ -299,7 +306,16 @@ async def async_setup_catalog(hass, entry):
             "failure",
         )
     ]
-    helpers += ["input_boolean.catalog_fault", "input_boolean.catalog_test"]
+    helpers += [
+        "input_boolean.catalog_" + key
+        for key in (
+            "fault",
+            "test",
+            "battery_low",
+            "battery_unknown",
+            "control_missing",
+        )
+    ]
     entry.async_on_unload(async_track_state_change_event(hass, helpers, update))
     hass.data["alarmmesh_simulation"] = {
         "fixtures": fixtures,

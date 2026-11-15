@@ -319,7 +319,7 @@ test("setup guide handles empty sources and only navigates to existing configura
   const data = normal(); data.sources = []; data.groups = []; data.rooms = []; data.usable = 0;
   transport.callbacks.at(-1)(data);
   assert.ok(root.querySelector(".setup-guide").open);
-  assert.equal(root.querySelectorAll(".setup-steps li").length, 3);
+  assert.equal(root.querySelectorAll(".setup-steps li").length, 7);
   assert.ok(root.querySelector('[data-step="sources"]').textContent.includes("existing Home Assistant"));
   root.querySelector('[data-step="groups"] button').click();
   assert.equal(panel.page, "groups"); assert.deepEqual(calls, []); panel.remove();
@@ -644,4 +644,98 @@ test("confirming after an unchecked attempt clears the obsolete validation warni
   assert.ok(box.querySelector(".request-status").textContent.includes("accepted"));
   assert.equal(execute.disabled, true);
   panel.remove();
+});
+
+test("seven guided steps follow server state, allow skipping and never enable anything", async () => {
+  const { panel, root, transport, calls } = setup("nl");
+  const data = featureData();
+  data.review = { steps: [
+    ["sources", "configured"], ["rooms", "needs_attention"], ["groups", "configured"],
+    ["sounders", "not_supported"], ["notifications", "disabled"], ["scripts", "disabled"], ["check", "needs_attention"]
+  ].map(([id, status]) => ({id, status, count: 0})), issues: [] };
+  transport.callbacks.at(-1)(data);
+  assert.equal(root.querySelectorAll(".setup-steps li").length, 7);
+  assert.ok(root.querySelector('[data-step="notifications"]').textContent.includes("Uit · optioneel"));
+  assert.ok(root.querySelector('[data-step="sounders"]').textContent.includes("Niet ondersteund"));
+  root.querySelector('[data-step="rooms"] button').click(); assert.equal(panel.page, "rooms");
+  await panel.go("overview"); assert.equal(root.querySelector('[data-step="sources"]').dataset.status, "configured");
+  root.querySelector('[data-step="notifications"] button').click();
+  assert.ok(root.querySelector('dialog [name="notifications-enabled"]'));
+  assert.deepEqual(calls, []); panel.remove();
+});
+
+test("maintenance keeps absent evidence unknown and a low-battery warning separate from smoke", async () => {
+  const {panel,root,transport,calls}=setup(); const data=featureData();
+  data.sources[0].capability.details={maintenance:{battery_percent:19,battery_low:false,fault:true}};
+  data.sources[1].capability.details={maintenance:{battery_percent:null,battery_low:null,fault:null}};
+  data.review={steps:[],issues:[{code:"control_missing",source:data.sources[1].entity_id,group:"simulated-group"}]};
+  transport.callbacks.at(-1)(data); await panel.go("maintenance");
+  const cards=root.querySelectorAll(".maintenance-device");
+  assert.ok(cards[0].textContent.includes("19%")); assert.ok(cards[0].textContent.includes("20% display threshold"));
+  assert.ok(cards[0].textContent.includes("Problem reported by device"));
+  assert.ok(cards[1].textContent.includes("Unknown")); assert.ok(!cards[1].textContent.includes("No problem reported"));
+  assert.ok(root.querySelector('[data-issue="control_missing"]'));
+  assert.deepEqual(panel.data.result,data.result); assert.deepEqual(calls,[]);
+  await panel.go("overview"); assert.ok(root.querySelector(".hero").textContent.includes("No smoke reported"));
+  panel.remove();
+});
+
+test("missing recipient stays visible until explicit removal, cancelling preserves it", async () => {
+  const {panel,root,transport,calls}=setup(); const data=featureData();
+  data.automation.settings.recipients=[{service:"mobile_app_simulated_gone",enabled:false}];
+  data.automation.missing_recipients=["mobile_app_simulated_gone"];
+  transport.callbacks.at(-1)(data); panel.openDialog({kind:"settings"});
+  const missing=[...root.querySelectorAll(".recipient-row")].find(r=>r.textContent.includes("simulated_gone"));
+  assert.ok(missing.textContent.includes("unavailable")); assert.equal(missing.querySelectorAll("button").length,1);
+  missing.querySelector("button").click(); panel.closeDialog(); assert.deepEqual(calls,[]);
+  panel.openDialog({kind:"settings"}); assert.ok(root.querySelector('input[value="mobile_app_simulated_gone"]'));
+  [...root.querySelectorAll(".recipient-row")].find(r=>r.textContent.includes("simulated_gone")).querySelector("button").click();
+  root.querySelector("form").dispatchEvent(new Event("submit",{cancelable:true})); await tick();
+  assert.deepEqual(calls[0].notifications.recipients,[]); panel.remove();
+});
+
+test("incident summary records only known times and separates pending clearance and device-test outcome", async () => {
+  const {panel,root,transport}=setup(); const data=featureData();
+  data.sources[0].status="UNREACHABLE";
+  data.incident={active_sources:[source.entity_id],targets:[{source:data.sources[1].entity_id,status:"failed",origins:[source.entity_id]}]};
+  data.automation.episodes=[{id:"episode",group_id:"notifications",phase:"start",started:"2026-11-15T08:00:00Z",origins:[source.entity_id],relevant:[source.entity_id],receipts:{p:{kind:"notification",target:"mobile_app_simulated_phone",phase:"start",status:"accepted"}}}];
+  data.selftest={source:data.sources[1].entity_id,status:"outcome_unknown"};
+  transport.callbacks.at(-1)(data); await panel.go("incidents");
+  const flow=root.querySelector(".incident-flow"); assert.ok(flow.textContent.includes("explicit no-smoke"));
+  assert.ok(!flow.textContent.includes("recovery recorded"));
+  assert.ok(root.querySelector(".incident-episode").textContent.includes("physical result unconfirmed"));
+  assert.ok(root.querySelector(".selftest-result").textContent.includes("not a pass"));
+  const recovered=structuredClone(data); recovered.automation.episodes[0].phase="recovery"; recovered.automation.episodes[0].updated="2026-11-15T08:05:00Z";
+  transport.callbacks.at(-1)(recovered); assert.ok(root.querySelector(".incident-flow").textContent.includes("recovery recorded"));
+  panel.remove();
+});
+
+test("maintenance and guide do not expose cached data after loss of admin authorization", async () => {
+  const {panel,root,transport,calls}=setup(); transport.callbacks.at(-1)(featureData());
+  await panel.go("maintenance"); assert.ok(root.querySelector(".maintenance-device"));
+  panel.hass={...panel._hass,user:{is_admin:false}};
+  assert.equal(root.querySelector(".maintenance-device"),null); assert.equal(root.querySelector(".setup-guide"),null);
+  assert.deepEqual(calls,[]); panel.remove();
+});
+
+test("page navigation returns to the panel start while live updates preserve reading position", async () => {
+  const original = HTMLElement.prototype.scrollIntoView;
+  const scrolled = [];
+  HTMLElement.prototype.scrollIntoView = function (options) { scrolled.push({ node: this, options }); };
+  let panel;
+  try {
+    const view = setup("nl"); panel = view.panel;
+    await panel.go("maintenance");
+    assert.equal(scrolled.length, 1);
+    assert.equal(scrolled[0].node.classList.contains("shell"), true);
+    assert.equal(scrolled[0].options.block, "start");
+    view.transport.callbacks.at(-1)(normal());
+    assert.equal(scrolled.length, 1, "a pushed state must not reset the reading position");
+    await panel.go("overview");
+    assert.equal(scrolled.length, 2);
+  } finally {
+    panel?.remove();
+    if (original) HTMLElement.prototype.scrollIntoView = original;
+    else delete HTMLElement.prototype.scrollIntoView;
+  }
 });

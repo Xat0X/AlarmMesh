@@ -121,9 +121,14 @@ for model/provider conditions, reproducible evidence and the separate review URL
 
 ## Guided setup and group troubleshooting (local development)
 
-The Overview's **Set up and check / Instellen en controleren** disclosure leads
-to the existing source selector and group pages. Opening these steps changes no
-configuration. Organizing groups does not require enabling linked sounding.
+Open **Set up and check / Instellen en controleren** on Overview or Settings.
+The same guide links to seven existing settings: detectors, HA rooms, groups and
+incident origins, supported sounder targets, phone recipients, start/recovery
+scripts, and a final configuration review. Each step shows its server-derived
+state and count. Configured means saved/current metadata, not physically tested.
+Optional-off and unsupported are distinct from attention needed. You can skip
+steps, navigate away and return; saved configuration determines progress. There
+is no second progress store or finish button that enables actions.
 
 Open a group for a **Configuration check / Configuratiecontrole**. It distinguishes
 disabled linking, no assigned sounders, stale source references, unavailable or
@@ -137,6 +142,39 @@ unsaved edit forms remain untouched. Losing the connection closes the detail and
 clears current checks. Matching assignments do not prove that a device will sound
 or that smoke detection/radio communication is healthy. Disabling a group does
 not stop a sounder that is already active.
+
+### Maintenance
+
+Open **Maintenance / Onderhoud** from Overview or Settings. **Configuration to
+review** lists missing sources/rooms, changed sounder mappings, missing scripts
+and saved phone recipients, with a button to the existing editor or detector
+details. Disabled options stay off; a stale saved assignment remains visible
+until you explicitly replace/remove it. A saved phone recipient can be removed
+in its form; cancelling discards that draft.
+
+**Device reports** lists battery percentage, binary low-battery/fault indications,
+source/control availability and the retained self-test request. The links must
+belong to the same device/provider/configuration; unrelated entities are never
+matched by their names. Missing, invalid and unsupported values remain Unknown.
+At or below **20%** is a clearly labelled display threshold only. It changes no
+smoke status, incident rule, command or notification. Off means no problem
+reported in the available value, not that a detector is healthy. HA timestamps
+do not establish radio contact. The retained self-test request, activity and
+explicit device result remain distinct; absence of a result never means success.
+
+### Incident details
+
+Incident details show current smoke sources and rooms, involved groups and
+sources still awaiting explicit no-smoke values. Request summaries separate
+sounder, phone and script requests from device self-test results. Recorded start
+and confirmed recovery times come from the existing bounded ledger; source
+arrival order and individual command times are not recorded and are not invented.
+An old recovery receipt is not current smoke truth. No new history is stored and
+the existing retention period is unchanged. HA acceptance never confirms physical
+sound, delivery or external script effects.
+
+Current implementation evidence, the eight-combination visual checklist and the
+existing onboarded review URL are in the [usability review](usability-review.md).
 
 
 ## Incident features in the current working tree

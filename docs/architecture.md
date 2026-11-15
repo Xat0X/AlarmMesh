@@ -442,3 +442,30 @@ unchanged branding. All new text is packaged in both Dutch and English.
 Reviewed separate-smoke contract evidence is cached against the source registry/device
 identity within the runtime. Test-control loss cannot turn an independently reported
 smoke value into a test echo. This cache stores no source state or device ownership.
+
+## Derived setup and maintenance presentation
+
+The existing authenticated panel snapshot now includes `review`: seven setup
+step states/counts and contextual configuration issues. `PanelController` uses
+the same capability resolver as execution for saved sounder mappings, and the
+current validated script/recipient inventory for other assignments. It does not
+persist progress, alter choices or add an execution path. Disabled optional
+features are labelled separately. Stale assignments remain in their original
+stores until explicit edits; there is no automatic replacement.
+
+`Capabilities.details` additionally normalizes known same-device battery and
+binary fault/low-battery values for maintenance display. Invalid/out-of-range
+percentages and absent information stay unknown. The frontend's 20% warning is
+presentation only. Existing related-entity subscriptions publish these changes
+and existing unload cleanup removes them; no polling, network, timers,
+notifications or health/last-contact inference is added. Smoke calculation,
+incident execution, self-test ownership, storage schemas and identities are
+unchanged. Incident details use the existing ledger only and explicitly label its
+missing chronology. See [current evidence](usability-review.md).
+
+Primary references rechecked **2026-11-15**:
+[HA battery sensor semantics](https://contributors.home-assistant.io/core/entities/sensor/),
+[binary battery/problem semantics](https://contributors.home-assistant.io/core/entities/binary-sensor/),
+[event helper lifecycle](https://contributors.home-assistant.io/core/integrations/events/),
+and [Bosch BSD-2 broadcast limitations](https://www.zigbee2mqtt.io/devices/BSD-2.html).
+No provider contract or prerequisite is expanded by this presentation work.

@@ -8,15 +8,15 @@
 
 Smoke reports and source availability from existing Home Assistant smoke detector
 entities, with a local panel for detectors, rooms and groups. This test release adds [optional linked sounding](docs/linked-sounding.md), off by default.
-The current unpublished working tree also adds [Companion notifications, group
+Version 0.1.0-beta.4 also offers [Companion notifications, group
 script actions, incident details and reviewed built-in self-test requests](docs/incident-features.md).
 New automatic behavior defaults off; existing explicit choices are preserved.
-The [current finishing review](docs/finish-review.md) records the completed form,
-incident and package checks, plus the remaining visual acceptance boundary.
+The local review build improves [guided setup, maintenance and incident details](docs/usability-review.md).
+Earlier [finishing checks](docs/finish-review.md) remain dated historical evidence.
 
 > AlarmMesh is not a certified fire alarm system and must not replace certified standalone smoke detectors.
 
-## Device support — 0.1.0-beta.3
+## Device support
 
 This test release includes an offline catalog of **52 converter definitions /
 67 model and variant rows**, additional reviewed HA select/siren/switch profiles,
@@ -27,11 +27,11 @@ BSD-2 activation requires its broadcast setting to explicitly report off;
 AlarmMesh never changes that setting. The original branding, two overview
 entities, source-selection schema and smoke rules remain unchanged.
 
-## Test release: 0.1.0-beta.3
+## Test release: 0.1.0-beta.4
 
 For opt-in testing, enable **Pre-release** in the AlarmMesh Marketplace page and
-choose **0.1.0-beta.3**. Back up before updating and follow the restart prompt.
-Read the [release notes](docs/releases/0.1.0-beta.3.md) before installing.
+choose **0.1.0-beta.4**. Back up before updating and follow the restart prompt.
+Read the [release notes](docs/releases/0.1.0-beta.4.md) before installing.
 
 ## Current status: local panel and two read-only overviews
 
@@ -71,7 +71,7 @@ in-memory result is shown by exactly two entities, with no physical device entry
 
 No smoke reported is not a guarantee of safety. Optional linking calls only
 explicitly mapped, verified existing HA controls. It adds no arbitrary AlarmMesh services or device transport. In the current
-working tree, notifications and script actions require separate opt-in; built-in
+version, notifications and script actions require separate opt-in; built-in
 self-test requests require a reviewed model/provider contract and confirmation.
 Activation-only profiles have no automatic stop; a completed HA action is not audible confirmation.
 

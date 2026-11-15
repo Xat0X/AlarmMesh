@@ -1,4 +1,4 @@
-import { TEXT } from "./translations.js?v=20261115-flows-1";
+import { TEXT } from "./translations.js?v=20261115-usability-visual-1";
 
 // Safe DOM construction: names, labels and registry data are always text nodes.
 const el = (tag, text, cls) => {
@@ -81,6 +81,7 @@ export class AlarmMeshPanel extends HTMLElement {
   }
   async go(page) {
     this.closeDialog(); this.page = page; this.render();
+    this.shadowRoot.querySelector(".shell")?.scrollIntoView?.({ block: "start", behavior: "instant" });
     if (page === "catalog" && !this.catalog && this._hass?.user?.is_admin) {
       const connection = this.connection;
       try {
@@ -107,7 +108,7 @@ export class AlarmMeshPanel extends HTMLElement {
     if (!this.shadowRoot) return;
     this.shadowRoot.querySelector("dialog")?.classList.toggle("dark", Boolean(this._hass?.themes?.darkMode));
     const t = this.t;
-    const link = el("link"); link.rel = "stylesheet"; link.href = "/alarmmesh-assets/panel.css?v=20261115-flows-1";
+    const link = el("link"); link.rel = "stylesheet"; link.href = "/alarmmesh-assets/panel.css?v=20261115-usability-visual-1";
     const shell = el("div", undefined, "shell");
     shell.classList.toggle("dark", Boolean(this._hass?.themes?.darkMode));
     const side = el("aside");
@@ -141,6 +142,7 @@ export class AlarmMeshPanel extends HTMLElement {
       if (this.page === "catalog") this.renderCatalog(main);
       if (this.page === "settings") this.renderSettings(main);
       if (this.page === "incidents") this.renderIncidents(main);
+      if (this.page === "maintenance") this.renderMaintenance(main);
       if (this.page === "devices") {
         main.append(this.section(t.selected, button(t.choose, () => this.choose())));
         this.sourceList(main, data.sources);
@@ -152,7 +154,7 @@ export class AlarmMeshPanel extends HTMLElement {
         const cards = el("div", undefined, "cards");
         for (const group of data.groups) {
           const card = button("", () => this.openDialog({ kind: "group", id: group.id }), "card room-card");
-          card.append(icon("select-group"), el("h3", group.name), this.badge(group.result), el("p", t[group.result.availability]), el("p", `${group.members.length} ${group.members.length === 1 ? t.detector : t.devices.toLowerCase()}`));
+          card.append(icon("select-group"), el("h3", group.name), this.badge(group.result), el("p", t[group.result.availability]), el("p", this.detectorCount(group.members.length)));
           if (group.unselected.length) card.append(el("p", `${group.unselected.length} · ${t.stale}`, "warning-text"));
           card.append(el("p", `${t.linkTogether}: ${t[group.linking_status || "disabled"]}`));
           cards.append(card);
@@ -179,7 +181,7 @@ export class AlarmMeshPanel extends HTMLElement {
     main.append(hero);
     hero.append(button(t.viewIncidents, () => this.go("incidents"), "button incident-link"));
     const stats = el("div", undefined, "stats");
-    for (const [label, value, note] of [[t.sources, `${data.usable} / ${data.sources.length}`, t.usable], [t.rooms, data.rooms.filter(r => r.id).length, "Home Assistant"], [t.groups, data.groups.length, t.organized]]) {
+    for (const [label, value, note] of [[t.sources, `${data.usable} / ${data.sources.length}`, data.usable === 1 ? t.usableSource : t.usable], [t.rooms, data.rooms.filter(r => r.id).length, "Home Assistant"], [t.groups, data.groups.length, t.organized]]) {
       const stat = el("div", undefined, "stat"); stat.append(el("span", label), el("strong", value), el("small", note)); stats.append(stat);
     }
     main.append(stats);
@@ -200,6 +202,7 @@ export class AlarmMeshPanel extends HTMLElement {
     const attention = data.sources.filter(s => !["SMOKE_REPORTED", "NO_SMOKE_REPORTED"].includes(s.status));
     if (attention.length) { main.append(this.section(t.attention)); this.sourceList(main, attention); }
     this.renderSetupGuide(main);
+    main.append(button(t.maintenance, () => this.go("maintenance"), "button maintenance-link"));
     const allRooms = button("→", () => this.go("rooms"));
     allRooms.setAttribute("aria-label", t.rooms);
     main.append(this.section(t.rooms, allRooms)); this.roomCards(main, data.rooms);
@@ -209,21 +212,68 @@ export class AlarmMeshPanel extends HTMLElement {
     const guide = el("details", undefined, "setup-guide");
     guide.open = this.setupGuideOpen ?? (!data.sources.length || !data.groups.length);
     guide.addEventListener("toggle", () => { this.setupGuideOpen = guide.open; });
-    guide.append(el("summary", t.setupTitle), el("p", t.setupNote));
+    guide.append(el("summary", t.setupTitle), el("p", t.guidanceNote));
     const steps = el("ol", undefined, "setup-steps");
     const add = (title, note, label, action, key) => {
       const item = el("li"); item.dataset.step = key;
-      const copy = el("div"); copy.append(el("h3", title), el("p", note));
+      const step = data.review?.steps.find(s => s.id === key);
+      const state = step?.status || "unknown";
+      const copy = el("div"); copy.append(el("h3", title), el("span", t['guide_' + state], `guide-state ${state}`), el("p", `${note}${step ? ` · ${t.savedCount}: ${step.count}` : ''}`));
+      item.dataset.status = state;
       item.append(copy, button(label, action)); steps.append(item);
     };
     add(t.setupSources, data.sources.length ? `${data.sources.length} · ${t.selected}` : t.setupNoSources,
       t.choose, () => this.choose(), "sources");
+    add(t.setupRooms, t.setupRoomsNote, t.rooms, () => this.go("rooms"), "rooms");
     add(t.setupGroups, data.groups.length ? `${data.groups.length} · ${t.groups}` : t.setupNoGroups,
       t.groups, () => this.go("groups"), "groups");
-    const review = data.groups.filter(g => g.linking_status === "review_needed");
-    add(t.setupCheck, review.length ? `${review.length} · ${t.review_needed}` : t.setupCheckNote,
-      t.inspectGroups, () => this.go("groups"), "check");
+    add(t.setupSounders, t.setupSoundersNote, t.inspectGroups, () => this.go("groups"), "sounders");
+    add(t.notifications, t.setupNotificationsNote, t.configureNotifications, () => this.openDialog({kind: "settings"}), "notifications");
+    add(t.incidentActions, t.actionsLocation, t.groups, () => this.go("groups"), "scripts");
+    add(t.setupCheck, t.setupCheckNote, t.maintenance, () => this.go("maintenance"), "check");
     guide.append(steps); parent.append(guide);
+  }
+  issueAction(issue) {
+    if (issue.group) return this.openDialog({ kind: "edit", group: this.data.groups.find(g => g.id === issue.group) });
+    if (issue.source && this.data.sources.some(s => s.entity_id === issue.source)) return this.openDialog({ kind: "source", id: issue.source });
+    if (issue.code === "recipient_unavailable") return this.openDialog({ kind: "settings" });
+    this.choose();
+  }
+  renderMaintenance(parent) {
+    const t = this.t, data = this.data;
+    parent.append(el("p", t.maintenanceNote, "notice"));
+    const config = el("section", undefined, "notice configuration-issues");
+    config.append(el("h2", t.configurationIssues));
+    const issues = data.review?.issues;
+    if (!issues) config.append(el("p", t.guide_unknown));
+    else if (!issues.length) config.append(el("p", t.noConfigurationIssues));
+    for (const issue of issues || []) {
+      const name = data.sources.find(s => s.entity_id === issue.source)?.name || data.groups.find(g => g.id === issue.group)?.name || issue.target || issue.source || "AlarmMesh";
+      const row = el("div", undefined, "check-item"); row.dataset.issue = issue.code;
+      row.append(icon("information-outline"), el("span", `${name}: ${t[issue.code] || t.error}`), button(t.reviewAssignment, () => this.issueAction(issue)));
+      config.append(row);
+    }
+    parent.append(config, this.section(t.deviceReports));
+    for (const source of data.sources) {
+      const card = el("section", undefined, "notice maintenance-device"); card.dataset.source = source.entity_id;
+      card.append(el("h3", source.name), el("p", source.area_name || t.noRoom));
+      const health = source.capability?.details?.maintenance;
+      const table = el("dl");
+      const field = (label, value, warn = false) => { table.append(el("dt", label), el("dd", value, warn ? "warning-text" : "")); };
+      field(t.battery, health?.battery_percent == null ? t.guide_unknown : `${health.battery_percent}%`, health?.battery_percent != null && health.battery_percent <= 20);
+      const low = health?.battery_low === true || health?.battery_percent != null && health.battery_percent <= 20;
+      field(t.battery_low, low ? t.lowBatteryPresentation : health?.battery_low === false || health?.battery_percent != null ? t.noLowBatteryReport : t.guide_unknown, low);
+      field(t.fault, health?.fault == null ? t.guide_unknown : health.fault ? t.faultReported : t.noFaultReport, health?.fault === true);
+      field(t.sourceAvailability, t[source.status] || t.guide_unknown);
+      field(t.controlAvailability, source.capability ? t[source.capability.reason] || t.guide_unknown : t.guide_unknown);
+      card.append(table);
+      const record = source.selftest?.record;
+      card.append(el("p", record ? `${t.lastTest}: ${this.formatTime(record.started)} · ${t['test_' + record.status] || t.guide_unknown}` : `${t.lastTest}: ${t.noTestRequest}`));
+      if (record) card.append(el("small", t.deviceResultNote));
+      card.append(button(t.inspectDetector, () => this.openDialog({kind: "source", id: source.entity_id})));
+      parent.append(card);
+    }
+    if (!data.sources.length) parent.append(button(t.choose, () => this.choose()));
   }
   renderGroupChecks(parent, group) {
     const t = this.t, data = this.data;
@@ -259,9 +309,10 @@ export class AlarmMeshPanel extends HTMLElement {
       const source = data.sources.find(s => s.entity_id === binding.source);
       const cap = source?.capability;
       const control = cap?.controls?.find(c => c.source === binding.source && c.target === binding.target && c.profile === binding.profile && c.identity === binding.identity);
-      if (!group.members.includes(binding.source) || !source || cap?.status !== "linkable" || !control) {
+      const checked = group.binding_checks?.find(c => c.source === binding.source && c.target === binding.target);
+      if (checked ? !checked.valid : !group.members.includes(binding.source) || !source || cap?.status !== "linkable" || !control) {
         unresolved++;
-        const reason = cap && cap.status !== "linkable" ? (t[cap.reason] || t.control_changed) : t.control_changed;
+        const reason = checked ? t[checked.reason] || t.control_changed : cap && cap.status !== "linkable" ? (t[cap.reason] || t.control_changed) : t.control_changed;
         add(`${source?.name || binding.source}: ${reason}`, t.edit, edit, true, "binding");
       } else if (!control.safe_stop) activationOnly++;
     }
@@ -570,7 +621,8 @@ export class AlarmMeshPanel extends HTMLElement {
   }
   renderSettings(parent) {
     const t = this.t, automation = this.data.automation;
-    parent.append(button(t.catalog, () => this.go("catalog")), button(t.viewIncidents, () => this.go("incidents")));
+    parent.append(button(t.catalog, () => this.go("catalog")), button(t.viewIncidents, () => this.go("incidents")), button(t.maintenance, () => this.go("maintenance")));
+    this.renderSetupGuide(parent);
     if (!automation) return;
     const section = el("section", undefined, "notice");
     section.append(el("h2", t.notifications), el("p", `${t.notifications}: ${t[automation.settings.enabled ? "enabled" : "disabled"]}`), el("p", t.notificationNote));
@@ -588,13 +640,14 @@ export class AlarmMeshPanel extends HTMLElement {
     const recovery = this.checkField(form, t.recoveryNotification, cfg.recovery, "notifications-recovery");
     const stored = new Map(cfg.recipients.map(r => [r.service, r]));
     const choices = [...a.recipients, ...cfg.recipients.filter(r => !a.recipients.some(n => n.service === r.service)).map(r => ({ ...r, name: r.service, missing: true }))];
-    const recipients = [];
+    const recipients = [], removed = new Set();
     if (!choices.length) form.append(el("p", t.noRecipients, "notice"));
     for (const recipient of choices) {
       const row = el("section", undefined, "recipient-row");
       const input = this.checkField(row, `${recipient.name}${recipient.missing ? ' · ' + t.recipient_unavailable : ''}`, stored.get(recipient.service)?.enabled || false, "recipient");
       input.value = recipient.service; recipients.push(input);
       if (!recipient.missing) row.append(button(t.testNotification, () => this.confirmRequest(form, { actionKind: "notification", target: recipient.service, name: recipient.name }), "button"));
+      if (stored.has(recipient.service)) row.append(button(t.forgetRecipient, () => { removed.add(recipient.service); row.remove(); }, "button destructive"));
       form.append(row);
     }
     const preview = el("details"); preview.append(el("summary", t.messagePreview), el("strong", a.preview.title), el("p", a.preview.message, "message-preview")); form.append(preview);
@@ -605,7 +658,7 @@ export class AlarmMeshPanel extends HTMLElement {
       event.preventDefault();
       if (form.querySelector(".request-confirmation")) { error.textContent = t.finishConfirmation; return; }
       if (!this.data) { error.textContent = t.offline; return; }
-      const value = { enabled: toggle.checked, recovery: recovery.checked, recipients: recipients.filter(r => r.checked || stored.has(r.value)).map(r => ({ service: r.value, enabled: r.checked })) };
+      const value = { enabled: toggle.checked, recovery: recovery.checked, recipients: recipients.filter(r => !removed.has(r.value) && (r.checked || stored.has(r.value))).map(r => ({ service: r.value, enabled: r.checked })) };
       if (value.enabled && !value.recipients.some(r => r.enabled)) { error.textContent = t.invalid_notifications; return; }
       const send = async confirmed => {
         save.disabled = true;
@@ -710,27 +763,50 @@ export class AlarmMeshPanel extends HTMLElement {
     if (pending.length) parent.append(el("p", `${t.incidentPending}: ${pending.map(id => data.sources.find(s => s.entity_id === id)?.name || id).join(", ")}`, "notice"));
     const groups = data.groups.filter(g => (g.origins || g.members).some(id => active.includes(id)));
     if (groups.length) { const section=el("section",undefined,"notice"); section.append(el("h2",t.groups)); for (const group of groups) section.append(button(group.name,()=>this.openDialog({kind:"group",id:group.id}))); parent.append(section); }
-    for (const target of data.incident?.targets || []) parent.append(el("p", `${data.sources.find(s => s.entity_id === target.source)?.name || target.source}: ${t[target.status] || target.status}`));
+    for (const target of data.incident?.targets || []) {
+      const row = el("section", undefined, "notice sounder-receipt");
+      row.append(el("h3", data.sources.find(s => s.entity_id === target.source)?.name || target.source), el("p", t[target.status] || t.guide_unknown));
+      if (target.origins?.length) row.append(el("p", `${t.recordedOrigins}: ${target.origins.map(id => this.sourceName(id)).join(", ")}`));
+      row.append(el("small", t.commandNote)); parent.append(row);
+    }
     const episodes = data.automation?.episodes || [];
     if (!episodes.length && !(data.incident?.active_sources || []).length) parent.append(el("p", t.noIncidents));
     for (const episode of episodes) {
       const card = el("section", undefined, "notice incident-episode"); card.dataset.incident = episode.id;
       const group = data.groups.find(g => g.id === episode.group_id);
-      card.append(el("h2", group?.name || t.notifications), el("p", `${t['phase_' + episode.phase]} · ${new Date(episode.started).toLocaleString(this._hass.language)}`));
-      for (const source of episode.origins) card.append(el("p", data.sources.find(s => s.entity_id === source)?.name || source));
+      card.append(el("h2", group?.name || t.notifications));
+      const flow = el("ol", undefined, "incident-flow");
+      flow.append(el("li", `${t.incidentStarted}: ${this.formatTime(episode.started)}`));
+      flow.append(el("li", `${t.recordedOrigins}: ${episode.origins.map(id => this.sourceName(id)).join(", ")}`));
+      if (episode.phase !== "recovery") {
+        const waiting = (episode.relevant || episode.origins).filter(id => data.sources.find(s => s.entity_id === id)?.status !== "NO_SMOKE_REPORTED");
+        flow.append(el("li", waiting.length ? `${t.incidentPending}: ${waiting.map(id => this.sourceName(id)).join(", ")}` : t.recoveryNotRecorded));
+      }
+      card.append(flow);
       for (const receipt of Object.values(episode.receipts)) {
         const row = el("div", undefined, "execution-row");
         const name = data.automation?.scripts.find(s => s.entity_id === receipt.target)?.name || receipt.target.replace(/^mobile_app_/, "");
-        row.append(icon(["failed", "blocked", "outcome_unknown"].includes(receipt.status) ? "alert-circle-outline" : "check-circle-outline"), el("span", `${name}: ${t['delivery_' + receipt.status]} · ${t['phase_' + receipt.phase]}`));
+        row.append(icon(["failed", "blocked", "outcome_unknown"].includes(receipt.status) ? "alert-circle-outline" : receipt.status === "accepted" ? "email-check-outline" : "progress-clock"), el("span", `${t[receipt.kind === "script" ? "scriptRequest" : "phoneRequest"]} · ${name}: ${t['delivery_' + receipt.status] || t.guide_unknown} · ${t['phase_' + receipt.phase]}`));
         if (["failed", "blocked", "outcome_unknown"].includes(receipt.status)) row.append(el("small", receipt.kind === "script" ? t.script_changed : t.deliveryAdvice));
         card.append(row);
       }
+      if (episode.phase === "recovery") flow.append(el("li", `${t.recoveryRecorded}: ${this.formatTime(episode.updated)}`));
+      card.append(el("small", t.incidentEvidenceLimit, "muted"));
       parent.append(card);
     }
     for (const row of data.automation?.manual_results || []) parent.append(el("p", `${t.explicitTest} · ${row.target}: ${t['delivery_' + row.status]}`));
     if (data.selftest) parent.append(el("section", undefined, "notice selftest-result"));
     const self = parent.querySelector(".selftest-result");
     if (self) self.append(el("h2", t.selfTests), el("p", `${data.sources.find(s => s.entity_id === data.selftest.source)?.name || data.selftest.source}: ${t['test_' + data.selftest.status]}`), el("p", t.deviceResultNote));
+  }
+  sourceName(id) {
+    const source = this.data.sources.find(s => s.entity_id === id);
+    return source ? `${source.name} · ${source.area_name || this.t.noRoom}` : id;
+  }
+  detectorCount(count) { return `${count} ${count === 1 ? this.t.detector : this.t.detectors}`; }
+  formatTime(value) {
+    const date = new Date(value);
+    return value && Number.isFinite(date.getTime()) ? date.toLocaleString(this._hass.language) : this.t.guide_unknown;
   }
   async mutate(payload, error) {
     try {
