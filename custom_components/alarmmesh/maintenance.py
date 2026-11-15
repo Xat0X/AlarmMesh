@@ -512,6 +512,7 @@ class Maintenance:
             return
         receipt[phase] = "sending"
         await self._persist()
+        self.publish()  # Observe the persisted request separately from its outcome.
         if not self._allowed(key, kind, issue, target, phase):
             receipt[phase] = "blocked"
             await self._persist()
@@ -524,6 +525,7 @@ class Maintenance:
                 )
         except asyncio.CancelledError:
             receipt[phase] = "outcome_unknown"
+            self.publish()
             raise
         except Exception:
             receipt[phase] = "failed"

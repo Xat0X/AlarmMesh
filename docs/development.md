@@ -54,7 +54,7 @@ phone/tablet layout, contrast or native keyboard focus. Use the separate
 The Python fixture substitutes only the missing upstream UI-wheel filesystem
 root in the pip HA harness; real HTTP routes, panel registration, WebSocket auth,
 HA registries and group storage remain in use. Official image runs use their
-real bundled frontend and now check **27 runtime + 16 driver** scenarios, including authenticated
+real bundled frontend and now check **29 runtime + 16 driver** scenarios, including authenticated
 panel subscription/group mutations, asset serving, persistent groups, verified
 mock control profiles, mixed-provider failure isolation and linking cleanup.
 The [linking simulation](linked-sounding.md#reproduce-the-simulation) uses mock

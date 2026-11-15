@@ -1,5 +1,27 @@
 # Architecture and scope
 
+## Local activity and calendar reminders
+
+`activity.py` observes already-published runtime transitions. Initial capture is a
+quiet baseline; old execution receipts are not imported as new events. A separate
+version-1/schema-1 HA Store, 128-item pending queue and single worker bound history
+to 1,000 events / 30 days. Faults mark incompleteness without changing status,
+incident ownership or receipts. A nearest-expiry timer only prunes journal rows.
+
+`reminders.py` owns a separate version-1/schema-1 Store of up to 256 source-bound
+calendar settings/cycle receipts. One serial ten-second notification worker uses
+the existing server-validated Companion route, with intent persisted before calls.
+Local dates map to 09:00 in the configured HA time zone; overdue startup cycles
+are suppressed. Smoke/latched incidents take priority. No reminder calls a device
+self-test, sounder or script. Pause/unload drain work and cancel timer/startup
+subscriptions. Explicit entry removal removes both new stores.
+
+Group copy is constructed server-side under the existing revision lock, copying
+only selected organizational members/origins into a new ID with actions/linking
+off. Existing group/source schemas and confirmations are preserved. New WebSocket
+mutations require admin authorization and exact review; diagnostic exports add
+only allowlisted counts/issues, never raw history. See [behavior/evidence](activity-reminders.md).
+
 ## Local maintenance/analysis extension
 
 `maintenance.py` adds an independent opt-in version-1/schema-1 Store and one

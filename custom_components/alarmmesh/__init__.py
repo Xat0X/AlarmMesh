@@ -88,5 +88,5 @@ async def async_remove_entry(hass: HomeAssistant, entry: AlarmMeshConfigEntry) -
     """Remove only this entry's organizational groups on explicit entry deletion."""
     await GroupStore(hass, entry.entry_id).store.async_remove()
     await NotificationStore(hass, entry.entry_id).store.async_remove()
-    for purpose in ("receipts", "selftest", "maintenance"):
+    for purpose in ("receipts", "selftest", "maintenance", "activity", "reminders"):
         await Store(hass, 1, f"alarmmesh.{purpose}.{entry.entry_id}").async_remove()

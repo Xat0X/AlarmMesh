@@ -30,6 +30,8 @@ async def check_features(hass, entry, registry, fixtures, ws_request, require, p
                     panel.linking._task,
                     panel.effects._task,
                     panel.maintenance.task,
+                    panel.reminders.task,
+                    panel.activity.task,
                     *panel.selftests.tasks,
                 )
                 if t is not None
@@ -397,6 +399,140 @@ async def check_features(hass, entry, registry, fixtures, ws_request, require, p
             panel.selftests.record["status"] == "outcome_unknown",
             "Timeout reported success",
         )
+        hass.states.async_set("input_boolean.catalog_a_smoke", "off")
+        hass.states.async_set("input_boolean.catalog_test", "off")
+        await settle()
+        history = panel.activity.snapshot()["events"]
+        require(
+            any(
+                r["kind"] == "selftest" and r["result"] == "outcome_unknown"
+                for r in history
+            ),
+            "Observed self-test outcome missing",
+        )
+        require(
+            any(
+                r["kind"] == "source" and r["result"] == "SMOKE_REPORTED"
+                for r in history
+            ),
+            "Observed smoke transition missing",
+        )
+        original = deepcopy(panel.groups.groups)
+        group = original[0]
+        copy_members = [
+            s for s in group["members"] if s in panel.runtime.source_entity_ids
+        ]
+        copy_origins = [
+            s for s in group.get("origins", group["members"]) if s in copy_members
+        ]
+        await ws_request(
+            {
+                "id": 115,
+                "type": "alarmmesh/group_copy",
+                "group_id": group["id"],
+                "revision": panel.groups.revision,
+                "name": "SIMULATION organizational copy",
+                "members": copy_members,
+                "origins": copy_origins,
+                "confirmed": True,
+            }
+        )
+        await settle()
+        copied = panel.groups.groups[-1]
+        require(
+            panel.groups.groups[:-1] == original
+            and copied["members"] == copy_members
+            and copied["origins"] == copy_origins
+            and copied["linking"] == {"enabled": False, "bindings": []}
+            and not copied.get("actions", {}).get("enabled"),
+            "Copy inherited authority or changed original",
+        )
+        passed("observed_activity_and_organizational_copy_without_authority")
+        from datetime import timedelta
+        from unittest.mock import patch
+        from zoneinfo import ZoneInfo
+
+        from homeassistant.util import dt as dt_util
+
+        r = panel.reminders
+        require(not r.items, "Reminders enabled by upgrade")
+        day = (
+            dt_util.utcnow()
+            .astimezone(ZoneInfo(hass.config.time_zone))
+            .date()
+            .isoformat()
+        )
+        value = {
+            "identity": r.identity(a),
+            "enabled": True,
+            "date": day,
+            "interval": 0,
+            "recipient": "mobile_app_simulated_a",
+        }
+        before = len(calls)
+        with patch(
+            "custom_components.alarmmesh.reminders.due_at",
+            return_value=dt_util.utcnow() - timedelta(seconds=1),
+        ):
+            await ws_request(
+                {
+                    "id": 116,
+                    "type": "alarmmesh/reminder",
+                    "operation": "save",
+                    "source": a,
+                    "revision": r.revision,
+                    "value": value,
+                    "confirmed": True,
+                }
+            )
+            await settle()
+            require(
+                len(calls) == before + 1 and r.items[a]["status"] == "accepted",
+                "Mock reminder request missing",
+            )
+            await ws_request(
+                {
+                    "id": 117,
+                    "type": "alarmmesh/reminder",
+                    "operation": "save",
+                    "source": a,
+                    "revision": r.revision,
+                    "value": value,
+                    "confirmed": True,
+                }
+            )
+            await settle()
+            require(len(calls) == before + 1, "Same reminder replayed")
+        test_before = deepcopy(panel.selftests.record)
+        await ws_request(
+            {
+                "id": 118,
+                "type": "alarmmesh/reminder",
+                "operation": "handle",
+                "source": a,
+                "revision": r.revision,
+                "value": {},
+                "confirmed": True,
+            }
+        )
+        await settle()
+        require(
+            panel.selftests.record == test_before and r.items[a]["status"] == "handled",
+            "Handling reminder changed test truth",
+        )
+        await ws_request(
+            {
+                "id": 119,
+                "type": "alarmmesh/reminder",
+                "operation": "delete",
+                "source": a,
+                "revision": r.revision,
+                "value": {},
+                "confirmed": True,
+            }
+        )
+        await settle()
+        passed("calendar_reminder_mock_delivery_dedup_handle_no_selftest")
         old = panel
         require(
             await hass.config_entries.async_unload(entry.entry_id), "Feature unload"
@@ -404,6 +540,15 @@ async def check_features(hass, entry, registry, fixtures, ws_request, require, p
         require(
             old.effects.closed and old.selftests.closed and not old.script_unsubscribe,
             "Feature subscription leak",
+        )
+        require(
+            old.activity.closed
+            and old.activity.task is None
+            and old.activity.cancel_timer is None
+            and old.reminders.closed
+            and old.reminders.task is None
+            and old.reminders.cancel_timer is None,
+            "Activity/reminder lifecycle leak",
         )
         passed("selftest_request_real_smoke_and_interruption")
     finally:

@@ -880,3 +880,63 @@ test("maintenance recovery receipts are labelled as requests, not future conditi
     } finally { panel.remove(); }
   }
 });
+
+test("combined detector filters retain global smoke and survive pushes", () => {
+  const {panel,root,transport}=setup(); const data=normal();
+  data.sources[0]={...data.sources[0],name:"Very long simulated detector ".repeat(12),area_id:"room-a",groups:["g"],capability:{origin:"mqtt",status:"detection_only",controls:[],details:{maintenance:{battery_percent:10,fault:false}}}};
+  data.sources.push({...source,entity_id:"binary_sensor.simulation_b",name:"Other",status:"SMOKE_REPORTED",capability:{origin:"zha",status:"detection_only",controls:[]}});
+  data.result={smoke:"SMOKE_REPORTED",availability:"COMPLETE"}; data.groups=[{id:"g",name:"SIMULATION group"}]; transport.callbacks.at(-1)(data); panel.go("devices");
+  const search=root.querySelector('[name="device-name"]');search.value="Very long";search.dispatchEvent(new Event("input"));
+  const provider=root.querySelector('[name="device-provider"]');provider.querySelector('[value="mqtt"]').selected=true;provider.dispatchEvent(new Event("change"));
+  assert.equal(root.querySelectorAll('.filtered-devices .source').length,1);assert.ok(root.querySelector('.filter-alarm').textContent.includes('Smoke reported'));
+  transport.callbacks.at(-1)(data);assert.equal(root.querySelector('[name="device-name"]').value,'Very long');
+  const next=root.querySelector('[name="device-name"]');next.value='No match';next.dispatchEvent(new Event('input'));assert.ok(root.querySelector('.filtered-devices').textContent.includes('No results'));
+  assert.ok(root.querySelector('.filter-alarm').textContent.includes('Smoke reported'));panel.remove();
+});
+
+test("activity empty state, filters and detail are read-only and retained",()=>{
+ const {panel,root,transport,calls}=setup('nl');const data=normal();data.activity={events:[],incomplete:false};transport.callbacks.at(-1)(data);panel.go('activity');assert.ok(root.querySelector('main').textContent.includes('Nog geen gebeurtenissen'));
+ data.activity.events=[{id:'observed',observed_at:'2026-11-15T12:00:00Z',category:'alarm',kind:'source',result:'SMOKE_REPORTED',source:source.entity_id,groups:[],target:'',correlation:'incident-observation'}];transport.callbacks.at(-1)(data);
+ const filter=root.querySelector('[name="activity-source"]');filter.querySelector(`[value="${source.entity_id}"]`).selected=true;filter.dispatchEvent(new Event('change'));root.querySelector('.activity-row').click();assert.ok(root.querySelector('dialog').textContent.includes('Waargenomen door AlarmMesh'));panel.closeDialog();assert.equal(panel.activityFilters.source,source.entity_id);assert.deepEqual(calls,[]);panel.remove();
+});
+
+test("reminder draft, exact confirmation, cancellation and offline guard",async()=>{
+ const {panel,root,transport,calls}=setup();const data=normal();data.sources[0].reminder_identity='a'.repeat(64);data.reminders={items:[],revision:0,time_zone:'Europe/Brussels'};data.automation={recipients:[{service:'mobile_app_mock',name:'SIMULATED phone'}]};transport.callbacks.at(-1)(data);panel.openDialog({kind:'reminder',id:source.entity_id});
+ let form=root.querySelector('dialog form');form.querySelector('[name="reminder-date"]').value='2027-04-01';form.querySelector('[name="reminder-enabled"]').checked=true;form.querySelector('[name="reminder-recipient"] option[value="mobile_app_mock"]').selected=true;
+ transport.event('disconnected');assert.equal(form.querySelector('[name="reminder-date"]').value,'2027-04-01');assert.equal(form.querySelector('[type="submit"]').disabled,true);assert.deepEqual(calls,[]);
+ transport.event('ready');await tick();transport.callbacks.at(-1)(data);assert.equal(root.querySelector('dialog form'),form);
+ form.dispatchEvent(new Event('submit',{cancelable:true}));assert.deepEqual(calls,[]);assert.ok(form.querySelector('.request-confirmation').textContent.includes('No automatic self-test'));
+ form.querySelector('[name="confirm-request"]').checked=true;form.querySelector('.confirm-execute').click();await tick();assert.equal(calls[0].type,'alarmmesh/reminder');assert.equal(calls[0].value.enabled,true);assert.equal(calls[0].value.date,'2027-04-01');assert.equal(calls[0].confirmed,true);
+ panel.openDialog({kind:'reminder',id:source.entity_id});[...root.querySelectorAll('dialog button')].find(b=>b.textContent==='Cancel').click();assert.equal(calls.length,1);panel.remove();
+});
+
+test("group copy previews only organizational choices without execution fields",async()=>{
+ const {panel,root,transport,calls}=setup();const data=normal();data.groups=[{id:'g',name:'SIMULATION floor',members:[source.entity_id],origins:[source.entity_id],unselected:[],linking:{enabled:true,bindings:[{target:'siren.mock'}]},actions:{enabled:true,start:[{entity_id:'script.mock'}],recovery:[]}}];transport.callbacks.at(-1)(data);panel.openDialog({kind:'copy',id:'g'});
+ const form=root.querySelector('dialog form');form.dispatchEvent(new Event('submit',{cancelable:true}));assert.deepEqual(calls,[]);assert.ok(form.querySelector('.request-confirmation').textContent.includes('off and empty'));form.querySelector('[name="confirm-request"]').checked=true;form.querySelector('.confirm-execute').click();await tick();assert.equal(calls[0].type,'alarmmesh/group_copy');assert.deepEqual(calls[0].members,[source.entity_id]);assert.ok(!('actions' in calls[0]) && !('linking' in calls[0]));assert.equal(data.groups[0].linking.enabled,true);panel.remove();
+});
+
+test("member search hides rows without losing selected members and origin counts",()=>{
+ const {panel,root}=setup();panel.openDialog({kind:'edit',group:null});const member=root.querySelector('[name="member"]');member.checked=true;member.dispatchEvent(new Event('change',{bubbles:true}));const search=root.querySelector('[type="search"]');search.value='missing';search.dispatchEvent(new Event('input'));assert.equal(member.checked,true);assert.equal(member.parentNode.hidden,true);assert.ok(root.querySelector('.member-count').textContent.includes('1'));panel.remove();
+});
+
+test("detector search and reminder controls use their own bilingual labels",()=>{
+ for(const [lang,search,save,choose] of [['nl','Zoek melder','Herinnering bewaren','Kies een ontvanger'],['en','Find detector','Save reminder','Choose a recipient']]) {
+  const {panel,root,transport}=setup(lang);const data=normal();data.sources[0].reminder_identity='a'.repeat(64);data.reminders={items:[],revision:0,time_zone:'Europe/Brussels'};data.automation={recipients:[{service:'mobile_app_mock',name:'SIMULATED phone'}]};transport.callbacks.at(-1)(data);
+  panel.go('devices');assert.equal(root.querySelector('[name="device-name"]').parentNode.textContent,search);
+  panel.openDialog({kind:'reminder',id:source.entity_id});assert.equal(root.querySelector('dialog [type="submit"]').textContent,save);assert.equal(root.querySelector('[name="reminder-recipient"] option').textContent,choose);panel.remove();
+ }
+});
+test("reminder confirmation includes enabled state and repeat preference",()=>{
+ const {panel,root,transport,calls}=setup('nl');const data=normal();data.sources[0].reminder_identity='a'.repeat(64);data.reminders={items:[],revision:0,time_zone:'Europe/Brussels'};data.automation={recipients:[{service:'mobile_app_mock',name:'SIMULATED phone'}]};transport.callbacks.at(-1)(data);panel.openDialog({kind:'reminder',id:source.entity_id});
+ const form=root.querySelector('dialog form');form.querySelector('[name="reminder-enabled"]').checked=true;form.querySelector('[name="reminder-date"]').value='2027-04-01';form.querySelector('[name="reminder-interval"] option[value="90"]').selected=true;form.querySelector('[name="reminder-recipient"] option[value="mobile_app_mock"]').selected=true;form.dispatchEvent(new Event('submit',{cancelable:true}));
+ const text=form.querySelector('.request-confirmation').textContent;assert.ok(text.includes('Herinnering inschakelen: Aan'));assert.ok(text.includes('90 dagen'));assert.deepEqual(calls,[]);panel.remove();
+});
+
+test("reminder removal is named independently of group deletion",()=>{
+ const {panel,root,transport}=setup('nl');const data=normal();data.sources[0].reminder_identity='a'.repeat(64);data.reminders={items:[{source:source.entity_id,date:'2027-04-01',interval:0,enabled:false,recipient:'mobile_app_mock'}],revision:1,time_zone:'Europe/Brussels'};data.automation={recipients:[{service:'mobile_app_mock',name:'SIMULATED phone'}]};transport.callbacks.at(-1)(data);panel.openDialog({kind:'reminder',id:source.entity_id});
+ const remove=[...root.querySelectorAll('dialog button')].find(b=>b.textContent==='Herinnering verwijderen');assert.ok(remove);remove.click();assert.ok(root.querySelector('.request-confirmation').textContent.includes('Herinnering verwijderen'));panel.remove();
+});
+
+test("activity result filters retain explicit device test result wording",()=>{
+ const {panel,root,transport}=setup('nl');const data=normal();data.activity={events:[{id:'test-result',observed_at:'2026-11-15T12:00:00Z',category:'selftest',kind:'selftest',result:'device_success',source:source.entity_id,groups:[],target:'',correlation:'request'}],incomplete:false};transport.callbacks.at(-1)(data);panel.go('activity');assert.ok(root.querySelector('[name="activity-result"]').parentNode.textContent.startsWith('Resultaat'));assert.ok(root.querySelector('[name="activity-result"] option[value="device_success"]').textContent.includes('expliciet succes'));panel.remove();
+});

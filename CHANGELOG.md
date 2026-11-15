@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased
+
+## 0.1.0-beta.7 — 2026-11-16
+
+- Complete eight language/theme/device browser dialog combinations; correct detector
+  search and reminder wording, exact reminder confirmation, copy-field styling and
+  explicit self-test result filters. Preserve offline drafts until a full page reload.
+
+- Add bounded local activity observations with request correlations, filters and
+  detail links. Quiet baseline, 30-day/1,000-event retention and explicit incomplete
+  history preserve the independent incident executor and its receipts.
+- Add separate default-off calendar check reminders with explicit recipient/date
+  confirmation, later/handled, bounded repeat preferences and durable one-attempt
+  receipts. Handling never changes a device self-test result.
+- Add combined detector filters, group-member search/counts and previewed group
+  copies that cannot inherit linked-sounder or script authority. Preserve branding,
+  HTTP request IDs, self-test correlation and both overview identities.
+- Extend EN/NL UI, real HA fixture/mock tests and exact compatibility scenarios.
+  See [behavior and current evidence](docs/activity-reminders.md). No physical
+  output, version change or publication is part of this work.
+
 ## 0.1.0-beta.6 — 2026-11-15
 
 - Complete the eight maintenance/example/diagnosis visual combinations and real

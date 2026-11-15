@@ -18,6 +18,9 @@ input leaves the saved selection unchanged. No second source selection is stored
 
 ## Panel screens
 
+The current local additions are [activity, optional check reminders, detector
+filters and safe group copies](activity-reminders.md), within existing navigation.
+
 Local development adds [separate maintenance messages, read-only group action
 examples and anonymized diagnosis](maintenance-tools.md) within the existing
 navigation. All new automatic delivery starts off; no existing setting is enabled.

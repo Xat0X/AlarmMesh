@@ -231,6 +231,29 @@ class GroupStore:
             group_id = command.get("group_id")
             previous = next((g for g in self.groups if g["id"] == group_id), None)
             operation = command.get("operation")
+            if operation == "copy":
+                if previous is None:
+                    raise GroupError("not_found")
+                members = command.get("members")
+                origins = command.get("origins")
+                if (
+                    not isinstance(members, list)
+                    or not isinstance(origins, list)
+                    or any(not isinstance(s, str) for s in members + origins)
+                    or not set(members) <= set(previous["members"]) & set(selected)
+                    or not set(origins)
+                    <= set(members) & set(previous.get("origins", previous["members"]))
+                ):
+                    raise GroupError("invalid_members")
+                # Construct a new organizational group, never inherit authority.
+                command = {
+                    "operation": "create",
+                    "revision": command["revision"],
+                    "name": command.get("name"),
+                    "members": members,
+                    "origins": origins,
+                }
+                group_id, previous, operation = None, None, "create"
             if operation not in {"create", "update", "delete"}:
                 raise GroupError("invalid_operation")
             if operation == "create":

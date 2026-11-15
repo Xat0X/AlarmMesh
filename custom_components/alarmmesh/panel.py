@@ -21,6 +21,7 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.event import async_track_state_change_event
 
+from .activity import Activity
 from .automation import AutomationError
 from .catalog import CATALOG
 from .diagnostics import support_report
@@ -29,6 +30,7 @@ from .groups import GroupError, GroupStore
 from .linking_runtime import LinkingRuntime
 from .maintenance import Maintenance
 from .preview import group_preview
+from .reminders import Reminders
 from .runtime import AlarmMeshConfigEntry
 from .self_test import SelfTests
 from .status import SourceStatus, StatusResult, evaluate_status
@@ -191,6 +193,8 @@ class PanelHub:
 
     @callback
     def publish(self, *_args) -> None:
+        if self.controller is not None:
+            self.controller.activity.capture(self.controller)
         for listener in tuple(self.listeners):
             listener()
 
@@ -213,6 +217,10 @@ class PanelController:
         )
         self.selftests = SelfTests(hass, entry, self.linking, hub.publish)
         self.maintenance = Maintenance(hass, entry, self.linking, hub.publish)
+        self.activity = Activity(hass, entry, hub.publish)
+        self.reminders = Reminders(
+            hass, entry, self.linking, hub.publish, self.activity
+        )
         self.integration_version = "unknown"
         self.linking.effects_changed = self._outputs_changed
         self.linking.independent_test_source = self.selftests.independent_source
@@ -229,6 +237,8 @@ class PanelController:
         await self.effects.load()
         await self.selftests.load()
         await self.maintenance.load()
+        await self.activity.load()
+        await self.reminders.load()
         self.unsubscribers.append(self.runtime.async_add_observer(self.hub.publish))
         for event in (
             er.EVENT_ENTITY_REGISTRY_UPDATED,
@@ -246,25 +256,29 @@ class PanelController:
             "alarmmesh-panel",
             sidebar_title="AlarmMesh",
             sidebar_icon="mdi:smoke-detector",
-            module_url=f"{ASSET_URL}/panel.js?v=20261115-maintenance-visual-1",
+            module_url=f"{ASSET_URL}/panel.js?v=20261115-activity-2",
             require_admin=True,
         )
         self.hub.controller = self
         self._watch_scripts()
+        self.activity.capture(self)
         self.linking.start()
         self.maintenance.start()
+        self.reminders.start()
         self.hub.publish()
 
     @callback
     def _outputs_changed(self):
         self.effects.changed()
         self.maintenance.changed()
+        self.reminders.changed()
 
     @callback
     def _registry_changed(self, *_args):
         self.linking.refresh_watch()
         self._watch_scripts()
         self.selftests.check_identity()
+        self.reminders.changed()
         self.hub.publish()
 
     def _watch_scripts(self):
@@ -285,9 +299,11 @@ class PanelController:
         await self.async_pause()
         await self.selftests.close()
         await self.maintenance.close()
+        await self.reminders.close()
         await self.effects.close()
         await self.linking.close()
         await self.groups.async_close()
+        await self.activity.close()
         if self.script_unsubscribe:
             self.script_unsubscribe()
             self.script_unsubscribe = None
@@ -300,10 +316,12 @@ class PanelController:
             self.hub.publish()
 
     async def async_pause(self):
+        await self.reminders.pause()
         await self.maintenance.pause()
         await self.linking.pause()
         await self.effects.pause()
         await self.selftests.pause()
+        await self.activity.pause()
 
     def snapshot(self) -> dict:
         """Resolve entity area before device area; don't infer device capabilities."""
@@ -354,6 +372,7 @@ class PanelController:
                 ],
                 "capability": self.linking.capabilities.describe(entity_id),
                 "selftest": self.selftests.describe(entity_id),
+                "reminder_identity": self.reminders.identity(entity_id),
             }
             sources.append(source)
             room = rooms.setdefault(
@@ -468,6 +487,8 @@ class PanelController:
             "automation": automation,
             "selftest": deepcopy(self.selftests.record),
             "maintenance": maintenance,
+            "activity": self.activity.snapshot(),
+            "reminders": self.reminders.snapshot(),
             "review": review,
         }
 
@@ -494,6 +515,8 @@ async def async_prepare(hass: HomeAssistant) -> PanelHub:
         websocket_api.async_register_command(hass, ws_maintenance)
         websocket_api.async_register_command(hass, ws_preview)
         websocket_api.async_register_command(hass, ws_diagnostics)
+        websocket_api.async_register_command(hass, ws_reminder)
+        websocket_api.async_register_command(hass, ws_group_copy)
     return hass.data[DATA_HUB]
 
 
@@ -708,3 +731,74 @@ def ws_diagnostics(hass, connection, msg):
             controller.snapshot(), controller.integration_version, __version__
         ),
     )
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "alarmmesh/reminder",
+        vol.Required("operation"): vol.In({"save", "snooze", "handle", "delete"}),
+        vol.Required("source"): vol.All(str, vol.Length(max=255)),
+        vol.Required("revision"): int,
+        vol.Required("value"): dict,
+        vol.Required("confirmed"): bool,
+    }
+)
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_reminder(hass, connection, msg):
+    controller = hass.data[DATA_HUB].controller
+    if controller is None:
+        connection.send_error(msg["id"], "not_loaded", "AlarmMesh is not loaded")
+        return
+    try:
+        await controller.reminders.save(
+            msg["operation"],
+            msg["source"],
+            msg["revision"],
+            msg["value"],
+            msg["confirmed"],
+        )
+    except (AutomationError, OSError) as err:
+        code = (
+            str(err) if isinstance(err, AutomationError) else "reminder_storage_error"
+        )
+        connection.send_error(msg["id"], code, code)
+        return
+    connection.send_result(msg["id"], {"revision": controller.reminders.revision})
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "alarmmesh/group_copy",
+        vol.Required("group_id"): str,
+        vol.Required("revision"): int,
+        vol.Required("name"): vol.All(str, vol.Length(max=64)),
+        vol.Required("members"): vol.All([str], vol.Length(max=256)),
+        vol.Required("origins"): vol.All([str], vol.Length(max=256)),
+        vol.Required("confirmed"): bool,
+    }
+)
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_group_copy(hass, connection, msg):
+    controller = hass.data[DATA_HUB].controller
+    if controller is None or controller.linking._paused:
+        connection.send_error(msg["id"], "not_loaded", "AlarmMesh is not loaded")
+        return
+    if msg["confirmed"] is not True:
+        connection.send_error(
+            msg["id"],
+            "automation_confirmation_required",
+            "Confirm the organizational copy",
+        )
+        return
+    try:
+        await controller.groups.async_mutate(
+            {**msg, "operation": "copy"}, controller.runtime.source_entity_ids
+        )
+    except (GroupError, OSError) as err:
+        code = str(err) if isinstance(err, GroupError) else "invalid_storage"
+        connection.send_error(msg["id"], code, code)
+        return
+    connection.send_result(msg["id"], {"revision": controller.groups.revision})
+    controller.hub.publish()

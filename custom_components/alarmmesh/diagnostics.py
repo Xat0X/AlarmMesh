@@ -32,6 +32,9 @@ REASONS = {
     "maintenance_storage_error",
     "maintenance_source_limit",
     "automation_storage_error",
+    "reminder_storage_error",
+    "reminder_identity_changed",
+    "activityIncomplete",
 }
 RESULTS = {
     "SMOKE_REPORTED",
@@ -128,6 +131,22 @@ def support_report(snapshot: dict, alarmmesh_version: str, ha_version: str) -> d
                 }
             )
     problems = []
+    if snapshot.get("activity", {}).get("incomplete"):
+        problems.append({"reason": "activityIncomplete", "setting": "maintenance"})
+    if snapshot.get("reminders", {}).get("error"):
+        problems.append({"reason": "reminder_storage_error", "setting": "maintenance"})
+    for row in snapshot.get("reminders", {}).get("items", []):
+        if row.get("attention") in {
+            "reminder_identity_changed",
+            "recipient_unavailable",
+        }:
+            problems.append(
+                {
+                    "reason": row["attention"],
+                    "setting": "maintenance",
+                    "source": alias("Detector", row["source"]),
+                }
+            )
     if snapshot.get("incident", {}).get("executor_state") in ("paused", "closed"):
         problems.append({"reason": "execution_paused", "setting": "integration"})
     for issue in snapshot.get("review", {}).get("issues", []):
@@ -206,6 +225,8 @@ def support_report(snapshot: dict, alarmmesh_version: str, ha_version: str) -> d
             "groups": len(snapshot["groups"]),
             "valid_assignments": sum(r["valid"] for r in assignments),
             "invalid_assignments": sum(not r["valid"] for r in assignments),
+            "activity_events": len(snapshot.get("activity", {}).get("events", [])),
+            "reminders": len(snapshot.get("reminders", {}).get("items", [])),
         },
         "sources": sources,
         "assignments": assignments,

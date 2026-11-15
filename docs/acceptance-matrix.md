@@ -1,3 +1,11 @@
+# Current test release — 0.1.0-beta.7
+
+The current release scope and installation instructions are in the
+[beta.7 release notes](releases/0.1.0-beta.7.md). Activity/reminder work and the
+independent eight-combination browser review are recorded in
+[activity and reminder evidence](activity-reminders.md#independent-browser-follow-up--2026-11-15).
+The dated material below is historical and does not supersede those results.
+
 # Current read-only MVP acceptance — 2026-11-13
 
 The **2026-11-14 incident-feature working tree** has its current automated results,
