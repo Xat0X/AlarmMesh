@@ -1,4 +1,4 @@
-import { TEXT } from "./translations.js?v=20261116-zwave-1";
+import { TEXT } from "./translations.js?v=20261117-recovery-1";
 import { Drafts } from "./drafts.js?v=20261116-matter-1";
 
 // Safe DOM construction: names, labels and registry data are always text nodes.
@@ -77,9 +77,10 @@ export class AlarmMeshPanel extends HTMLElement {
         this.transport = data.available ? "ready" : "notLoaded";
         if (!data.available) this.offlineDraft();
         else if (this.shadowRoot.querySelector(".offline-draft")) { this.shadowRoot.querySelector(".offline-draft").remove(); for (const b of this.shadowRoot.querySelectorAll('dialog button[type="submit"],dialog .confirm-execute,dialog .confirm-linking')) if (!b.dataset.started && !b.dataset.confirmLocked) b.disabled = false; }
+        if (data.available && this.detail?.pendingRecovery?.interrupted) this.detail.showMemberships();
         this.updateTestResult();
         if (!data.available || this.page !== "catalog" || !this.shadowRoot.querySelector(".catalog-filters")) this.render();
-        if (this.detail && !["edit", "delete", "settings", "maintenance", "test", "reminder", "copy"].includes(this.detail.kind)) this.renderDialog();
+        if (this.detail && !["edit", "delete", "settings", "maintenance", "test", "reminder", "copy", "route", "recovery"].includes(this.detail.kind)) this.renderDialog();
       }, { type: "alarmmesh/subscribe" }, { resubscribe: false });
       if (generation !== this.generation || !this.isConnected) unsubscribe()?.catch?.(() => {});
       else this.unsubscribe = unsubscribe;
@@ -111,13 +112,22 @@ export class AlarmMeshPanel extends HTMLElement {
     window.history.pushState(null, "", "/config/integrations/integration/alarmmesh");
     window.dispatchEvent(new Event("location-changed"));
   }
+  updateRecoverySmoke() {
+    const dialog=this.shadowRoot.querySelector("dialog");
+    if(!dialog || this.detail?.kind!=="recovery")return;
+    let warning=dialog.querySelector(".recovery-smoke");
+    if(this.data?.result.smoke!=="SMOKE_REPORTED"){warning?.remove();return;}
+    if(!warning){warning=el("p",undefined,"notice recovery-smoke");warning.setAttribute("role","alert");dialog.insertBefore(warning,dialog.children[1]);}
+    warning.textContent=`${this.t.SMOKE_REPORTED}: ${this.data.sources.filter(s=>s.status==="SMOKE_REPORTED").map(s=>s.name).join(", ")}`;
+  }
   render() {
+    this.updateRecoverySmoke();
     if (!this.shadowRoot) return;
     this.shadowRoot.querySelector("dialog")?.classList.toggle("dark", Boolean(this._hass?.themes?.darkMode));
     const t = this.t;
     const sticky = this.shadowRoot.activeElement;
     const stickyKey = sticky?.dataset.sticky, selection = stickyKey ? [sticky.selectionStart, sticky.selectionEnd] : null;
-    const link = el("link"); link.rel = "stylesheet"; link.href = "/alarmmesh-assets/panel.css?v=20261116-matter-2";
+    const link = el("link"); link.rel = "stylesheet"; link.href = "/alarmmesh-assets/panel.css?v=20261117-recovery-1";
     const shell = el("div", undefined, "shell");
     shell.classList.toggle("dark", Boolean(this._hass?.themes?.darkMode));
     const side = el("aside");
@@ -303,7 +313,9 @@ export class AlarmMeshPanel extends HTMLElement {
       field(t.fault, health?.fault == null ? t.guide_unknown : health.fault ? t.faultReported : t.noFaultReport, health?.fault === true);
       field(t.sourceAvailability, t[source.status] || t.guide_unknown);
       field(t.controlAvailability, source.capability ? t[source.capability.reason] || t.guide_unknown : t.guide_unknown);
-      card.append(table);
+      card.append(table,el("p",data.groups.filter(g=>g.members.includes(source.entity_id)).map(g=>g.name).join(", ")));
+      if(source.identity_changed || source.status==="MISSING") card.append(el("p",t[source.identity_changed ? "recovery_changed":"recovery_missing"]),button(t.recoverSource,()=>this.openDialog({kind:"recovery",id:source.entity_id})));
+      else if(source.status==="UNREACHABLE") card.append(el("p",t.recovery_temporary));
       const record = source.selftest?.record;
       card.append(el("p", record ? `${t.lastTest}: ${this.formatTime(record.started)} · ${t['test_' + record.status] || t.guide_unknown}` : `${t.lastTest}: ${t.noTestRequest}`));
       if (record) card.append(el("small", t.deviceResultNote));
@@ -430,7 +442,7 @@ export class AlarmMeshPanel extends HTMLElement {
       for (const [label, value] of [[t.state, source.ha_state || t.MISSING], [t.room, source.area_name || t.noRoom], [t.device, source.device_name], [t.manufacturer, source.manufacturer], [t.model, source.model]]) {
         props.append(el("dt", label), el("dd", value || t.unavailable));
       }
-      dialog.append(props);
+      dialog.append(props,button(t.alarmRoute,()=>this.openDialog({kind:"route",id:source.entity_id})),button(t.recoverSource,()=>this.openDialog({kind:"recovery",id:source.entity_id})));
       if (!source.capability) { const technical = el("details"); technical.append(el("summary", t.requirements), el("p", `${t.entity}: ${source.entity_id}`)); dialog.append(technical); }
       if (source.capability) {
         const cap = source.capability;
@@ -478,6 +490,8 @@ export class AlarmMeshPanel extends HTMLElement {
     } else if (detail.kind === "edit") this.groupForm(dialog, detail.group);
     else if (detail.kind === "settings") this.notificationForm(dialog);
     else if (detail.kind === "maintenance") this.maintenanceForm(dialog);
+    else if (detail.kind === "route") this.routeForm(dialog,detail);
+    else if (detail.kind === "recovery") this.recoveryForm(dialog,detail);
     else if (detail.kind === "preview") this.previewForm(dialog, detail);
     else if (detail.kind === "reminder") this.reminderForm(dialog, detail);
     else if (detail.kind === "copy") this.copyForm(dialog, detail);
@@ -485,6 +499,7 @@ export class AlarmMeshPanel extends HTMLElement {
     else if (detail.kind === "test") {
       dialog.append(el("h2", detail.actionKind === "selftest" ? t.startSelfTest : t.explicitTest));
       this.confirmRequest(dialog, detail);
+      if(detail.actionKind==="selftest") dialog.append(button(t.refreshData,async()=>{const generation=this.generation;try{const fresh=await this._hass.callWS({type:"alarmmesh/current"});if(generation!==this.generation || this.detail!==detail)return;if(!fresh.available){this.closeDialog();return;}this.data=fresh;}catch{dialog.append(el("p",t.error));return;}const src=this.data?.sources.find(s=>s.entity_id===detail.target);if(!src?.selftest?.available){this.closeDialog();this.openDialog({kind:"source",id:detail.target});return;} this.openDialog({kind:"test",actionKind:"selftest",target:src.entity_id,name:src.name,identity:src.selftest.control.identity});}));
     }
     else if (detail.kind === "delete") {
       dialog.append(el("h2", t.confirmDelete), el("p", detail.group.name), el("p", t.deleteNote));
@@ -494,6 +509,7 @@ export class AlarmMeshPanel extends HTMLElement {
         await this.mutate({ operation: "delete", group_id: detail.group.id, revision: detail.revision }, error);
       }, "button destructive"));
     }
+    this.updateRecoverySmoke();
     dialog.oncancel = () => this.closeDialog();
     if (first) { dialog.showModal(); close.focus(); }
     else if (focusIndex >= 0) ([...dialog.querySelectorAll("button,input")][focusIndex] || close).focus();
@@ -687,7 +703,8 @@ export class AlarmMeshPanel extends HTMLElement {
     filters.append(search, provider, capability); parent.append(filters, count, results); update();
   }
   offlineDraft() {
-    if (!["edit", "settings", "maintenance", "reminder", "copy"].includes(this.detail?.kind)) { this.closeDialog(); return; }
+    if (this.detail?.pendingRecovery) this.detail.pendingRecovery.interrupted = true;
+    if (!["edit", "settings", "maintenance", "reminder", "copy", "recovery"].includes(this.detail?.kind)) { this.closeDialog(); return; }
     const dialog = this.shadowRoot.querySelector("dialog");
     if (!dialog) return;
     if (!dialog.querySelector(".offline-draft")) dialog.prepend(el("p", this.t.offlineDraft, "notice offline-draft"));
@@ -815,7 +832,70 @@ export class AlarmMeshPanel extends HTMLElement {
         output.append(el("h3",t.maintenanceRecovery),el("p",t.previewRecovery),el("p",result.recovery_sources.map(id=>this.data.sources.find(s=>s.entity_id===id)?.name || id).join(', ')),el("p",`${t.recoveryNotification}: ${t[result.notification_recovery ? 'enabled':'disabled']}`),el("p",t.physicalNotTested));
       } catch(e) { if(output.isConnected) output.replaceChildren(el("p",t[e.code] || t.error)); }
     };
-    select.addEventListener("change",load); dialog.append(label,select,output); load();
+    select.addEventListener("change",load); dialog.append(label,select,button(t.alarmRoute,()=>this.openDialog({kind:"route",id:select.value})),output); load();
+  }
+
+  routeForm(parent,detail) {
+    const t=this.t, source=this.data.sources.find(s=>s.entity_id===detail.id);
+    parent.append(el("h2",t.alarmRoute),el("p",source ? `${source.name} · ${source.area_name || t.noRoom}` : detail.id),el("p",t.exampleNoOutput,"notice"));
+    const output=el("div");let serial=0;
+    const load=async()=>{const n=++serial;output.replaceChildren(el("p",t.loading));try{const r=await this._hass.callWS({type:"alarmmesh/route",source:detail.id});if(n!==serial || !output.isConnected || !this.data)return;if(r.revision!==this.data.revision || !r.readonly){output.replaceChildren(el("p",t.previewStale));return;}
+      output.replaceChildren(el("h3",t.linkTogether));if(!r.targets.length)output.append(el("p",t.checkNoTargets));
+      for(const row of r.targets){output.append(el("h3",this.sourceName(row.source)),el("p",t[row.eligible ? "routeOnce":"routeBlocked"]));for(const via of row.via)output.append(el("p",`${this.data.groups.find(g=>g.id===via.group)?.name || t.groups}: ${t[via.reason] || t.guide_unknown}`));}
+      output.append(el("h3",t.notifications));for(const row of r.phones)output.append(el("p",`${row.target}: ${t[row.reason] || t.guide_unknown}`));if(!r.phones.length)output.append(el("p",t.noRecipients));
+      for(const g of r.groups){output.append(el("h3",this.data.groups.find(x=>x.id===g.group)?.name || t.groups));for(const row of g.scripts)output.append(el("p",`${t['phase_'+row.phase]} ${row.order} · ${row.name}: ${t[row.reason] || t.guide_unknown}`));}
+      output.append(el("p",t.previewRecovery),el("p",t.routeScripts),el("p",t.physicalNotTested));
+    }catch(e){if(output.isConnected)output.replaceChildren(el("p",t[e.code] || t.error));}};
+    parent.append(button(t.refreshData,load),output);load();
+  }
+  recoveryForm(parent,detail) {
+    const t=this.t;parent.append(el("h2",t.recoverSource),el("p",this.sourceName(detail.id)),el("p",t.recoverySteps,"notice"));
+    parent.append(button(t.choose,()=>this.choose()),button(t.notifications,()=>this.go("settings")),button(t.groups,()=>this.go("groups")));
+    const output=el("div");parent.append(output);
+    detail.showMemberships = () => {
+      const attempt = detail.pendingRecovery;
+      if (!attempt || !this.data) return;
+      delete detail.pendingRecovery;
+      const summary = el("section", undefined, "notice recovery-summary");
+      summary.setAttribute("role", "status");
+      summary.append(el("h3", t.recoveryCurrent), el("p", t.recoveryLostReply));
+      for (const item of attempt.groups) {
+        const group = this.data.groups.find(g => g.id === item.id);
+        const members = group?.members || [];
+        const names = [detail.id, attempt.target].filter(id => members.includes(id)).map(id => this.sourceName(id));
+        const state = group ? names.join(", ") || t.recoveryNeither : t.recoveryGroupGone;
+        summary.append(el("p", (group?.name || item.name) + " · " + state));
+      }
+      output.replaceChildren(summary);
+    };
+    const load=async()=>{output.replaceChildren(el("p",t.loading));try{const plan=await this._hass.callWS({type:"alarmmesh/recovery",source:detail.id});if(!output.isConnected || !this.data)return;output.replaceChildren(el("p",plan.selected ? t.recoveryOldSelected:t.recoveryOldRemoved));
+      if(plan.blocked || plan.outputs_enabled){output.append(el("p",t[plan.blocked ? "recovery_busy":"recovery_disable"]));return;}
+      const form=el("form"),select=el("select");select.setAttribute("aria-label",t.recoveryCandidate);for(const c of plan.candidates){const o=el("option",`${c.name} · ${c.area_name || t.noRoom}`);o.value=c.entity_id;select.append(o);}form.append(el("label",t.recoveryCandidate),select);const checks=[];
+      for(const id of plan.groups){const c=this.checkField(form,this.data.groups.find(g=>g.id===id)?.name || id,false,"recovery-group");c.value=id;checks.push(c);}
+      const error=el("p", "","form-error");form.append(el("p",t.recoveryAuthority),error);const save=el("button",t.recoveryReview,"button primary");save.type="submit";save.disabled=!plan.candidates.length || !plan.groups.length;form.append(save);
+      form.addEventListener("submit",event=>{event.preventDefault();if(form.querySelector('.request-confirmation'))return;const target=select.value,groups=checks.filter(c=>c.checked).map(c=>c.value);if(!groups.length){error.textContent=t.invalid_members;return;}this.confirmRequest(form,{name:t.recoverSource,confirmationOnly:true,note:`${this.sourceName(detail.id)} → ${this.sourceName(target)}\n${groups.map(id=>this.data.groups.find(g=>g.id===id)?.name || id).join(', ')}\n${t.recoveryAuthority}`,execute:async()=>{
+        const attempt = {target, groups: groups.map(id => ({id, name: this.data.groups.find(g => g.id === id)?.name || id}))};
+        detail.pendingRecovery = attempt;
+        try{await this._hass.callWS({type:"alarmmesh/recovery",source:detail.id,target,groups,token:plan.token,confirmed:true});if(detail.pendingRecovery !== attempt || attempt.interrupted)return;delete detail.pendingRecovery;output.replaceChildren(el("p",t.recoverySaved),button(t.groups,()=>this.go("groups")),button(t.choose,()=>this.choose()));} catch(e) {
+          if (detail.pendingRecovery !== attempt || attempt.interrupted) return;
+          error.textContent=t[e?.code] || t.error;
+          if (e?.code && t[e.code]) delete detail.pendingRecovery;
+          else attempt.interrupted = true;
+        }
+      }});});output.append(form);
+    }catch(e){if(output.isConnected)output.replaceChildren(el("p",t[e.code] || t.error));}};
+    parent.append(button(t.refreshData,async()=>{
+      if (!detail.pendingRecovery) return load();
+      if (!detail.pendingRecovery.interrupted || !this.data) return;
+      const generation = this.generation;
+      const attempt = detail.pendingRecovery;
+      try {
+        const fresh = await this._hass.callWS({type:"alarmmesh/current"});
+        if (!fresh.available || this.detail !== detail || generation !== this.generation || detail.pendingRecovery !== attempt) return;
+        this.data = fresh;
+        detail.showMemberships();
+      } catch { if (output.isConnected) output.append(el("p",t.error)); }
+    }));load();
   }
   async loadDiagnostics() {
     if (!this.data || !this._hass.user?.is_admin) return;

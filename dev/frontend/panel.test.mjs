@@ -1035,3 +1035,63 @@ for (const language of ["nl", "en"]) test(`Z-Wave provider filter and honest det
   assert.ok(dialog.textContent.includes(language==="nl" ? "Een ping is geen zelftest" : "A ping is not a detector self-test"));
   assert.deepEqual(calls,[]);panel.remove();
 });
+
+test('source alarm route merges backend targets and refresh sends only read requests',async()=>{
+ const v=setup();v.panel._hass.callWS=async command=>{v.calls.push(command);return {readonly:true,revision:0,targets:[{source:source.entity_id,target:'select.simulated',eligible:true,via:[{group:'a',reason:'preview_eligible'},{group:'b',reason:'disabled'}]}],phones:[],groups:[]};};
+ v.panel.openDialog({kind:'route',id:source.entity_id});await tick();assert.ok(v.root.querySelector('dialog').textContent.includes(v.panel.t.routeOnce));
+ [...v.root.querySelectorAll('dialog button')].find(b=>b.textContent===v.panel.t.refreshData).click();await tick();v.panel.closeDialog();
+ assert.equal(v.calls.length,2);assert.ok(v.calls.every(c=>c.type==='alarmmesh/route'));v.panel.remove();
+});
+test('recovery conflict preserves selection and never retries automatically',async()=>{
+ const v=setup();v.panel._hass.callWS=async c=>{v.calls.push(c);if(c.target)throw {code:'conflict'};return {token:'old',selected:true,blocked:false,outputs_enabled:false,groups:['g'],candidates:[{entity_id:'binary_sensor.simulation_b',name:'SIMULATED replacement'}]};};
+ v.panel.openDialog({kind:'recovery',id:source.entity_id});await tick();const form=v.root.querySelector('form');form.querySelector('select option').selected=true;form.querySelector('[name="recovery-group"]').checked=true;form.dispatchEvent(new Event('submit',{cancelable:true}));await tick();
+ assert.equal(v.calls.length,1);v.root.querySelector('[name="confirm-request"]').checked=true;v.root.querySelector('.confirm-execute').click();await tick();
+ assert.ok(v.root.querySelector('.form-error').textContent.includes(v.panel.t.conflict));assert.equal(v.calls.length,2);v.panel.closeDialog();assert.equal(v.calls.length,2);v.panel.remove();
+});
+test('refresh self-test discards acknowledgement and cannot adopt another request result',async()=>{
+ const v=setup();v.transport.callbacks.at(-1)(featureData());const s=featureData().sources[0];v.panel.openDialog({kind:'test',actionKind:'selftest',target:s.entity_id,name:s.name,identity:s.selftest.control.identity});
+ v.root.querySelector('[name="confirm-request"]').checked=true;const data=featureData();data.sources[0].selftest.control.identity='e'.repeat(64);data.selftest={request_id:'other',status:'device_success'};v.transport.callbacks.at(-1)(data);
+ v.panel._hass.callWS=async c=>{v.calls.push(c);return data;};[...v.root.querySelectorAll('dialog button')].find(b=>b.textContent===v.panel.t.refreshData).click();await tick();assert.equal(v.root.querySelector('[name="confirm-request"]').checked,false);assert.equal(v.root.querySelector('.request-status').textContent,'');assert.deepEqual(v.calls,[{type:'alarmmesh/current'}]);v.panel.remove();
+});
+
+test('live smoke remains visible inside recovery without replacing choices',async()=>{
+ const v=setup();v.panel._hass.callWS=async()=>({token:'t',selected:true,groups:['g'],candidates:[{entity_id:'binary_sensor.new',name:'Replacement'}]});v.panel.data.groups=[{id:'g',name:'Group'}];v.panel.openDialog({kind:'recovery',id:source.entity_id});await tick();const form=v.root.querySelector('dialog form'),choice=form.querySelector('input');choice.checked=true;const data=normal();data.result.smoke='SMOKE_REPORTED';data.sources[0].status='SMOKE_REPORTED';v.transport.callbacks.at(-1)(data);assert.ok(v.root.querySelector('dialog form')===form);assert.equal(choice.checked,true);assert.ok(v.root.querySelector('dialog [role="alert"]').textContent.includes('Smoke reported'));assert.ok(v.root.querySelector('dialog [role="alert"]').textContent.includes('Detector A'));v.panel.remove();
+});
+
+test('recovery choices survive disconnect and reconnect without automatic save',async()=>{
+ const v=setup();const data=normal();data.groups=[{id:'g',name:'Group'}];v.transport.callbacks.at(-1)(data);v.panel._hass.callWS=async c=>{v.calls.push(c);return{token:'t',selected:true,groups:['g'],candidates:[{entity_id:'binary_sensor.new',name:'Replacement'}]};};v.panel.openDialog({kind:'recovery',id:source.entity_id});await tick();const form=v.root.querySelector('dialog form'),choice=form.querySelector('input');choice.checked=true;v.transport.event('disconnected');assert.ok(v.root.querySelector('dialog form')===form);assert.equal(form.querySelector('[type=submit]').disabled,true);assert.ok(v.root.querySelector('.offline-draft'));v.transport.event('ready');await tick();v.transport.callbacks.at(-1)(data);assert.equal(choice.checked,true);assert.equal(form.querySelector('[type=submit]').disabled,false);assert.equal(v.calls.length,1);v.panel.remove();
+});
+
+for (const committed of [false, true]) {
+  test(`reconnected recovery shows actual membership when committed=${committed}`, async () => {
+    const v = setup(), data = normal(), target = "binary_sensor.replacement";
+    data.groups = [{id:"g", name:"Hall", members:[source.entity_id]}];
+    v.transport.callbacks.at(-1)(data);
+    let rejectSave;
+    v.panel._hass.callWS = async command => {
+      v.calls.push(command);
+      if (command.confirmed) return new Promise((_, reject) => { rejectSave = reject; });
+      return {token:"t", selected:true, groups:["g"], candidates:[{entity_id:target, name:"Replacement"}]};
+    };
+    v.panel.openDialog({kind:"recovery", id:source.entity_id});
+    await tick();
+    const form = v.root.querySelector("dialog form");
+    form.querySelector("select option").selected = true;
+    form.querySelector("[name=recovery-group]").checked = true;
+    form.dispatchEvent(new Event("submit", {cancelable:true}));
+    v.root.querySelector("[name=confirm-request]").checked = true;
+    v.root.querySelector(".confirm-execute").click();
+    v.transport.event("disconnected");
+    rejectSave({code:"connection_lost"});
+    await tick();
+    v.transport.event("ready");
+    await tick();
+    data.groups[0].members = [committed ? target : source.entity_id];
+    v.transport.callbacks.at(-1)(data);
+    const summary = v.root.querySelector(".recovery-summary");
+    assert.ok(summary.textContent.includes("Hall · " + v.panel.sourceName(data.groups[0].members[0])));
+    assert.equal(v.root.querySelector(".confirm-execute"), null);
+    assert.equal(v.calls.filter(command => command.confirmed).length, 1);
+    v.panel.remove();
+  });
+}

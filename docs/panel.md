@@ -226,3 +226,38 @@ reload. Continue or discard it explicitly; it expires after two hours and never
 restores confirmation. If identities changed, discard and reopen; if another
 browser saved first, the original revision is still rejected. Private browser
 storage may not retain drafts. See the guide for exact fields and privacy limits.
+
+## Alarm route and guided source recovery (local review)
+
+In **Detectors > detector details > View alarm route**, inspect all associated
+groups at once. Shared sounder targets show one eligible request and each group's
+reason. Phone recipients follow their global incident rules; scripts retain each
+group's start/recovery order. Opening, refreshing and closing perform reads only.
+The same route is reachable from the group's existing action example.
+
+**Maintenance > Recover source** distinguishes temporary unavailability, a missing
+entity and changed identity. Temporary outages need provider investigation, not
+replacement. Recovery uses explicit separate saved steps because HA options and
+groups have no shared transaction:
+
+1. Disable affected group linking/scripts and global incident notifications.
+2. In the existing HA source options add the replacement, retaining the old source.
+3. Reopen recovery, choose the already selected replacement and explicitly choose
+   memberships. Review old/new source and groups, then confirm.
+4. Review origins, controls, scripts and notifications separately. The replacement
+   inherits no origin permission or sounder binding. Remove the old source through
+   HA options only when appropriate. History/reminders are never reassigned.
+
+The group step saves all chosen memberships atomically. Failed writes leave groups
+unchanged; stale or repeated submissions conflict. Active affected smoke, any
+running self-test, a changed identity or missing/non-clear candidate blocks it.
+Reload/reopen derives progress from stored options and groups. If the acknowledgement
+is lost, refresh to see saved state; never assume a failed connection rolled back a save.
+Closing the guide or removing a source is not proof of smoke clearance. Existing
+independent groups remain unchanged. Replacing an identity under the same entity ID
+continues to use its existing identity review, available in detector details.
+
+The self-test dialog's **Refresh data** fetches a fresh authenticated snapshot,
+rechecks whether the test is available and clears the previous acknowledgement.
+It never sends a test request. Only the dialog's own request ID can display a result.
+These are software controls, not physical-device validation.

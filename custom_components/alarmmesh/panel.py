@@ -30,7 +30,8 @@ from .groups import GroupError, GroupStore
 from .linking_runtime import LinkingRuntime
 from .maintenance import Maintenance
 from .matter import MatterSources, is_co_source
-from .preview import group_preview
+from .preview import group_preview, source_preview
+from .recovery import recover_groups, recovery_plan
 from .reminders import Reminders
 from .runtime import AlarmMeshConfigEntry
 from .self_test import SelfTests
@@ -260,7 +261,7 @@ class PanelController:
             "alarmmesh-panel",
             sidebar_title="AlarmMesh",
             sidebar_icon="mdi:smoke-detector",
-            module_url=f"{ASSET_URL}/panel.js?v=20261116-zwave-1",
+            module_url=f"{ASSET_URL}/panel.js?v=20261117-recovery-1",
             require_admin=True,
         )
         self.hub.controller = self
@@ -547,6 +548,9 @@ async def async_prepare(hass: HomeAssistant) -> PanelHub:
         websocket_api.async_register_command(hass, ws_test)
         websocket_api.async_register_command(hass, ws_maintenance)
         websocket_api.async_register_command(hass, ws_preview)
+        websocket_api.async_register_command(hass, ws_route)
+        websocket_api.async_register_command(hass, ws_current)
+        websocket_api.async_register_command(hass, ws_recovery)
         websocket_api.async_register_command(hass, ws_diagnostics)
         websocket_api.async_register_command(hass, ws_reminder)
         websocket_api.async_register_command(hass, ws_group_copy)
@@ -872,3 +876,72 @@ async def ws_matter_review(hass, connection, msg):
     controller.linking.changed()
     controller.hub.publish()
     connection.send_result(msg["id"], {"revision": controller.matter_sources.revision})
+
+
+@websocket_api.websocket_command(
+    {vol.Required("type"): "alarmmesh/route", vol.Required("source"): str}
+)
+@websocket_api.require_admin
+@callback
+def ws_route(hass, connection, msg):
+    controller = hass.data[DATA_HUB].controller
+    if controller is None:
+        connection.send_error(msg["id"], "not_loaded", "AlarmMesh is not loaded")
+        return
+    try:
+        result = source_preview(controller, msg["source"])
+    except AutomationError as err:
+        connection.send_error(msg["id"], str(err), str(err))
+        return
+    connection.send_result(msg["id"], result)
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "alarmmesh/recovery",
+        vol.Required("source"): str,
+        vol.Optional("target"): str,
+        vol.Optional("groups"): [str],
+        vol.Optional("token"): str,
+        vol.Optional("confirmed"): bool,
+    }
+)
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_recovery(hass, connection, msg):
+    panel = hass.data[DATA_HUB].controller
+    if panel is None:
+        connection.send_error(msg["id"], "not_loaded", "AlarmMesh is not loaded")
+        return
+    try:
+        if "target" in msg:
+            if msg.get("confirmed") is not True:
+                raise AutomationError("test_confirmation_required")
+            await recover_groups(
+                panel,
+                msg["source"],
+                msg["target"],
+                msg.get("groups", []),
+                msg.get("token"),
+            )
+            panel.hub.publish()
+        result = (
+            {"saved": True, "revision": panel.groups.revision}
+            if "target" in msg
+            else recovery_plan(panel, msg["source"])
+        )
+    except (AutomationError, OSError) as err:
+        code = str(err) if isinstance(err, AutomationError) else "error"
+        connection.send_error(msg["id"], code, code)
+        return
+    connection.send_result(msg["id"], result)
+
+
+@websocket_api.websocket_command({vol.Required("type"): "alarmmesh/current"})
+@websocket_api.require_admin
+@callback
+def ws_current(hass, connection, msg):
+    panel = hass.data[DATA_HUB].controller
+    connection.send_result(
+        msg["id"], panel.snapshot() if panel else {"available": False}
+    )

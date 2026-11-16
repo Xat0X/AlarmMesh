@@ -551,3 +551,20 @@ and compares current identity/choice signatures. It restores no confirmations,
 request IDs or execution rights. Invalid/misaddressed/oversized data is rejected;
 account switching, successful save and explicit discard clear it. Existing
 background updates still preserve open forms. See [review evidence](matter-review.md).
+
+## Source route and staged recovery
+
+The local extension reuses `group_preview` for all source memberships; sounder
+rows merge by existing target ID, phones stay global and scripts stay per group.
+The authenticated route/current endpoints are read-only. Recovery delegates initial
+selection to the supported existing HA options flow, then atomically edits only
+selected organizational group memberships under the existing group lock. It does
+not claim an atomic options-plus-groups transaction. A hash of source registry
+identities, selected options and group revision prevents stale application; current
+smoke, tests and permissions are rechecked inside the lock. Affected output settings
+must first be disabled. No history or activation binding is moved. Existing schemas,
+status rules and provider contracts remain unchanged. The group step uses the
+existing Store save-before-memory-commit behavior.
+
+Official options-flow guidance checked 2026-11-16:
+https://contributors.home-assistant.io/core/integrations/options-flow/

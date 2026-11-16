@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.0-beta.9 — 2026-11-17
+
+- After a lost recovery acknowledgement, show actual group memberships on reconnect without resubmitting.
+
+- Add read-only per-detector alarm routes across groups, with shared sounder targets,
+  global recipients and ordered scripts. Add staged source recovery through existing
+  HA selection and atomic membership transfer without inherited control authority.
+- Keep live smoke visible inside recovery dialogs and retain recovery choices across
+  disconnects without automatic saving.
+- Add fresh self-test-dialog data review with new acknowledgement and no dispatch.
+  See [local review evidence](docs/route-recovery-review.md).
+
 ## 0.1.0-beta.8 — 2026-11-16
 
 - Add Z-Wave JS smoke sources and device health details in mixed groups. Z-Wave sounder control and remote self-test are unsupported.

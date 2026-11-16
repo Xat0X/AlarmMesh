@@ -13,10 +13,18 @@ from .linking import Activation
 from .status import SourceStatus
 
 
-def group_preview(panel, group_id: str, source: str) -> dict:
+def group_preview(panel, group_id: str | None, source: str) -> dict:
     group = next((g for g in panel.groups.groups if g["id"] == group_id), None)
-    if group is None or source not in group["members"]:
+    if (group_id is not None and group is None) or source not in (
+        group["members"] if group else panel.runtime.source_entity_ids
+    ):
         raise AutomationError("invalid_preview")
+    group = group or {
+        "id": None,
+        "members": [],
+        "origins": [],
+        "linking": {"enabled": False, "bindings": []},
+    }
     engine = panel.linking
 
     def independent(origin):
@@ -167,3 +175,34 @@ def group_preview(panel, group_id: str, source: str) -> dict:
         "physical_confirmed": False,
         "existing_incident": bool(engine.active),
     }
+
+
+def source_preview(panel, source: str) -> dict:
+    """Aggregate the same group assessment; phones are global, scripts per group."""
+    base = group_preview(panel, None, source)
+    groups = [
+        group_preview(panel, g["id"], source)
+        for g in panel.groups.groups
+        if source in g["members"]
+    ]
+    targets = {}
+    for group in groups:
+        for row in group["targets"]:
+            target = targets.setdefault(
+                row["target"],
+                {
+                    "target": row["target"],
+                    "source": row["source"],
+                    "eligible": False,
+                    "via": [],
+                },
+            )
+            target["eligible"] |= row["eligible"]
+            target["via"].append(
+                {
+                    "group": group["group"],
+                    "reason": row["reason"],
+                    "eligible": row["eligible"],
+                }
+            )
+    return {**base, "groups": groups, "targets": list(targets.values())}

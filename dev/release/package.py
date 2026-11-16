@@ -47,6 +47,7 @@ REQUIRED_FILES = FOUNDATION_FILES | {
     "activity.py",
     "reminders.py",
     "matter.py",
+    "recovery.py",
     "zwave.py",
     "panel.py",
     "frontend/panel.js",
@@ -57,6 +58,7 @@ REQUIRED_FILES = FOUNDATION_FILES | {
 CATALOG_FILES = REQUIRED_FILES - {
     "frontend/drafts.js",
     "matter.py",
+    "recovery.py",
     "zwave.py",
     "activity.py",
     "reminders.py",
