@@ -16,6 +16,7 @@ LIMIT = 1000
 PENDING_LIMIT = 128
 CATEGORIES = {"alarm", "maintenance", "selftest", "configuration"}
 KINDS = {
+    "end_of_service",
     "source",
     "sounder",
     "notification",
@@ -309,6 +310,25 @@ class Activity:
                             self.record(
                                 "maintenance",
                                 kind,
+                                "problem" if value else "recovered",
+                                source=source,
+                                groups=groups,
+                            )
+                if "end_of_service" in health:
+                    condition_key = (source, identity, "end_of_service")
+                    issue = self.conditions.setdefault(condition_key, {"active": False})
+                    value = (
+                        health["end_of_service"]
+                        if sample["verified"] and usable
+                        else None
+                    )
+                    if value is not None:
+                        old = issue["active"]
+                        issue["active"] = value
+                        if self.previous is not None and old != value:
+                            self.record(
+                                "maintenance",
+                                "end_of_service",
                                 "problem" if value else "recovered",
                                 source=source,
                                 groups=groups,

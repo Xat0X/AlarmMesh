@@ -670,6 +670,38 @@ async def main(requested):
         passed("real_mqtt_unload_no_commands")
         current = "offline_zha"
         await zha_checks(passed)
+        current = "offline_matter"
+        from check_matter import matter_registry_checks
+
+        await matter_registry_checks(hass, passed, require)
+        current = "offline_zwave"
+        from homeassistant.components.binary_sensor import BinarySensorDeviceClass
+        from homeassistant.components.zwave_js import binary_sensor as zwave_binary
+
+        schemas = zwave_binary.DISCOVERY_SCHEMAS
+        smoke = [
+            s
+            for s in schemas
+            if s.entity_description.device_class == BinarySensorDeviceClass.SMOKE
+        ]
+        require(bool(smoke), "Z-Wave HA smoke discovery missing")
+        require(
+            any(
+                s.entity_description.key == "1"
+                and s.entity_description.states == {1, 2}
+                for s in smoke
+            ),
+            "Z-Wave smoke notification contract changed",
+        )
+        passed("zwave_offline_ha_smoke_contract")
+        require(
+            any(
+                d.device_class == BinarySensorDeviceClass.CO
+                for d in zwave_binary.NOTIFICATION_SENSOR_MAPPINGS
+            ),
+            "Separate HA CO notification mapping missing",
+        )
+        passed("zwave_offline_ha_co_separate")
         report["result"] = "PASS"
     except Exception as exc:
         report["scenarios"][current] = "FAIL"

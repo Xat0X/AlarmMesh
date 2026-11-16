@@ -29,11 +29,13 @@ from .effects import IncidentEffects
 from .groups import GroupError, GroupStore
 from .linking_runtime import LinkingRuntime
 from .maintenance import Maintenance
+from .matter import MatterSources, is_co_source
 from .preview import group_preview
 from .reminders import Reminders
 from .runtime import AlarmMeshConfigEntry
 from .self_test import SelfTests
 from .status import SourceStatus, StatusResult, evaluate_status
+from .zwave import invalid_source as invalid_zwave_source
 
 DATA_HUB = "alarmmesh_panel"
 ASSET_URL = "/alarmmesh-assets"
@@ -211,6 +213,7 @@ class PanelController:
         self.hass, self.entry, self.hub = hass, entry, hub
         self.runtime = entry.runtime_data
         self.groups = GroupStore(hass, entry.entry_id)
+        self.matter_sources = MatterSources(hass, entry)
         self.linking = LinkingRuntime(hass, entry, self.groups, hub.publish)
         self.effects = IncidentEffects(
             hass, entry, self.linking, self.groups, hub.publish
@@ -234,6 +237,7 @@ class PanelController:
             ]
         )
         await self.groups.async_load()
+        await self.matter_sources.load()
         await self.effects.load()
         await self.selftests.load()
         await self.maintenance.load()
@@ -256,7 +260,7 @@ class PanelController:
             "alarmmesh-panel",
             sidebar_title="AlarmMesh",
             sidebar_icon="mdi:smoke-detector",
-            module_url=f"{ASSET_URL}/panel.js?v=20261115-activity-2",
+            module_url=f"{ASSET_URL}/panel.js?v=20261116-zwave-1",
             require_admin=True,
         )
         self.hub.controller = self
@@ -275,6 +279,19 @@ class PanelController:
 
     @callback
     def _registry_changed(self, *_args):
+        changed = False
+        for source, status in self.runtime.source_statuses.items():
+            if status is not SourceStatus.UNKNOWN and (
+                is_co_source(self.hass, source)
+                or invalid_zwave_source(self.hass, source)
+            ):
+                self.runtime.source_statuses[source] = SourceStatus.UNKNOWN
+                changed = True
+        if changed:
+            self.runtime.async_set_result(
+                evaluate_status(self.runtime.source_statuses.values())
+            )
+            self.runtime.async_notify_observers()
         self.linking.refresh_watch()
         self._watch_scripts()
         self.selftests.check_identity()
@@ -304,6 +321,7 @@ class PanelController:
         await self.linking.close()
         await self.groups.async_close()
         await self.activity.close()
+        await self.matter_sources.close()
         if self.script_unsubscribe:
             self.script_unsubscribe()
             self.script_unsubscribe = None
@@ -364,7 +382,13 @@ class PanelController:
                 "ha_state": state.state if state else None,
                 "area_id": room_id,
                 "area_name": area.name if area else None,
-                "model": (device.model_id or device.model) if device else None,
+                "model": (
+                    (device.model or device.model_id)
+                    if entity and entity.platform in {"matter", "zwave_js"}
+                    else (device.model_id or device.model)
+                )
+                if device
+                else None,
                 "manufacturer": device.manufacturer if device else None,
                 "device_name": (device.name_by_user or device.name) if device else None,
                 "groups": [
@@ -449,6 +473,13 @@ class PanelController:
             ]
         maintenance = self.maintenance.snapshot()
         review = configuration_review(sources, groups, automation)
+        if self.matter_sources.error:
+            review["issues"].append(
+                {"code": self.matter_sources.error, "purpose": "matter"}
+            )
+            review["steps"][-1].update(
+                status="needs_attention", count=len(review["issues"])
+            )
         maintenance_problems = []
         if maintenance["error"]:
             maintenance_problems.append(
@@ -490,6 +521,8 @@ class PanelController:
             "activity": self.activity.snapshot(),
             "reminders": self.reminders.snapshot(),
             "review": review,
+            "matter_revision": self.matter_sources.revision,
+            "matter_error": self.matter_sources.error,
         }
 
 
@@ -517,6 +550,7 @@ async def async_prepare(hass: HomeAssistant) -> PanelHub:
         websocket_api.async_register_command(hass, ws_diagnostics)
         websocket_api.async_register_command(hass, ws_reminder)
         websocket_api.async_register_command(hass, ws_group_copy)
+        websocket_api.async_register_command(hass, ws_matter_review)
     return hass.data[DATA_HUB]
 
 
@@ -802,3 +836,39 @@ async def ws_group_copy(hass, connection, msg):
         return
     connection.send_result(msg["id"], {"revision": controller.groups.revision})
     controller.hub.publish()
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "alarmmesh/matter_review",
+        vol.Required("source"): str,
+        vol.Required("identity"): str,
+        vol.Required("revision"): int,
+        vol.Required("confirmed"): bool,
+    }
+)
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_matter_review(hass, connection, msg):
+    controller = hass.data[DATA_HUB].controller
+    if controller is None or controller.linking._paused:
+        connection.send_error(msg["id"], "not_loaded", "AlarmMesh is not loaded")
+        return
+    try:
+        await controller.matter_sources.review(
+            msg["source"], msg["identity"], msg["revision"], msg["confirmed"]
+        )
+    except (AutomationError, OSError) as err:
+        code = (
+            str(err)
+            if isinstance(err, AutomationError)
+            else "matter_identity_storage_error"
+        )
+        connection.send_error(msg["id"], code, code)
+        return
+    controller.activity.record(
+        "configuration", "configuration", "changed", source=msg["source"]
+    )
+    controller.linking.changed()
+    controller.hub.publish()
+    connection.send_result(msg["id"], {"revision": controller.matter_sources.revision})

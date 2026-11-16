@@ -9,13 +9,15 @@ from homeassistant.helpers.storage import Store
 from .automation import NotificationStore
 from .const import CONF_SOURCE_ENTITY_IDS
 from .groups import GroupStore
+from .matter import is_co_source
 from .panel import PanelController, async_prepare
 from .runtime import (
     AlarmMeshConfigEntry,
     AlarmMeshRuntimeData,
     source_status_from_state,
 )
-from .status import evaluate_status
+from .status import SourceStatus, evaluate_status
+from .zwave import invalid_source as invalid_zwave_source
 
 PLATFORMS = (Platform.BINARY_SENSOR, Platform.SENSOR)
 
@@ -27,11 +29,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: AlarmMeshConfigEntry) ->
     entry.runtime_data = runtime
     entry.async_on_unload(runtime.async_clear_listeners)
 
+    def interpret(entity_id, state):
+        # Invalid old selections must not reinterpret Matter CO as smoke.
+        return (
+            SourceStatus.UNKNOWN
+            if is_co_source(hass, entity_id) or invalid_zwave_source(hass, entity_id)
+            else source_status_from_state(state)
+        )
+
     @callback
     def async_source_changed(event: Event[EventStateChangedData]) -> None:
         """Update only the selected source whose local state changed."""
-        runtime.source_statuses[event.data["entity_id"]] = source_status_from_state(
-            event.data["new_state"]
+        runtime.source_statuses[event.data["entity_id"]] = interpret(
+            event.data["entity_id"], event.data["new_state"]
         )
         runtime.async_set_result(evaluate_status(runtime.source_statuses.values()))
         runtime.async_notify_observers()
@@ -44,7 +54,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: AlarmMeshConfigEntry) ->
     # All of setup above and this snapshot run in one event-loop turn. The
     # listener is already installed, so changes cannot fall into a setup gap.
     runtime.source_statuses.update(
-        (entity_id, source_status_from_state(hass.states.get(entity_id)))
+        (entity_id, interpret(entity_id, hass.states.get(entity_id)))
         for entity_id in sources
     )
     runtime.result = evaluate_status(runtime.source_statuses.values())
@@ -88,5 +98,12 @@ async def async_remove_entry(hass: HomeAssistant, entry: AlarmMeshConfigEntry) -
     """Remove only this entry's organizational groups on explicit entry deletion."""
     await GroupStore(hass, entry.entry_id).store.async_remove()
     await NotificationStore(hass, entry.entry_id).store.async_remove()
-    for purpose in ("receipts", "selftest", "maintenance", "activity", "reminders"):
+    for purpose in (
+        "receipts",
+        "selftest",
+        "maintenance",
+        "activity",
+        "reminders",
+        "matter_sources",
+    ):
         await Store(hass, 1, f"alarmmesh.{purpose}.{entry.entry_id}").async_remove()

@@ -8,7 +8,7 @@
 
 Smoke reports and source availability from existing Home Assistant smoke detector
 entities, with a local panel for detectors, rooms and groups. This test release adds [optional linked sounding](docs/linked-sounding.md), off by default.
-Version 0.1.0-beta.7 also offers [Companion notifications, group
+Version 0.1.0-beta.8 also offers [Companion notifications, group
 script actions, incident details and reviewed built-in self-test requests](docs/incident-features.md).
 New automatic behavior defaults off; existing explicit choices are preserved.
 It includes [opt-in maintenance messages, non-executing action
@@ -22,6 +22,14 @@ Earlier [finishing checks](docs/finish-review.md) remain dated historical eviden
 
 ## Device support
 
+The **Matter integration** adds HA-only smoke sources, endpoint-bound
+optional diagnostics/self-test requests and separate provider/transport labels.
+It offers no Matter sounder, stop or mute command. See the [Matter model/function
+matrix and setup](docs/matter-support.md) and [current review results](docs/matter-review.md).
+The local draft feature preserves selected unsent configuration input through a
+full browser reload, without restoring confirmation or bypassing revisions.
+Existing [Z-Wave JS smoke entities](docs/zwave-support.md) can also join mixed groups and provide device health information.
+
 This test release includes an offline catalog of **52 converter definitions /
 67 model and variant rows**, additional reviewed HA select/siren/switch profiles,
 read-only battery/fault/test details and searchable compatibility in the existing
@@ -31,11 +39,11 @@ BSD-2 activation requires its broadcast setting to explicitly report off;
 AlarmMesh never changes that setting. The original branding, two overview
 entities, source-selection schema and smoke rules remain unchanged.
 
-## Test release: 0.1.0-beta.7
+## Test release: 0.1.0-beta.8
 
 For opt-in testing, enable **Pre-release** in the AlarmMesh Marketplace page and
-choose **0.1.0-beta.7**. Back up before updating and follow the restart prompt.
-Read the [release notes](docs/releases/0.1.0-beta.7.md) before installing.
+choose **0.1.0-beta.8**. Back up before updating and follow the restart prompt.
+Read the [release notes](docs/releases/0.1.0-beta.8.md) before installing.
 
 ## Current status: local panel and two read-only overviews
 
@@ -155,3 +163,5 @@ are recorded in the acceptance guide; physical-device validation is outside scop
 The real-device pilot records user-reported installation and current status on
 Core 2026.11.1 separately. Physical smoke transitions, connection loss/recovery
 and a production restart remain unvalidated.
+
+Z-Wave JS rookmelders via bestaande HA-entiteiten: [ondersteuning en grenzen](docs/zwave-support.md).

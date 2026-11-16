@@ -940,3 +940,98 @@ test("reminder removal is named independently of group deletion",()=>{
 test("activity result filters retain explicit device test result wording",()=>{
  const {panel,root,transport}=setup('nl');const data=normal();data.activity={events:[{id:'test-result',observed_at:'2026-11-15T12:00:00Z',category:'selftest',kind:'selftest',result:'device_success',source:source.entity_id,groups:[],target:'',correlation:'request'}],incomplete:false};transport.callbacks.at(-1)(data);panel.go('activity');assert.ok(root.querySelector('[name="activity-result"]').parentNode.textContent.startsWith('Resultaat'));assert.ok(root.querySelector('[name="activity-result"] option[value="device_success"]').textContent.includes('expliciet succes'));panel.remove();
 });
+
+// Matter and local-draft regressions. DOM behavior, not visual acceptance.
+const { Drafts, validDraft } = await import('../../custom_components/alarmmesh/frontend/drafts.js');
+class LocalDraftStorage {
+ getItem(k){return this[k] ?? null;}
+ setItem(k,v){this[k]=String(v);}
+ removeItem(k){delete this[k];}
+}
+const draftValue=()=>({enabled:false,recovery:false,recipients:[{service:'mobile_app_simulated',enabled:true}]});
+test('local drafts separate users and entries, expire, and cannot contain permissions',()=>{
+ const storage=new LocalDraftStorage(),d=new Drafts(storage); d.switchUser('user-a');
+ assert.equal(d.put('user-a','entry-a','settings','new',4,'identity-list',draftValue()),true);
+ assert.deepEqual(d.read('user-a','entry-b'),{}); assert.deepEqual(d.read('user-b','entry-a'),{});
+ assert.equal(validDraft('settings',{...draftValue(),confirmed:true}),false);
+ assert.equal(d.put('user-a','entry-a','settings','new',4,'identity-list',{...draftValue(),token:'NO'}),false);
+ const key=d.bucket('user-a','entry-a'),raw=JSON.parse(storage.getItem(key));raw['settings:new'].time-=7200001;storage.setItem(key,JSON.stringify(raw));
+ assert.deepEqual(d.read('user-a','entry-a'),{});
+ d.put('user-a','entry-a','settings','new',4,'s',draftValue());d.switchUser('user-b');assert.deepEqual(d.read('user-a','entry-a'),{});
+});
+test('tampered, misaddressed, oversized and unavailable draft storage fails closed',()=>{
+ const storage=new LocalDraftStorage(),d=new Drafts(storage),key=d.bucket('a','b');
+ d.put('a','b','settings','new',7,'s',draftValue());const saved=JSON.parse(storage.getItem(key));
+ saved['settings:new'].confirmed=true;storage.setItem(key,JSON.stringify(saved));assert.deepEqual(d.read('a','b'),{});
+ delete saved['settings:new'].confirmed;storage.setItem(key,JSON.stringify({'edit:new':saved['settings:new']}));assert.deepEqual(d.read('a','b'),{});
+ storage.setItem(key,' '.repeat(250001));assert.deepEqual(d.read('a','b'),{});assert.equal(d.error,true);
+ assert.equal(new Drafts(null).put('a','b','settings','new',7,'s',draftValue()),false);
+ const failed=new Drafts({getItem(){throw Error('blocked');}});assert.deepEqual(failed.read('a','b'),{});
+});
+function withDraftUser(view,storage) {
+ view.panel.drafts=new Drafts(storage);view.panel.hass={...view.panel._hass,user:{id:'simulated-user',is_admin:true}};view.transport.callbacks.at(-1)(normal());
+}
+test('full panel recreation restores input only, retains original revision and clears successful save',async()=>{
+ const storage=new LocalDraftStorage();let view=setup();withDraftUser(view,storage);
+ view.panel.openDialog({kind:'edit',group:null});let name=view.root.querySelector('#group-name');name.value='Unsent simulation';name.dispatchEvent(new Event('input',{bubbles:true}));
+ assert.ok(storage.getItem(view.panel.drafts.bucket('simulated-user','test-entry')));assert.deepEqual(view.calls,[]);view.panel.remove();
+ view=setup();withDraftUser(view,storage);const current=normal();current.revision=9;view.transport.callbacks.at(-1)(current);
+ view.panel.openDialog({kind:'edit',group:null});assert.equal(view.root.querySelector('form'),null);
+ [...view.root.querySelectorAll('dialog button')].find(b=>b.textContent===view.panel.t.continueDraft).click();
+ assert.equal(view.root.querySelector('#group-name').value,'Unsent simulation');assert.deepEqual(view.calls,[]);
+ assert.ok(view.root.querySelector('dialog').textContent.includes(view.panel.t.draftRestored));
+ view.root.querySelector('form').dispatchEvent(new Event('submit',{cancelable:true}));await tick();
+ assert.equal(view.calls[0].revision,0);assert.equal(view.calls[0].operation,'create');assert.equal(view.calls[0].confirmed,undefined);
+ assert.deepEqual(view.panel.drafts.read('simulated-user','test-entry'),{});view.panel.remove();
+});
+test('restored enabled notification draft requires a fresh exact confirmation and keeps old revision',async()=>{
+ const view=setup(),storage=new LocalDraftStorage();withDraftUser(view,storage);view.transport.callbacks.at(-1)(featureData());
+ const value={...featureData().automation.settings,enabled:true,recipients:[{service:'mobile_app_simulated_phone',enabled:true}]};delete value.revision;
+ assert.ok(view.panel.drafts.put('simulated-user','test-entry','settings','new',2,view.panel.draftSignature(),value));
+ view.panel.openDialog({kind:'settings'});[...view.root.querySelectorAll('dialog button')].find(b=>b.textContent===view.panel.t.continueDraft).click();
+ assert.deepEqual(view.calls,[]);view.root.querySelector('form').dispatchEvent(new Event('submit',{cancelable:true}));await tick();
+ assert.ok(view.root.querySelector('.request-confirmation'));assert.equal(view.root.querySelector('[name="confirm-request"]').checked,false);assert.deepEqual(view.calls,[]);
+ view.panel.closeDialog();assert.deepEqual(view.calls,[]);view.panel.remove();
+});
+test('identity changes prevent local-draft restoration; discard makes no request',()=>{
+ const view=setup(),storage=new LocalDraftStorage();withDraftUser(view,storage);
+ view.panel.drafts.put('simulated-user','test-entry','settings','new',2,'OLD_IDENTITIES',draftValue());view.panel.openDialog({kind:'settings'});
+ assert.ok(view.root.querySelector('dialog').textContent.includes(view.panel.t.draftChanged));assert.equal([...view.root.querySelectorAll('dialog button')].some(b=>b.textContent===view.panel.t.continueDraft),false);
+ [...view.root.querySelectorAll('dialog button')].find(b=>b.textContent===view.panel.t.discardDraft).click();assert.deepEqual(view.calls,[]);assert.deepEqual(view.panel.drafts.read('simulated-user','test-entry'),{});view.panel.remove();
+});
+test('Matter details and help separate transport, CO, unavailable functions and unknown physical outcome',()=>{
+ for(const lang of ['en','nl']) {const v=setup(lang),data=normal();data.matter_revision=0;
+ data.sources[0].capability={origin:'matter',status:'detection_only',reason:'matter_no_sounder_route',controls:[],details:{values:[]},matter:{transport:'unknown',source_kind:'local_smoke',functions:[{key:'self_test_result',reason:'matter_no_correlated_result'},{key:'activation',reason:'matter_no_sounder_route'},{key:'co',reason:'matter_entity_available'}]}};
+ v.transport.callbacks.at(-1)(data);v.panel.go('devices');assert.ok([...v.root.childNodes].map(n=>n.textContent).join(' ').includes(v.panel.t.transport_unknown));v.panel.openDialog({kind:'source',id:source.entity_id});
+ const dialog=v.root.querySelector('dialog');assert.ok(dialog.textContent.includes(v.panel.t.matter_no_correlated_result));assert.ok(dialog.textContent.includes(v.panel.t.matter_function_co));assert.deepEqual(v.calls,[]);
+ v.panel.go('matterHelp');assert.equal(v.root.querySelector('ol').children.length,6);assert.ok(v.root.querySelector('a[href="https://www.home-assistant.io/integrations/thread/"]'));assert.deepEqual(v.calls,[]);v.panel.remove();}
+});
+
+test('changed Matter fingerprint blocks a draft even without optional controls',()=>{
+ const view=setup();withDraftUser(view,new LocalDraftStorage());const d=normal();d.sources[0].capability={origin:'matter',controls:[],matter:{fingerprint:'a'.repeat(64)}};view.transport.callbacks.at(-1)(d);
+ view.panel.drafts.put('simulated-user','test-entry','settings','new',0,view.panel.draftSignature(),draftValue());
+ d.sources[0].capability.matter.fingerprint='b'.repeat(64);view.transport.callbacks.at(-1)(d);view.panel.openDialog({kind:'settings'});
+ assert.ok(view.root.querySelector('dialog').textContent.includes(view.panel.t.draftChanged));assert.deepEqual(view.calls,[]);view.panel.remove();
+});
+
+test('Matter combination and secondary value labels are readable in both languages',()=>{
+ for(const [lang,kind,co,interconnect] of [['nl','Rook- en CO-melder','CO-waarde (afzonderlijk)','Native interconnectwaarde (alleen lezen)'],['en','Smoke and CO detector','CO report (separate)','Native interconnect report (read-only)']]) {
+  const v=setup(lang),data=normal();data.sources[0].capability={origin:'matter',kind:'smoke_co',status:'detection_only',reason:'matter_no_sounder_route',controls:[],details:{values:[{key:'co',value:'off'},{key:'interconnect_smoke',value:'off'}]}};v.transport.callbacks.at(-1)(data);v.panel.openDialog({kind:'source',id:source.entity_id});const labels=[...v.root.querySelectorAll('dialog .diagnostics dt')].map(n=>n.textContent);const values=[...v.root.querySelectorAll('dialog .diagnostics dd')].map(n=>n.textContent);assert.ok(values.includes(kind));assert.ok(labels.includes(co));assert.ok(labels.includes(interconnect));assert.deepEqual(v.calls,[]);v.panel.remove();
+ }
+});
+
+test('cancelling a standalone self-test closes its dialog without dispatch',()=>{
+ const v=setup();v.panel.openDialog({kind:'test',actionKind:'selftest',target:source.entity_id,identity:'mock-identity',name:'SIMULATED Matter detector'});const cancel=[...v.root.querySelectorAll('dialog button')].find(b=>b.textContent==='Cancel');assert.ok(cancel);cancel.click();assert.ok(!v.root.querySelector('dialog'));assert.deepEqual(v.calls,[]);v.panel.remove();
+});
+
+for (const language of ["nl", "en"]) test(`Z-Wave provider filter and honest details (${language})`, () => {
+  const { panel, root, transport, calls } = setup(language);
+  const data=normal();data.sources[0].capability={origin:"zwave_js",status:"detection_only",reason:"zwave_observation_only",controls:[],kind:"smoke",zwave:{self_test:false,sounder:false},details:{values:[],maintenance:{}}};
+  transport.callbacks.at(-1)(data);panel.go("devices");
+  assert.ok([...root.querySelectorAll("option")].some(o=>o.value==="zwave_js" && o.textContent==="Z-Wave JS"));
+  panel.openDialog({kind:"source",id:source.entity_id});
+  const dialog=root.querySelector("dialog");assert.ok(dialog.textContent.includes("Z-Wave JS"));
+  assert.equal(dialog.querySelector('a[href="https://www.home-assistant.io/integrations/zwave_js/"]').getAttribute("rel"),"noopener noreferrer");
+  assert.ok(dialog.textContent.includes(language==="nl" ? "Een ping is geen zelftest" : "A ping is not a detector self-test"));
+  assert.deepEqual(calls,[]);panel.remove();
+});

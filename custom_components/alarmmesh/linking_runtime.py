@@ -8,6 +8,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.event import async_track_state_change_event
 
+from . import matter
 from .capabilities import Capabilities, Control
 from .linking import Activation, plan_activations, update_incidents
 from .status import SourceStatus
@@ -83,6 +84,10 @@ class LinkingRuntime:
         statuses = {
             source: SourceStatus.UNKNOWN
             if self.capabilities.source_identity_changed(source)
+            or (
+                self.capabilities.metadata(source)[2] == "matter"
+                and not matter.origin_allowed(self.hass, source)
+            )
             else status
             for source, status in self.runtime.source_statuses.items()
         }

@@ -90,6 +90,23 @@ def validate_catalog(data: dict) -> None:
         identities
     ):
         raise ValueError("Incomplete website inventory")
+    for entry in data.get("matter_entries", []):
+        if (
+            entry["id"] in identities
+            or entry["physical_tested"] is not False
+            or set(entry["providers"]) != {"matter"}
+        ):
+            raise ValueError("Invalid Matter review")
+        identities.add(entry["id"])
+        review = entry["providers"]["matter"]
+        if (
+            review["profile"] is not None
+            or review["activation"] != "not_available"
+            or review["stop"] != "not_authorized"
+            or not review["sources"]
+            or review["self_test"] != "conditional_request"
+        ):
+            raise ValueError("Unreviewed Matter authority")
 
 
 def recognize(provider: str, model: str, vendor: str) -> dict | None:
@@ -99,6 +116,14 @@ def recognize(provider: str, model: str, vendor: str) -> dict | None:
     matching definitions are ambiguous, including future overlapping signatures.
     """
     model, vendor = model.casefold(), vendor.casefold()
+    if provider == "matter":
+        found = [
+            entry
+            for entry in CATALOG.get("matter_entries", [])
+            if model in {m.casefold() for m in entry["models"]}
+            and vendor in {v.casefold() for v in entry["vendors"]}
+        ]
+        return found[0] if len(found) == 1 else None
     found = []
     for entry in CATALOG["entries"]:
         matches = list(entry["matchers"].get(provider, ()))

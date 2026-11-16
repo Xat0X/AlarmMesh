@@ -4,9 +4,16 @@ import re
 
 from .catalog import CATALOG
 
-PROVIDERS = {"zigbee2mqtt", "mqtt", "zha", "unknown_origin"}
+PROVIDERS = {"zigbee2mqtt", "mqtt", "zha", "matter", "zwave_js", "unknown_origin"}
 ASSESSMENTS = {"linkable", "detection_only", "not_confirmed", "setting_needed"}
 REASONS = {
+    "zwave_observation_only",
+    "matter_identity_changed",
+    "matter_identity_storage_error",
+    "matter_no_sounder_route",
+    "matter_interconnect_origin",
+    "matter_origin_unknown",
+    "matter_interconnect_unseparated",
     "no_verified_profile",
     "source_identity_changed",
     "ambiguous_control",
@@ -74,7 +81,10 @@ def support_report(snapshot: dict, alarmmesh_version: str, ha_version: str) -> d
         return aliases[key]
 
     sources = []
-    models = {entry["id"]: entry["model"] for entry in CATALOG["entries"]}
+    models = {
+        entry["id"]: entry["model"]
+        for entry in [*CATALOG["entries"], *CATALOG.get("matter_entries", [])]
+    }
     for source in snapshot["sources"]:
         cap = source.get("capability", {})
         health = cap.get("details", {}).get("maintenance", {})
@@ -87,6 +97,14 @@ def support_report(snapshot: dict, alarmmesh_version: str, ha_version: str) -> d
                 else "unknown",
                 "source_status": known(source.get("status"), RESULTS),
                 "provider": known(cap.get("origin"), PROVIDERS),
+                "transport": known(
+                    cap.get("matter", {}).get("transport"),
+                    {"thread", "wifi", "bridge", "unknown"},
+                ),
+                "source_kind": known(
+                    cap.get("matter", {}).get("source_kind"),
+                    {"local_smoke", "interconnect_smoke", "unknown"},
+                ),
                 "model": models.get(cap.get("catalog_id"), "unknown")
                 if isinstance(cap.get("catalog_id"), str)
                 else "unknown",
@@ -100,6 +118,9 @@ def support_report(snapshot: dict, alarmmesh_version: str, ha_version: str) -> d
                 else None,
                 "fault": health.get("fault")
                 if type(health.get("fault")) is bool
+                else None,
+                "end_of_service": health.get("end_of_service")
+                if type(health.get("end_of_service")) is bool
                 else None,
             }
         )

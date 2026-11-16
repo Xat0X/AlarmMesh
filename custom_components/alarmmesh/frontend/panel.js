@@ -1,4 +1,5 @@
-import { TEXT } from "./translations.js?v=20261115-activity-1";
+import { TEXT } from "./translations.js?v=20261116-zwave-1";
+import { Drafts } from "./drafts.js?v=20261116-matter-1";
 
 // Safe DOM construction: names, labels and registry data are always text nodes.
 const el = (tag, text, cls) => {
@@ -29,6 +30,7 @@ export class AlarmMeshPanel extends HTMLElement {
     this.transport = "loading";
     this.generation = 0;
     this.detail = null;
+    let storage;try{storage=globalThis.localStorage;}catch{storage=null;}this.drafts=new Drafts(storage);
     this.deviceFilters = {name:"", room:"", group:"", provider:"", status:"", maintenance:""};
     this.activityFilters = {source:"", group:"", kind:"", result:"", category:""};
     this.onDisconnected = () => { this.generation++; this.unsubscribe?.()?.catch?.(() => {}); this.unsubscribe = null; this.data = null; this.diagnostics = null; this.transport = "offline"; this.offlineDraft(); this.render(); };
@@ -37,7 +39,9 @@ export class AlarmMeshPanel extends HTMLElement {
   set hass(value) {
     const old = this._hass;
     this._hass = value;
-    if (this.isConnected && (old?.connection !== value.connection || old?.user?.is_admin !== value.user?.is_admin)) this.bindConnection();
+    if(value.user?.id) this.drafts.switchUser(value.user.id);
+    if(old?.user?.id && old.user.id!==value.user?.id) {this.clearDraftsForOldUser(old.user.id);this.closeDialog();}
+    if (this.isConnected && (old?.connection !== value.connection || old?.user?.is_admin !== value.user?.is_admin || old?.user?.id !== value.user?.id)) this.bindConnection();
     if (old?.language !== value.language || old?.themes?.darkMode !== value.themes?.darkMode) this.render();
     if (!value.user?.is_admin) { this.generation++; this.data = null; this.closeDialog(); this.render(); }
   }
@@ -113,7 +117,7 @@ export class AlarmMeshPanel extends HTMLElement {
     const t = this.t;
     const sticky = this.shadowRoot.activeElement;
     const stickyKey = sticky?.dataset.sticky, selection = stickyKey ? [sticky.selectionStart, sticky.selectionEnd] : null;
-    const link = el("link"); link.rel = "stylesheet"; link.href = "/alarmmesh-assets/panel.css?v=20261115-activity-1";
+    const link = el("link"); link.rel = "stylesheet"; link.href = "/alarmmesh-assets/panel.css?v=20261116-matter-2";
     const shell = el("div", undefined, "shell");
     shell.classList.toggle("dark", Boolean(this._hass?.themes?.darkMode));
     const side = el("aside");
@@ -150,6 +154,7 @@ export class AlarmMeshPanel extends HTMLElement {
       if (this.page === "maintenance") this.renderMaintenance(main);
       if (this.page === "diagnostics") this.renderDiagnostics(main);
       if (this.page === "activity") this.renderActivity(main);
+      if (this.page === "matterHelp") this.renderMatterHelp(main);
       if (this.page === "devices") {
         main.append(this.section(t.selected, button(t.choose, () => this.choose())));
         this.renderDevices(main);
@@ -187,6 +192,7 @@ export class AlarmMeshPanel extends HTMLElement {
     const active = data.sources.filter(s => s.status === "SMOKE_REPORTED");
     for (const source of active) hero.append(button(`${t.alarmFrom}: ${source.name} · ${source.area_name || t.noRoom}`, () => this.openDialog({ kind: "source", id: source.entity_id }), "alarm-source"));
     main.append(hero);
+    this.renderDrafts(main);
     hero.append(button(t.viewIncidents, () => this.go("incidents"), "button incident-link"));
     hero.append(button(t.activity, () => this.go("activity")));
     const stats = el("div", undefined, "stats");
@@ -212,6 +218,7 @@ export class AlarmMeshPanel extends HTMLElement {
     if (attention.length) { main.append(this.section(t.attention)); this.sourceList(main, attention); }
     this.renderSetupGuide(main);
     main.append(button(t.maintenance, () => this.go("maintenance"), "button maintenance-link"));
+    main.append(button(t.matterHelp,()=>this.go("matterHelp")));
     const allRooms = button("→", () => this.go("rooms"));
     allRooms.setAttribute("aria-label", t.rooms);
     main.append(this.section(t.rooms, allRooms)); this.roomCards(main, data.rooms);
@@ -230,6 +237,7 @@ export class AlarmMeshPanel extends HTMLElement {
       const copy = el("div"); copy.append(el("h3", title), el("span", t['guide_' + state], `guide-state ${state}`), el("p", `${note}${step ? ` · ${t.savedCount}: ${step.count}` : ''}`));
       item.dataset.status = state;
       item.append(copy, button(label, action)); steps.append(item);
+      if(key === "sources") item.append(button(t.matterHelp,()=>this.go("matterHelp")));
       if (key === "notifications" && data.maintenance) {
         copy.append(el("p", `${t.maintenanceNotifications}: ${t[data.maintenance.settings.enabled ? "enabled" : "disabled"]}`));
         item.append(button(t.configureMaintenance, () => this.openDialog({kind: "maintenance"})));
@@ -247,6 +255,7 @@ export class AlarmMeshPanel extends HTMLElement {
     guide.append(steps); parent.append(guide);
   }
   issueAction(issue) {
+    if (issue.purpose === "matter") return this.go("matterHelp");
     if (issue.purpose === "maintenance") return this.openDialog({kind:"maintenance"});
     if (issue.group) return this.openDialog({ kind: "edit", group: this.data.groups.find(g => g.id === issue.group) });
     if (issue.source && this.data.sources.some(s => s.entity_id === issue.source)) return this.openDialog({ kind: "source", id: issue.source });
@@ -290,6 +299,7 @@ export class AlarmMeshPanel extends HTMLElement {
       field(t.battery, health?.battery_percent == null ? t.guide_unknown : `${health.battery_percent}%`, health?.battery_percent != null && health.battery_percent <= 20);
       const low = health?.battery_low === true || health?.battery_percent != null && health.battery_percent <= 20;
       field(t.battery_low, low ? t.lowBatteryPresentation : health?.battery_low === false || health?.battery_percent != null ? t.noLowBatteryReport : t.guide_unknown, low);
+      if (health && "end_of_service" in health) field(t.end_of_service, health.end_of_service == null ? t.guide_unknown : t[health.end_of_service ? "matter_expired" : "matter_not_expired"], health.end_of_service === true);
       field(t.fault, health?.fault == null ? t.guide_unknown : health.fault ? t.faultReported : t.noFaultReport, health?.fault === true);
       field(t.sourceAvailability, t[source.status] || t.guide_unknown);
       field(t.controlAvailability, source.capability ? t[source.capability.reason] || t.guide_unknown : t.guide_unknown);
@@ -365,7 +375,7 @@ export class AlarmMeshPanel extends HTMLElement {
     for (const source of sources) {
       const row = button("", () => this.openDialog({ kind: "source", id: source.entity_id }), "source");
       const name = el("span", undefined, "source-name"); name.append(el("strong", source.name), el("small", [source.area_name || this.t.noRoom, source.manufacturer, source.model].filter(Boolean).join(" · ")));
-      if (source.capability) name.append(el("small", `${this.t[source.capability.origin]} · ${this.capabilityLabel(source.capability)}`));
+      if (source.capability) name.append(el("small", `${this.providerLabel(source.capability)} · ${this.capabilityLabel(source.capability)}`));
       row.append(icon("smoke-detector"), name, this.badge(source), icon("chevron-right")); list.append(row);
     }
     parent.append(list);
@@ -380,7 +390,10 @@ export class AlarmMeshPanel extends HTMLElement {
   }
   openDialog(detail) {
     if (!this.detail) this.previousFocus = this.shadowRoot.activeElement;
-    this.detail = detail; this.renderDialog();
+    this.detail = detail;
+    const draft=this.drafts.read(this._hass?.user?.id,this.data?.entry_id)[this.draftKey(detail)];
+    if(draft) this.detail.pendingDraft=draft;
+    this.renderDialog();
     const dialog = this.shadowRoot.querySelector("dialog");
     if (dialog) { dialog.querySelector("button")?.focus(); dialog.scrollTop = 0; }
   }
@@ -401,6 +414,14 @@ export class AlarmMeshPanel extends HTMLElement {
     dialog.setAttribute("aria-label", t.details);
     const close = button(t.close, () => this.closeDialog());
     dialog.append(close);
+    if(detail.pendingDraft) {
+      const draft=detail.pendingDraft, valid=draft.signature===this.draftSignature();
+      dialog.append(el("h2",t.draftFound),el("p",valid ? t.draftReview : t.draftChanged));
+      if(valid) dialog.append(button(t.continueDraft,()=>{detail.restoredDraft=draft;delete detail.pendingDraft;this.renderDialog();}));
+      dialog.append(button(t.discardDraft,()=>{this.clearDraft();delete detail.pendingDraft;this.renderDialog();}));
+      if(first){dialog.showModal();close.focus();}return;
+    }
+    if(detail.restoredDraft) dialog.append(el("p",t.draftRestored,"notice"));
     if (detail.kind === "source") {
       const source = this.data.sources.find(s => s.entity_id === detail.id);
       if (!source) { this.closeDialog(); return; }
@@ -413,8 +434,13 @@ export class AlarmMeshPanel extends HTMLElement {
       if (!source.capability) { const technical = el("details"); technical.append(el("summary", t.requirements), el("p", `${t.entity}: ${source.entity_id}`)); dialog.append(technical); }
       if (source.capability) {
         const cap = source.capability;
-        dialog.append(el("h3", t.functions), el("p", `${t[cap.origin]} / ${this.capabilityLabel(cap)}`));
+        dialog.append(el("h3", t.functions), el("p", `${this.providerLabel(cap)} / ${this.capabilityLabel(cap)}`));
         this.detectorDetails(dialog, source);
+        if (cap.matter) this.matterDetails(dialog,source);
+        if (cap.zwave) {
+          dialog.append(el("p",t.zwave_observation_only,"notice"),el("p",t.zwaveSetup));
+          const help=el("a",t.zwaveHelp);help.href=t.zwaveSetupUrl;help.target="_blank";help.rel="noopener noreferrer";dialog.append(help);
+        }
         const limitations = el("details"); limitations.append(el("summary", t.requirements), el("p", t[cap.reason] || t.no_verified_profile), el("p", t.physicalNotTested, "muted"));
         limitations.append(el("p", `${t.entity}: ${source.entity_id}`));
         for (const control of cap.controls) limitations.append(el("p", `${t.proposedControl}: ${control.target}`));
@@ -473,7 +499,8 @@ export class AlarmMeshPanel extends HTMLElement {
     else if (focusIndex >= 0) ([...dialog.querySelectorAll("button,input")][focusIndex] || close).focus();
   }
   groupForm(dialog, group) {
-    const t = this.t, revision = this.data.revision;
+    const original=group;group=this.detail.restoredDraft?.value || group;
+    const t = this.t, revision = this.detail.restoredDraft?.revision ?? this.data.revision;
     dialog.append(el("h2", group ? t.edit : t.newGroup), el("p", t.groupNote));
     const form = el("form"); form.noValidate = true;
     const label = el("label", t.name); label.htmlFor = "group-name";
@@ -514,7 +541,7 @@ export class AlarmMeshPanel extends HTMLElement {
       if (oldBinding && !controls.some(c => c.target === oldBinding.target && c.identity === oldBinding.identity)) {
         const stale = el("option", t.storedControlChanged); stale.value = `stored:${oldBinding.target}`; stale.selected = true; select.append(stale);
       }
-      row.append(targetLabel, select, el("small", cap ? `${t[cap.origin]} / ${this.capabilityLabel(cap)}` : t.no_verified_profile));
+      row.append(targetLabel, select, el("small", cap ? `${this.providerLabel(cap)} / ${this.capabilityLabel(cap)}` : t.no_verified_profile));
       if (cap) { row.append(el("small", t[cap.reason] || t.no_verified_profile)); const requirements = el("details"); requirements.append(el("summary", t.technicalDetails), el("p", `${source.model || t.unknown} · ${source.entity_id}`)); for (const control of controls) requirements.append(el("p", control.target)); row.append(requirements); }
       else row.append(el("small", t.storedSourceMissing, "warning-text"));
       row.hidden = !selected.has(source.entity_id);
@@ -548,7 +575,7 @@ export class AlarmMeshPanel extends HTMLElement {
         const control = b.controls.find(c => c.target === b.select.value);
         return control ? { source: control.source, target: control.target, profile: control.profile, identity: control.identity } : b.oldBinding;
       });
-      const payload = { operation: group ? "update" : "create", ...(group ? { group_id: group.id } : {}), revision, name: name.value.trim(), members };
+      const payload = { operation: original ? "update" : "create", ...(original ? { group_id: original.id } : {}), revision, name: name.value.trim(), members };
       const origins = originRows.filter(c => c.checked && members.includes(c.value)).map(c => c.value);
       if (group?.origins || origins.length !== members.length) payload.origins = origins;
       const actionValue = actionFields();
@@ -591,13 +618,14 @@ export class AlarmMeshPanel extends HTMLElement {
       await this.mutate(payload, error);
       save.disabled = false;
     });
+    this.trackDraft(form,revision,()=>({name:name.value,members:[...form.querySelectorAll('[name="member"]')].filter(c=>c.checked).map(c=>c.value),origins:originRows.filter(c=>c.checked && [...form.querySelectorAll('[name="member"]')].some(m=>m.value===c.value && m.checked)).map(c=>c.value),linking:{enabled:toggle.checked,bindings:bindings.filter(b=>[...form.querySelectorAll('[name="member"]')].some(m=>m.checked && m.value===b.source.entity_id) && b.select.value).map(b=>{const c=b.controls.find(c=>c.target===b.select.value);return c ? {source:c.source,target:c.target,profile:c.profile,identity:c.identity} : b.oldBinding;}).filter(Boolean)},actions:actionFields(),unselected:group?.unselected || []}));
     dialog.append(form);
   }
   detectorDetails(parent, source) {
     const t = this.t, details = source.capability.details || {};
     const table = el("dl", undefined, "diagnostics");
     const add = (label, value) => table.append(el("dt", label), el("dd", value));
-    add(t.detectorType, source.capability.kind ? t[source.capability.kind === "smoke" ? "kind_smoke" : source.capability.kind] : t.genericSmoke);
+    add(t.detectorType, t["kind_" + source.capability.kind] || t[source.capability.kind] || t.genericSmoke);
     add(t.sourceAvailability, source.ha_state === "on" || source.ha_state === "off" ? t.usableValue : t.unavailable);
     add(t.controlAvailability, source.capability.controls.length ? t.usableValue : t.unavailable);
     add(t.firmware, details.firmware || t.unavailable);
@@ -605,7 +633,7 @@ export class AlarmMeshPanel extends HTMLElement {
     for (const value of details.values || []) {
       const cell = el("dd", value.value === null ? t.unavailable : `${t[value.value] || value.value}${value.unit ? " " + value.unit : ""}`);
       if (value.changed_at) cell.append(el("small", `${t.valueChanged}: ${new Date(value.changed_at).toLocaleString(this._hass.language)}`));
-      table.append(el("dt", t[value.key] || value.key), cell);
+      table.append(el("dt", (source.capability.origin === "matter" ? t["matter_function_" + value.key] : null) || t[value.key] || value.key), cell);
     }
     parent.append(table, el("small", t.contactUnknown, "muted"));
   }
@@ -617,7 +645,7 @@ export class AlarmMeshPanel extends HTMLElement {
     const filters = el("div", undefined, "catalog-filters");
     const search = el("input"); search.type = "search"; search.placeholder = t.searchCatalog; search.setAttribute("aria-label", t.searchCatalog); search.value = this.catalogSearch || "";
     const provider = el("select"); provider.setAttribute("aria-label", t.provider);
-    for (const [value, label] of [["zigbee2mqtt", "Zigbee2MQTT"], ["zha", "ZHA"]]) { const option = el("option", label); option.value = value; provider.append(option); }
+    for (const [value, label] of [["zigbee2mqtt", "Zigbee2MQTT"], ["zha", "ZHA"], ["matter", "Matter"], ["zwave_js", "Z-Wave JS"]]) { const option = el("option", label); option.value = value; provider.append(option); }
     [...provider.options].find(option => option.value === (this.catalogProvider || "zigbee2mqtt")).selected = true;
     const capability = el("select"); capability.setAttribute("aria-label", t.functions);
     for (const [value, label] of [["all", t.allModels], ["implemented", t.externalActivation], ["stop", t.automaticStop], ["detection", t.smokeSource], ["unconfirmed", t.not_confirmed]]) { const option = el("option", label); option.value = value; capability.append(option); }
@@ -627,7 +655,14 @@ export class AlarmMeshPanel extends HTMLElement {
     const update = () => {
       this.catalogSearch = search.value; this.catalogProvider = provider.value; this.catalogCapability = capability.value;
       results.replaceChildren(); let shown = 0;
-      for (const entry of catalog.entries) {
+      search.disabled=capability.disabled=provider.value === "zwave_js";
+      if(provider.value === "zwave_js") {
+        count.textContent=t.zwaveGeneric;
+        results.append(el("h3","Z-Wave JS"),el("p",t.zwaveSetup),el("p",t.zwave_observation_only,"notice"),el("p",t.physicalNotTested));
+        return;
+      }
+      const entries = provider.value === "matter" ? (catalog.matter_entries || []) : catalog.entries;
+      for (const entry of entries) {
         for (const variant of [{ vendor: entry.vendor, model: entry.model }, ...entry.aliases]) {
         const review = variant.providers?.[provider.value] || entry.providers[provider.value];
         const matches = capability.value === "all" || capability.value === "implemented" && review.activation === "implemented" || capability.value === "stop" && review.stop === "implemented" || capability.value === "detection" && review.detection !== "not_available" || capability.value === "unconfirmed" && [review.detection, review.activation].includes("unconfirmed");
@@ -635,7 +670,7 @@ export class AlarmMeshPanel extends HTMLElement {
           if (!`${variant.vendor} ${variant.model} ${entry.model}`.toLocaleLowerCase().includes(search.value.toLocaleLowerCase().trim())) continue;
           shown++;
           const card = el("article", undefined, "card catalog-card");
-          card.append(el("h3", `${variant.vendor} ${variant.model}`), el("p", `${t[provider.value]} / ${t[entry.kind === "smoke" ? "kind_smoke" : entry.kind] || entry.kind}`));
+          card.append(el("h3", `${variant.vendor} ${variant.model}`), el("p", `${t[provider.value]} / ${t["kind_" + entry.kind] || t[entry.kind] || entry.kind}`));
           if (variant.model !== entry.model) card.append(el("small", `${t.documentedVariant}: ${entry.vendor} ${entry.model}`, "muted"));
           const info = el("dl");
           for (const [label, value] of [[t.smokeSource, review.detection], [t.externalActivation, review.activation], [t.automaticStop, review.stop], [t.selfTestStatus, review.self_test]]) info.append(el("dt", label), el("dd", t[value] || value));
@@ -646,7 +681,7 @@ export class AlarmMeshPanel extends HTMLElement {
           card.append(info, evidence); results.append(card);
         }
       }
-      count.textContent = `${shown} / ${catalog.website_rows} ${t.catalogModels}`;
+      count.textContent = `${shown} / ${provider.value === "matter" ? (catalog.matter_entries || []).length : catalog.website_rows} ${t.catalogModels}`;
     };
     search.addEventListener("input", update); provider.addEventListener("change", update); capability.addEventListener("change", update);
     filters.append(search, provider, capability); parent.append(filters, count, results); update();
@@ -660,7 +695,7 @@ export class AlarmMeshPanel extends HTMLElement {
   }
   renderSettings(parent) {
     const t = this.t, automation = this.data.automation;
-    parent.append(button(t.catalog, () => this.go("catalog")), button(t.viewIncidents, () => this.go("incidents")), button(t.maintenance, () => this.go("maintenance")), button(t.diagnostics, () => this.go("diagnostics")));
+    parent.append(button(t.matterHelp,()=>this.go("matterHelp")),button(t.catalog, () => this.go("catalog")), button(t.viewIncidents, () => this.go("incidents")), button(t.maintenance, () => this.go("maintenance")), button(t.diagnostics, () => this.go("diagnostics")));
     this.renderSetupGuide(parent);
     if (!automation) return;
     const section = el("section", undefined, "notice");
@@ -674,7 +709,7 @@ export class AlarmMeshPanel extends HTMLElement {
   notificationForm(dialog) {
     const t = this.t, a = this.data.automation;
     if (!a) return;
-    const cfg = a.settings, revision = cfg.revision, form = el("form");
+    const cfg = this.detail.restoredDraft?.value || a.settings, revision = this.detail.restoredDraft?.revision ?? a.settings.revision, form = el("form");
     dialog.append(el("h2", t.notifications), el("p", t.notificationNote));
     const toggle = this.checkField(form, t.enableNotifications, cfg.enabled, "notifications-enabled");
     const recovery = this.checkField(form, t.recoveryNotification, cfg.recovery, "notifications-recovery");
@@ -702,18 +737,19 @@ export class AlarmMeshPanel extends HTMLElement {
       if (value.enabled && !value.recipients.some(r => r.enabled)) { error.textContent = t.invalid_notifications; return; }
       const send = async confirmed => {
         save.disabled = true;
-        try { await this._hass.callWS({ type: "alarmmesh/settings", revision, notifications: value, confirmed }); this.closeDialog(); }
+        try { await this._hass.callWS({ type: "alarmmesh/settings", revision, notifications: value, confirmed }); this.clearDraft(); this.closeDialog(); }
         catch (e) { error.textContent = t[e.code] || t.error; save.disabled = Boolean(save.dataset.confirmLocked); }
       };
       if (!value.enabled) { await send(false); return; }
       this.confirmRequest(form, { name: t.confirmAutomation, confirmationOnly: true, note: `${t.notificationNote}\n${value.recipients.filter(r => r.enabled).map(r => r.service).join(', ')}`, execute: () => send(true) });
     });
+    this.trackDraft(form,revision,()=>({enabled:toggle.checked,recovery:recovery.checked,recipients:recipients.filter(r=>!removed.has(r.value) && (r.checked || stored.has(r.value))).map(r=>({service:r.value,enabled:r.checked}))}));
     dialog.append(form);
   }
   maintenanceForm(dialog) {
     const t = this.t, m = this.data.maintenance, a = this.data.automation;
     if (!m || !a) return;
-    const cfg = m.settings, revision = cfg.revision, form = el("form");
+    const cfg = this.detail.restoredDraft?.value || m.settings, revision = this.detail.restoredDraft?.revision ?? m.settings.revision, form = el("form");
     dialog.append(el("h2", t.maintenanceNotifications), el("p", t.maintenanceDeliveryNote));
     const enabled = this.checkField(form, t.enableMaintenance, cfg.enabled, "maintenance-enabled"), fields = {};
     for (const kind of ["battery", "fault", "unavailable", "recovery"]) fields[kind] = this.checkField(form, t['maintenance_' + kind], cfg[kind], 'maintenance-' + kind);
@@ -742,12 +778,13 @@ export class AlarmMeshPanel extends HTMLElement {
       if (settings.enabled && (!settings.recipients.some(r=>r.enabled) || !["battery","fault","unavailable"].some(k=>settings[k]))) { error.textContent = t.invalid_maintenance; return; }
       const send = async confirmed => {
         save.disabled = true;
-        try { await this._hass.callWS({type:"alarmmesh/maintenance_settings",revision,settings,confirmed}); this.closeDialog(); }
+        try { await this._hass.callWS({type:"alarmmesh/maintenance_settings",revision,settings,confirmed}); this.clearDraft(); this.closeDialog(); }
         catch (e) { error.textContent = t[e.code] || t.error; save.disabled = Boolean(save.dataset.confirmLocked); }
       };
       if (!settings.enabled) { await send(false); return; }
       this.confirmRequest(form, {name:t.maintenanceNotifications, confirmationOnly:true, note:`${t.maintenanceDeliveryNote}\n${["battery","fault","unavailable"].filter(k=>settings[k]).map(k=>t['maintenance_'+k]).join(', ')}\n${settings.delay} ${t.minutes}\n${t.maintenance_recovery}: ${t[settings.recovery ? 'enabled' : 'disabled']}\n${settings.recipients.filter(r=>r.enabled).map(r=>r.service).join(', ')}`, execute:()=>send(true)});
     });
+    this.trackDraft(form,revision,()=>({enabled:enabled.checked,delay:Number(delay.value),recipients:inputs.filter(r=>!removed.has(r.value) && (r.checked || stored.has(r.value))).map(r=>({service:r.value,enabled:r.checked})),...Object.fromEntries(Object.entries(fields).map(([key,input])=>[key,input.checked]))}));
     dialog.append(form);
   }
   previewForm(dialog, detail) {
@@ -845,7 +882,7 @@ export class AlarmMeshPanel extends HTMLElement {
         this.updateTestResult();
       } catch (e) { error.textContent = t[e.code] || t.error; }
     }, "button destructive confirm-execute");
-    box.append(status, error, button(t.cancel, () => { box.remove(); restore(); }), execute); parent.append(box); ack.focus();
+    box.append(status, error, button(t.cancel, () => { box.remove(); restore(); if (parent.tagName === "DIALOG" && this.detail?.kind === "test") this.closeDialog(); }), execute); parent.append(box); ack.focus();
   }
   updateTestResult() {
     const result = this.data?.selftest;
@@ -941,6 +978,54 @@ export class AlarmMeshPanel extends HTMLElement {
     const source = this.data.sources.find(s => s.entity_id === id);
     return source ? `${source.name} · ${source.area_name || this.t.noRoom}` : id;
   }
+  draftKey(detail=this.detail) {return detail ? detail.kind+":"+(detail.id || detail.group?.id || "new") : "";}
+  draftSignature() {const d=this.data;if(!d)return "";return JSON.stringify([d.sources.map(s=>[s.entity_id,s.reminder_identity || null,s.capability?.matter?.fingerprint || null,s.capability?.controls?.map(c=>[c.target,c.identity]) || [],s.selftest?.control?.identity || null]),(d.automation?.scripts || []).map(s=>[s.entity_id,s.identity]),(d.automation?.recipients || []).map(r=>r.service).sort()]);}
+  clearDraftsForOldUser(id) {this.drafts.clearUser(id);}
+  clearDraft() {this.drafts.remove(this._hass?.user?.id,this.data?.entry_id,this.draftKey());}
+  trackDraft(form,revision,read) {
+    const user=this._hass?.user?.id,entry=this.data?.entry_id,detail=this.detail,signature=this.draftSignature(),target=detail.id || detail.group?.id || "new";
+    const capture=event=>{if(!form.isConnected || !user || event.target?.closest?.('.request-confirmation,.link-confirmation'))return;try{this.drafts.put(user,entry,detail.kind,target,revision,signature,read());}catch{this.drafts.error=true;}};
+    form.addEventListener("input",capture);form.addEventListener("change",capture);
+    form.addEventListener("click",event=>{if(event.target?.closest?.('.request-confirmation,.link-confirmation'))return;setTimeout(()=>capture(event),0);});
+  }
+  renderDrafts(parent) {
+    const entries=Object.entries(this.drafts.read(this._hass?.user?.id,this.data?.entry_id));
+    if(!entries.length)return;const t=this.t,box=el("section",undefined,"notice draft-list");box.append(el("h2",t.draftFound),el("p",t.draftReview));
+    for(const [key,draft] of entries) {
+      const label=t[draft.kind==="edit" ? "groups" : draft.kind==="reminder" ? "reminders" : draft.kind==="maintenance" ? "maintenanceNotifications" : "notifications"];
+      const group=this.data.groups.find(g=>g.id===draft.target);
+      if(draft.kind==="edit" && draft.target!=="new" && !group) box.append(el("p",t.draftChanged));
+      else box.append(button(`${t.continueDraft}: ${label}`,()=>{const detail={kind:draft.kind};if(draft.kind==="edit")detail.group=group || null;if(draft.kind==="reminder")detail.id=draft.target;this.openDialog(detail);}));
+      box.append(button(t.discardDraft,()=>{this.drafts.remove(this._hass?.user?.id,this.data?.entry_id,key);this.render();}));
+    }parent.append(box);
+  }
+  providerLabel(cap) {
+    if(cap.origin!=="matter") return this.t[cap.origin] || this.t.unknown_origin;
+    return `${this.t.matter} · ${this.t['transport_'+(cap.matter?.transport || 'unknown')]}`;
+  }
+  matterDetails(parent,source) {
+    const t=this.t, info=source.capability.matter;
+    parent.append(el("p",t['matter_kind_'+info.source_kind] || t.matter_origin_unknown));
+    const table=el("dl",undefined,"matter-functions");
+    for(const row of info.functions || []) {table.append(el("dt",t['matter_function_'+row.key] || t[row.key] || row.key),el("dd",t[row.reason] || t.guide_unknown));}
+    parent.append(table);
+    if(info.identity_changed && info.fingerprint) parent.append(button(t.reviewMatterIdentity,()=>{
+      const current=this.data; if(!current)return;
+      const groups=current.groups.filter(g=>g.members.includes(source.entity_id));
+      this.confirmRequest(parent,{name:source.name,confirmationOnly:true,note:`${t.matterIdentityNote}\n${source.name} · ${source.model || t.guide_unknown}\n${groups.map(g=>`${g.name}: ${t[g.linking?.enabled ? 'enabled':'disabled']}`).join('\n')}`,execute:async()=>{
+        if(!this.data)return;const status=el("p", "");parent.append(status);
+        try{await this._hass.callWS({type:"alarmmesh/matter_review",source:source.entity_id,identity:info.fingerprint,revision:current.matter_revision,confirmed:true});this.closeDialog();}catch(e){status.textContent=t[e.code] || t.error;}
+      }});
+    }));
+    parent.append(button(t.matterHelp,()=>this.go("matterHelp")));
+  }
+  renderMatterHelp(parent) {
+    const t=this.t;parent.append(el("p",t.matterHelpIntro,"notice"));
+    const steps=el("ol",undefined,"incident-flow");for(let i=1;i<=6;i++) steps.append(el("li",t['matterStep'+i]));parent.append(steps,el("p",t.matterTransportNote),el("p",t.matterRouteLimits));
+    for(const [url,label] of [[t.matterSetupUrl,t.matterSetupLink],[t.threadSetupUrl,t.threadSetupLink]]) {const link=el("a",label);link.href=url;link.target="_blank";link.rel="noopener noreferrer";parent.append(link,el("br"));}
+    parent.append(button(t.choose,()=>this.choose()),button(t.groups,()=>this.go("groups")),button(t.catalog,()=>this.go("catalog")));
+    if(this.data.matter_error) parent.append(el("p",t[this.data.matter_error] || t.error,"notice warning-text"));
+  }
   filterField(parent, label, key, value, choices, change) {
     const wrapper=el("label",label), field=el(choices ? "select" : "input");
     field.dataset.sticky=key; field.name=key;
@@ -954,11 +1039,11 @@ export class AlarmMeshPanel extends HTMLElement {
     if(!data.sources.length) return;
     const bar=el("div",undefined,"filter-bar device-filters"), results=el("section",undefined,"filtered-devices");
     const draw=()=> { results.replaceChildren(); const rows=data.sources.filter(s=>{
-      const h=s.capability?.details?.maintenance, attention=h?.fault===true || h?.battery_low===true || h?.battery_percent!=null && h.battery_percent<=20;
+      const h=s.capability?.details?.maintenance, attention=h?.end_of_service===true || h?.fault===true || h?.battery_low===true || h?.battery_percent!=null && h.battery_percent<=20;
       return (!f.name || s.name.toLocaleLowerCase().includes(f.name.toLocaleLowerCase())) && (!f.room || (s.area_id || "none")===f.room) && (!f.group || s.groups.includes(f.group)) && (!f.provider || (s.capability?.origin === "zigbee2mqtt" ? "mqtt" : s.capability?.origin || "unknown_origin")===f.provider) && (!f.status || (f.status==="unusable" ? ["UNREACHABLE","MISSING"].includes(s.status) : s.status===f.status)) && (!f.maintenance || (f.maintenance==="attention" ? attention : h?.fault==null && h?.battery_low==null && h?.battery_percent==null));
     }); if(!rows.length) results.append(el("p",t.noFilterResults,"notice")); else this.sourceList(results,rows); };
     const field=(label,key,choices)=>this.filterField(bar,label,`device-${key}`,f[key],choices,value=>{ f[key]=value; draw(); });
-    field(t.findDetector,"name"); field(t.room,"room",data.rooms.map(r=>[r.id || "none",r.name || t.noRoom])); field(t.groups,"group",data.groups.map(g=>[g.id,g.name])); field(t.provider,"provider",[["mqtt",t.zigbee2mqtt],["zha",t.zha],["unknown_origin",t.unknown_origin]]);
+    field(t.findDetector,"name"); field(t.room,"room",data.rooms.map(r=>[r.id || "none",r.name || t.noRoom])); field(t.groups,"group",data.groups.map(g=>[g.id,g.name])); field(t.provider,"provider",[["mqtt",t.zigbee2mqtt],["zha",t.zha],["matter",t.matter],["zwave_js",t.zwave_js],["unknown_origin",t.unknown_origin]]);
     field(t.state,"status",[["SMOKE_REPORTED",t.SMOKE_REPORTED],["unusable",t.unavailable],["UNKNOWN",t.UNKNOWN]]); field(t.maintenance,"maintenance",[["attention",t.attention],["unknown",t.missingInformation]]);
     bar.append(button(t.clearFilters,()=>{for(const key of Object.keys(f)) f[key]=""; this.render();})); parent.append(bar,results); draw();
   }
@@ -992,16 +1077,16 @@ export class AlarmMeshPanel extends HTMLElement {
     parent.append(section);
   }
   reminderForm(parent,detail) {
-    const t=this.t, source=this.data.sources.find(s=>s.entity_id===detail.id), saved=this.data.reminders.items.find(i=>i.source===detail.id), revision=this.data.reminders.revision;
+    const t=this.t, source=this.data.sources.find(s=>s.entity_id===detail.id), serverSaved=this.data.reminders.items.find(i=>i.source===detail.id), saved=detail.restoredDraft?.value || serverSaved, revision=detail.restoredDraft?.revision ?? this.data.reminders.revision;
     parent.append(el("h2",t.reminders),el("p",source?.name || detail.id),el("p",t.reminderNote));
     const form=el("form");form.noValidate=true;const enabled=this.checkField(form,t.enableReminder,saved?.enabled,"reminder-enabled");
     const label=el("label",t.nextReminder), when=el("input");when.type="date";when.name="reminder-date";const parts=new Intl.DateTimeFormat('en-CA',{timeZone:this.data.reminders.time_zone,year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());const part=key=>parts.find(p=>p.type===key)?.value;when.value=saved?.date || `${part('year')}-${part('month')}-${part('day')}`;label.append(when);form.append(label,el("p",`${t.reminderTime}: ${this.data.reminders.time_zone}`));
     const intervalLabel=el("label",t.repeatPreference), interval=el("select"); interval.name="reminder-interval";for(const days of [0,30,90,180,365]) {const o=el("option",days ? `${days} ${t.days}` : t.noRepeat);o.value=String(days);o.selected=days===(saved?.interval || 0);interval.append(o);} intervalLabel.append(interval);form.append(intervalLabel);
     const receiverLabel=el("label",t.recipient), receiver=el("select");receiver.name="reminder-recipient";const choices=this.data.automation?.recipients || [];const empty=el("option",t.chooseRecipient);empty.value="";empty.selected=!saved;receiver.append(empty);for(const row of choices) {const o=el("option",row.name || row.service);o.value=row.service;o.selected=row.service===saved?.recipient;receiver.append(o);}if(saved && !choices.some(r=>r.service===saved.recipient)){const o=el("option",`${saved.recipient} · ${t.recipient_unavailable}`);o.value=saved.recipient;o.selected=true;receiver.append(o);}receiverLabel.append(receiver);form.append(receiverLabel);
     const error=el("p","","form-error");error.setAttribute("role","alert");form.append(error);
-    const request=(operation,value)=>{if(!this.data){error.textContent=t.offline;return;}this.confirmRequest(form,{name:t.reminders,confirmationOnly:true,note:`${source?.name || detail.id}\n${operation === 'handle' ? t.handleReminder : operation==='snooze' ? t.snoozeReminder : operation==='delete' ? t.removeReminder : t.saveReminder}\n${operation === "save" ? value.date : operation === "snooze" ? value.date : saved?.date} · ${operation === "save" ? value.recipient : saved?.recipient}\n${t.enableReminder}: ${t[(operation === "save" ? value.enabled : saved?.enabled) ? "enabled" : "disabled"]}\n${t.repeatPreference}: ${(operation === "save" ? value.interval : saved?.interval) ? `${operation === "save" ? value.interval : saved?.interval} ${t.days}` : t.noRepeat}\n${t.reminderNote}`,execute:async()=>{if(!this.data){error.textContent=t.offline;return;}try{await this._hass.callWS({type:"alarmmesh/reminder",operation,source:detail.id,revision,value,confirmed:true});this.closeDialog();}catch(e){error.textContent=t[e.code] || t.error;}}});};
+    const request=(operation,value)=>{if(!this.data){error.textContent=t.offline;return;}this.confirmRequest(form,{name:t.reminders,confirmationOnly:true,note:`${source?.name || detail.id}\n${operation === 'handle' ? t.handleReminder : operation==='snooze' ? t.snoozeReminder : operation==='delete' ? t.removeReminder : t.saveReminder}\n${operation === "save" ? value.date : operation === "snooze" ? value.date : serverSaved?.date} · ${operation === "save" ? value.recipient : serverSaved?.recipient}\n${t.enableReminder}: ${t[(operation === "save" ? value.enabled : serverSaved?.enabled) ? "enabled" : "disabled"]}\n${t.repeatPreference}: ${(operation === "save" ? value.interval : serverSaved?.interval) ? `${operation === "save" ? value.interval : serverSaved?.interval} ${t.days}` : t.noRepeat}\n${t.reminderNote}`,execute:async()=>{if(!this.data){error.textContent=t.offline;return;}try{await this._hass.callWS({type:"alarmmesh/reminder",operation,source:detail.id,revision,value,confirmed:true});this.clearDraft();this.closeDialog();}catch(e){error.textContent=t[e.code] || t.error;}}});};
     const save=el("button",t.saveReminder,"button primary");save.type="submit";form.append(button(t.cancel,()=>this.closeDialog()),save);form.addEventListener("submit",event=>{event.preventDefault();if(form.querySelector('.request-confirmation')) return;if(!source?.reminder_identity || !when.value || !receiver.value){error.textContent=t.invalid_reminder;return;}request("save",{identity:source.reminder_identity,enabled:enabled.checked,date:when.value,interval:Number(interval.value),recipient:receiver.value});});
-    if(saved) form.append(button(t.snoozeReminder,()=>request("snooze",{date:when.value})),button(t.handleReminder,()=>request("handle",{})),button(t.removeReminder,()=>request("delete",{}),"button destructive")); parent.append(form);
+    if(serverSaved) form.append(button(t.snoozeReminder,()=>request("snooze",{date:when.value})),button(t.handleReminder,()=>request("handle",{})),button(t.removeReminder,()=>request("delete",{}),"button destructive")); this.trackDraft(form,revision,()=>({identity:source?.reminder_identity || saved?.identity,enabled:enabled.checked,date:when.value,interval:Number(interval.value),recipient:receiver.value})); parent.append(form);
   }
   copyForm(parent,detail) {
     const t=this.t, group=this.data.groups.find(g=>g.id===detail.id);if(!group) {parent.append(el("p",t.not_found));return;}
@@ -1020,6 +1105,7 @@ export class AlarmMeshPanel extends HTMLElement {
   async mutate(payload, error) {
     try {
       await this._hass.callWS({ type: "alarmmesh/group", ...payload });
+      this.clearDraft();
       this.closeDialog();
     } catch (err) { error.textContent = this.t[err.code] || this.t.error; }
   }

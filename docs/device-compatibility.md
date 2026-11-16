@@ -288,3 +288,13 @@ They are not authority to start a device test. The [incident guide](incident-fea
 adds a separately reviewed small set of button/select self-test contracts, their
 provider-specific prerequisites and unknown-result behavior. Existing external
 activation/stop profiles are unchanged. No physical acceptance is claimed.
+
+## Matter — current unpublished extension, checked 2026-11-16
+
+The five separately reviewed Matter variants and individual conditional functions
+are in the [Matter compatibility matrix](matter-support.md). They do not change
+the historical 52/67 Zigbee denominators or grant Matter sounder authority.
+Known model names alone never permit commands. Exact HA entity mappings and
+mock-only tests cover 2026.10.4 and 2026.11.1; no physical or commissioning claim
+is made. [Current results](matter-review.md) supersede historical counts only for
+this local working tree; earlier UI and hosted results are not new Matter evidence.

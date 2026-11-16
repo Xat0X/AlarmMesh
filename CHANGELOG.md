@@ -1,6 +1,25 @@
 # Changelog
 
-## Unreleased
+## 0.1.0-beta.8 — 2026-11-16
+
+- Add Z-Wave JS smoke sources and device health details in mixed groups. Z-Wave sounder control and remote self-test are unsupported.
+
+- Complete eight Matter browser combinations and actual reload-draft/virtual-self-test
+  flows. Correct readable Matter model names, EN/NL detail labels, standalone test
+  cancellation and long-name wrapping; preserve the original status rules.
+
+- Add HA-registry-only Matter sources, per-endpoint optional battery/fault/end-of-service,
+  test/interconnect/CO/mute information, provider/transport labels and NL/EN setup help.
+  Review HS1SA-M, S1-M, MS-1, MSC-1 and the distinct MS-1 Interlink variant separately.
+- Reuse mixed-provider groups and exact HA self-test buttons with mocked I/O checks
+  on 2026.10.4/2026.11.1. No Matter sounder, stop, mute, controller or dependency added.
+  Forwarded interconnect remains visible without becoming an independent output origin.
+- Pin Matter source identities; block execution after replacement until explicit
+  administrator review. Keep invalid saved CO-only selections unknown rather than smoke.
+- Preserve bounded local unsent group/settings/reminder drafts across browser reload,
+  with original revisions, identity checks and fresh confirmations. No autosubmit.
+- See [current results and remaining visual/physical acceptance](docs/matter-review.md).
+  Existing smoke rules, 79 status tests, identities and branding stay unchanged.
 
 ## 0.1.0-beta.7 — 2026-11-16
 
@@ -179,3 +198,11 @@ No smoke reported is not a safety guarantee. This beta does not replace certifie
 standalone smoke detectors. Historical development and acceptance evidence is
 retained under docs/; physical-device and production-upgrade acceptance remain
 separate from technical simulation checks.
+
+### 0.1.0-beta.8 — 2026-11-16
+
+- Add Z-Wave JS smoke sources and device health details in mixed groups. Z-Wave sounder control and remote self-test are unsupported. — Z-Wave JS sources
+
+- Add cached Z-Wave JS smoke sources, provider filtering, exact-device maintenance and setup help.
+- Reject overridden CO/heat/diagnostic sources, including invalid saved selections.
+- Add registry-only simulator and regression tests; no Z-Wave sounder, self-test or network commands.

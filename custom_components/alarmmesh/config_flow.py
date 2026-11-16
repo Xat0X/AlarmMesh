@@ -16,6 +16,7 @@ from homeassistant.core import HomeAssistant, callback, split_entity_id, valid_e
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import selector
 
+from . import matter, zwave
 from .const import CONF_SOURCE_ENTITY_IDS, DOMAIN, NAME
 
 
@@ -58,6 +59,17 @@ def _validate_sources(hass: HomeAssistant, sources: Any) -> str | None:
         if split_entity_id(entity_id)[0] != Platform.BINARY_SENSOR:
             return "wrong_domain"
         registered = registry.async_get(entity_id)
+        if (
+            registered
+            and registered.platform == "matter"
+            and (
+                matter.is_contract(registered, "co")
+                or matter.is_contract(registered, "interconnect_co")
+            )
+        ):
+            return "wrong_device_class"
+        if zwave.invalid_source(hass, entity_id):
+            return "wrong_device_class"
         state = hass.states.get(entity_id)
         if registered is None and state is None:
             return "unknown_entity"

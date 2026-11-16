@@ -16,6 +16,69 @@ lovelace:
 alarmmesh_simulation:
   incidents: true
 input_boolean:
+  zwave_smoke:
+    name: SIMULATED Z-Wave smoke
+    initial: false
+  zwave_co:
+    name: SIMULATED Z-Wave co
+    initial: false
+  zwave_fault:
+    name: SIMULATED Z-Wave fault
+    initial: false
+  zwave_battery_low:
+    name: SIMULATED Z-Wave battery_low
+    initial: false
+  zwave_unavailable:
+    name: SIMULATED Z-Wave unavailable
+    initial: false
+  matter_a_smoke:
+    name: SIMULATED Matter A smoke
+    initial: false
+  matter_a_co:
+    name: SIMULATED Matter A co
+    initial: false
+  matter_a_interconnect:
+    name: SIMULATED Matter A interconnect
+    initial: false
+  matter_a_test:
+    name: SIMULATED Matter A test
+    initial: false
+  matter_a_fault:
+    name: SIMULATED Matter A fault
+    initial: false
+  matter_a_expired:
+    name: SIMULATED Matter A expired
+    initial: false
+  matter_a_unavailable:
+    name: SIMULATED Matter A unavailable
+    initial: false
+  matter_a_battery_low:
+    name: SIMULATED Matter A battery_low
+    initial: false
+  matter_b_smoke:
+    name: SIMULATED Matter B smoke
+    initial: false
+  matter_b_co:
+    name: SIMULATED Matter B co
+    initial: false
+  matter_b_interconnect:
+    name: SIMULATED Matter B interconnect
+    initial: false
+  matter_b_test:
+    name: SIMULATED Matter B test
+    initial: false
+  matter_b_fault:
+    name: SIMULATED Matter B fault
+    initial: false
+  matter_b_expired:
+    name: SIMULATED Matter B expired
+    initial: false
+  matter_b_unavailable:
+    name: SIMULATED Matter B unavailable
+    initial: false
+  matter_b_battery_low:
+    name: SIMULATED Matter B battery_low
+    initial: false
   catalog_battery_low:
     name: SIMULATION B battery 14 percent
     initial: false

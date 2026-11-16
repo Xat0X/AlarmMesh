@@ -38,3 +38,32 @@ views:
           - input_boolean.incident_notify_failure
           - input_select.incident_test_result
           - sensor.incident_simulated_requests
+
+      - type: entities
+        title: SIMULATED Matter - registry fixture, no controller or network
+        entities:
+          - input_boolean.matter_a_smoke
+          - input_boolean.matter_a_co
+          - input_boolean.matter_a_interconnect
+          - input_boolean.matter_a_test
+          - input_boolean.matter_a_fault
+          - input_boolean.matter_a_expired
+          - input_boolean.matter_a_unavailable
+          - input_boolean.matter_a_battery_low
+          - input_boolean.matter_b_smoke
+          - input_boolean.matter_b_co
+          - input_boolean.matter_b_interconnect
+          - input_boolean.matter_b_test
+          - input_boolean.matter_b_fault
+          - input_boolean.matter_b_expired
+          - input_boolean.matter_b_unavailable
+          - input_boolean.matter_b_battery_low
+
+      - type: entities
+        title: SIMULATED Z-Wave JS - no controller or radio
+        entities:
+          - input_boolean.zwave_smoke
+          - input_boolean.zwave_co
+          - input_boolean.zwave_fault
+          - input_boolean.zwave_battery_low
+          - input_boolean.zwave_unavailable

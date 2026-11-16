@@ -27,3 +27,17 @@ Sirens, notifications or alarm propagation would each need a **new assignment**,
 explicit user intent, a dedicated design and independent simulation/physical
 acceptance boundaries. No action interface, adapter, capability field or runtime
 hook for those proposals is created here.
+
+## Current Matter assignment and next bounded steps
+
+A later explicit assignment implements [HA-only Matter support and local drafts](matter-support.md)
+in the local working tree. That supersedes the old planning boundary above only
+for this requested scope. Existing incident engines and provider contracts are
+reused; no future command adapters have been prepared.
+
+| Next step | Scope and dependency | Acceptance | Excluded |
+| --- | --- | --- | --- |
+| Finish Matter visual review | Supported browser access to the owned 8131 simulator; NL/EN, light/dark, phone/tablet | Inspect screenshots of details, mixed groups, exact test confirmation, missing controls, long names and draft restore; all eight combinations | Physical output, production access |
+| Record one exact model's actual HA exposes | Separately authorized, read-only owner observation with aliases and firmware/provider versions | Compare documented functions with actual endpoint entities, record absent attributes and unknown transport honestly | Commissioning, network data export, actuation |
+| Plan physical acceptance separately | Explicit scope and manufacturer-prescribed procedure before any test | Distinguish requested command, activity and explicit result; smoke detection and radio loss require their own evidence | Automatic execution or inferred success |
+| Review any future Matter control | Only after an actual supported HA route exists for a named function/model | Primary evidence, exact identity binding, fail-closed fixture tests and independent acceptance | Generic cluster commands, Identify/mute/test as sounder substitutes |

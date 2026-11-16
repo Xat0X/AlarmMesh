@@ -8,6 +8,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 
+from . import matter, zwave
 from .catalog import action_profile, recognize
 from .const import DOMAIN
 from .profiles import PROFILES
@@ -43,7 +44,7 @@ class Capabilities:
         self.hass = hass
 
     def source_identity_changed(self, source: str) -> bool:
-        """Positive identity contradictions block execution; absence is not release."""
+        """Identity/provenance contradictions block execution, never clear smoke."""
         entity = er.async_get(self.hass).async_get(source)
         state = self.hass.states.get(source)
         device_class = (
@@ -55,6 +56,15 @@ class Capabilities:
             source.partition(".")[0] != "binary_sensor"
             or (entity is not None and entity.platform == DOMAIN)
             or (device_class is not None and device_class != "smoke")
+            or zwave.invalid_source(self.hass, source)
+            or entity is not None
+            and entity.platform == "matter"
+            and (
+                matter.identity_changed(self.hass, source)
+                or matter.is_contract(entity, "co")
+                or matter.is_contract(entity, "interconnect_co")
+                or matter.interconnect_unseparated(self.hass, source)
+            )
         )
 
     def related(self, source: str) -> tuple:
@@ -107,14 +117,31 @@ class Capabilities:
         )
         origin = (
             entity.platform
-            if entity and entity.platform in {"mqtt", "zha"}
+            if entity and entity.platform in {"mqtt", "zha", "matter", "zwave_js"}
             else "unknown_origin"
         )
         if entity and self.mqtt_property(source, "smoke"):
             origin = "zigbee2mqtt"
-        model = (device.model_id or device.model or "") if device else ""
+        model = (
+            (
+                (device.model or "")
+                if origin in {"matter", "zwave_js"}
+                else (device.model_id or device.model or "")
+            )
+            if device
+            else ""
+        )
         vendor = (device.manufacturer or "") if device else ""
-        return entity, device, origin, model, vendor, recognize(origin, model, vendor)
+        catalog = recognize(origin, model, vendor)
+        if (
+            origin == "matter"
+            and catalog
+            and catalog.get("product_id") is not None
+            and device.model_id
+            and str(device.model_id) != str(catalog["product_id"])
+        ):
+            catalog = None
+        return entity, device, origin, model, vendor, catalog
 
     def bound(self, source: str) -> tuple:
         entity = er.async_get(self.hass).async_get(source)
@@ -128,6 +155,14 @@ class Capabilities:
         )
 
     def _property(self, source: str, origin: str, key: str) -> tuple:
+        if origin == "zwave_js":
+            return ()  # Never infer test/control contracts from translation keys.
+        if origin == "matter":
+            return (
+                matter.properties(self.hass, source, key)
+                if key in matter.CONTRACTS
+                else ()
+            )
         return (
             self.mqtt_property(source, key)
             if origin == "zigbee2mqtt"
@@ -138,6 +173,8 @@ class Capabilities:
         """Only observed test status is read; commands/settings are never executed."""
         _, _, origin, _, _, catalog = self.metadata(source)
         flags = {"test": ["on"]}
+        if origin == "matter":
+            flags["test_in_progress"] = ["on"]
         if origin == "zigbee2mqtt" and catalog:
             flags.update(catalog["test_flags"])
         if origin == "zha":
@@ -178,7 +215,17 @@ class Capabilities:
             "halo_test_result",
             "smoke_level",
         }
-        if origin == "zigbee2mqtt":
+        if origin == "matter":
+            maintenance["end_of_service"] = None
+            entities = [
+                (key, e)
+                for key in matter.CONTRACTS
+                if key not in {"smoke", "self_test_request", "battery_charge_low"}
+                for e in matter.properties(self.hass, source, key)
+            ]
+        elif origin == "zwave_js":
+            entities = zwave.properties(self.hass, source)
+        elif origin == "zigbee2mqtt":
             props = (
                 catalog["providers"][origin]["information"]
                 if catalog
@@ -235,6 +282,8 @@ class Capabilities:
                 if key == "battery_low"
                 else "fault"
                 if key in {"fault", "fault_state", "trouble"}
+                else "end_of_service"
+                if key == "end_of_service"
                 else None
             )
             if flag and e.domain == "binary_sensor" and value in {"on", "off"}:
@@ -270,6 +319,30 @@ class Capabilities:
             "kind": catalog["kind"] if catalog else None,
             "details": self.details(source),
         }
+        if origin == "zwave_js":
+            result.update(
+                zwave=zwave.describe(self.hass, source),
+                kind="smoke",
+                reason="source_identity_changed"
+                if self.source_identity_changed(source)
+                else "zwave_observation_only",
+            )
+            return result
+        if origin == "matter":
+            info = matter.describe(self.hass, source)
+            result.update(
+                matter=info,
+                reason="matter_identity_changed"
+                if info["identity_changed"]
+                else "matter_interconnect_unseparated"
+                if info["origin_separation_missing"]
+                else "matter_interconnect_origin"
+                if info["source_kind"] == "interconnect_smoke"
+                else "matter_origin_unknown"
+                if info["source_kind"] != "local_smoke"
+                else "matter_no_sounder_route",
+            )
+            return result
         if not device or not entity or entity.disabled_by:
             return result
         source_state = self.hass.states.get(source)

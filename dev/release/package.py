@@ -46,12 +46,18 @@ REQUIRED_FILES = FOUNDATION_FILES | {
     "diagnostics.py",
     "activity.py",
     "reminders.py",
+    "matter.py",
+    "zwave.py",
     "panel.py",
     "frontend/panel.js",
     "frontend/panel.css",
     "frontend/translations.js",
+    "frontend/drafts.js",
 }
 CATALOG_FILES = REQUIRED_FILES - {
+    "frontend/drafts.js",
+    "matter.py",
+    "zwave.py",
     "activity.py",
     "reminders.py",
     "automation.py",

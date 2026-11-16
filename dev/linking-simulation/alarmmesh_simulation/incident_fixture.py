@@ -1,5 +1,9 @@
 """No transport/phones/sound: explicit mock self-check and notification endpoints."""
 
+import json
+from pathlib import Path
+
+from homeassistant.const import EVENT_HOMEASSISTANT_STARTED
 from homeassistant.core import callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry as dr
@@ -15,6 +19,57 @@ async def async_setup_incidents(hass, entry):
     calls = []
     registry = er.async_get(hass)
     tests = {}
+    from .matter_fixture import async_setup_matter_fixture
+
+    matter_tests = await async_setup_matter_fixture(hass, entry)
+    from .zwave_fixture import async_setup_zwave_fixture
+
+    await async_setup_zwave_fixture(hass, entry)
+
+    async def audit_started(_event):
+        """Local mock-only evidence, without account data or raw HA snapshots."""
+        alarmmesh = hass.config_entries.async_entries("alarmmesh")
+        panel = alarmmesh[0].runtime_data.panel if alarmmesh else None
+        state = panel.snapshot() if panel else None
+        helpers = hass.states.async_all("input_boolean")
+        owner = next(
+            e
+            for e in hass.config_entries.async_entries("matter")
+            if e.unique_id == "alarmmesh_simulation_registry_only"
+        )
+        evidence = {
+            "scope": "mock simulator only, no physical validation",
+            "helpers": len(helpers),
+            "helpers_all_off": bool(helpers) and all(s.state == "off" for s in helpers),
+            "test_result_idle": hass.states.is_state(
+                "input_select.incident_test_result", "idle"
+            ),
+            "matter_owner_ignored": owner.source == "ignore" and owner.data == {},
+            "matter_controller_loaded": "matter" in hass.config.components,
+            "selected_sources": len(state["sources"]) if state else 0,
+            "selected_smoke_off": bool(state)
+            and all(s["ha_state"] == "off" for s in state["sources"]),
+            "linking_off": not state
+            or not any(g["linking"]["enabled"] for g in state["groups"]),
+            "scripts_off": not state
+            or not any(g.get("actions", {}).get("enabled") for g in state["groups"]),
+            "notifications_off": not state
+            or not state["automation"]["settings"]["enabled"],
+            "maintenance_off": not state
+            or not state["maintenance"]["settings"]["enabled"],
+            "reminders_off": not state
+            or not any(r["enabled"] for r in state["reminders"]["items"]),
+            "no_active_selftest": panel is None or panel.selftests._request is None,
+        }
+        await hass.async_add_executor_job(
+            Path(hass.config.path("alarmmesh-simulation-audit.json")).write_text,
+            json.dumps(evidence, indent=2),
+            "utf-8",
+        )
+
+    entry.async_on_unload(
+        hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, audit_started)
+    )
     for name, prop, provider in (
         ("a", "trigger_selftest", "mqtt"),
         ("b", "selftest", "mqtt"),
@@ -92,6 +147,16 @@ async def async_setup_incidents(hass, entry):
             raise HomeAssistantError("Deliberate simulated notification failure")
 
     async def press(call):
+        if call.data.get("entity_id") in matter_tests:
+            calls.append({"kind": "selftest", "target": call.data["entity_id"]})
+            await hass.services.async_call(
+                "input_boolean",
+                "turn_on",
+                {"entity_id": matter_tests[call.data["entity_id"]]},
+                blocking=True,
+            )
+            update()
+            return
         if call.data.get("entity_id") not in tests:
             raise HomeAssistantError("Only explicit simulated test buttons")
         calls.append({"kind": "selftest", "target": call.data["entity_id"]})

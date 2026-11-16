@@ -513,3 +513,41 @@ Primary references rechecked **2026-11-15**:
 [event helper lifecycle](https://contributors.home-assistant.io/core/integrations/events/),
 and [Bosch BSD-2 broadcast limitations](https://www.zigbee2mqtt.io/devices/BSD-2.html).
 No provider contract or prerequisite is expanded by this presentation work.
+
+## Matter and local drafts (current review)
+
+[The Matter guide and matrix](matter-support.md) records endpoint-bound HA-only
+support on 2026.10.4/2026.11.1. No optional Matter module is imported: installations
+without Matter remain supported. Recognition distinguishes provider from transport;
+registered diagnostic identities may establish Thread/Wi-Fi, but their network
+values are never read. Missing evidence remains unknown. Local SmokeState and
+forwarded interconnect have separate execution provenance; both remain visible in
+the existing smoke calculation. CO-only registry contracts are rejected, including
+when found in invalid previously saved selections. No CO engine is added.
+
+`matter.py` centralizes the reviewed HA description/unique-ID contracts. Candidate
+functions require matching provider, config entry, device, opaque prefix and
+endpoint. The existing self-test resolver uses the standard HA button only; no
+new dispatcher, controller, sounder/stop/mute profile or dependency is introduced.
+The official HA-class compatibility check replaces device I/O with mocks; the
+registry stage replaces the ignored empty-data Matter owner's setup only.
+It never starts Matter Server.
+
+`MatterSources` uses HA Store version/schema 1, key
+`alarmmesh.matter_sources.<entry>`, for at most 256 source identity hashes and an
+optimistic revision. Source options and config-entry version are unchanged.
+Initial selected existing identities are pinned; replacements or delayed new
+identities require explicit administrator review. Device identifiers are included
+in the hash. Corruption blocks Matter execution while current read-only reports
+remain visible. Exact confirmation/revision/identity are rechecked under a lock;
+close drains that lock, detaches the owner and blocks future writes. Entry removal
+removes this separate store. Existing source/control subscriptions handle updates
+and teardown; no polling or heartbeat is added.
+
+`frontend/drafts.js` stores only allowlisted form input, local to HA origin/user/
+entry/target, with a two-hour TTL and five-draft bound. It is independent of device
+state. Full reload restoration is explicit, retains the original server revision,
+and compares current identity/choice signatures. It restores no confirmations,
+request IDs or execution rights. Invalid/misaddressed/oversized data is rejected;
+account switching, successful save and explicit discard clear it. Existing
+background updates still preserve open forms. See [review evidence](matter-review.md).

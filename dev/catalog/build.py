@@ -51,6 +51,26 @@ def table(snapshot: dict) -> str:
             f"| [{entry['vendor']} {entry['model']}]({url}) | {aliases} "
             f"| {entry['kind']} | {profiles[0]} | {profiles[1]} |"
         )
+    lines.extend(
+        [
+            "",
+            "## Matter (separate provider review)",
+            "",
+            "The 52/67 counts above describe the unchanged Z2M website inventory. "
+            "Matter evidence uses the same snapshot; "
+            "no entry authorizes a sounder. "
+            "See [Matter capability matrix](matter-support.md).",
+            "",
+            "| Model | Region / variant | HA route |",
+            "| --- | --- | --- |",
+        ]
+    )
+    for entry in snapshot.get("matter_entries", []):
+        lines.append(
+            f"| {entry['vendor']} {entry['model']} | {entry['region']} "
+            "| Smoke + optional endpoint-scoped information / "
+            "conditional self-test button; no sounder |"
+        )
     return "\n".join(lines) + "\n"
 
 

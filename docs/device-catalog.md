@@ -58,3 +58,15 @@ Generated from [the reviewed snapshot](../dev/catalog/review.json). Use [the gui
 | [Woox R7049](https://www.zigbee2mqtt.io/devices/R7049.html) | — | smoke | No reviewed action | No reviewed action |
 | [Xiaomi JTYJ-GD-01LM/BW](https://www.zigbee2mqtt.io/devices/JTYJ-GD-01LM_BW.html) | Xiaomi YTC4020RT | smoke | No reviewed action | No reviewed action |
 | [eWeLink CK-TLSR8656-SS5-01(7035)](https://www.zigbee2mqtt.io/devices/CK-TLSR8656-SS5-01(7035).html) | eWeLink CK-TLSR8656-Z123SE22DY-01(7035) | smoke | No reviewed action | No reviewed action |
+
+## Matter (separate provider review)
+
+The 52/67 counts above describe the unchanged Z2M website inventory. Matter evidence uses the same snapshot; no entry authorizes a sounder. See [Matter capability matrix](matter-support.md).
+
+| Model | Region / variant | HA route |
+| --- | --- | --- |
+| Heiman HS1SA-M | Europe / China; do not substitute Zigbee HS1SA-E | Smoke + optional endpoint-scoped information / conditional self-test button; no sounder |
+| Heiman S1-M | USA; S1-TM is a separate model | Smoke + optional endpoint-scoped information / conditional self-test button; no sounder |
+| Sensereo MS-1 | Original MS-1; not MS-1 Interlink | Smoke + optional endpoint-scoped information / conditional self-test button; no sounder |
+| Sensereo MSC-1 | Smoke portion only; CO remains separate | Smoke + optional endpoint-scoped information / conditional self-test button; no sounder |
+| Sensereo MS-1 Interlink | Separate July 2026 variant; native Interlink is not AlarmMesh permission | Smoke + optional endpoint-scoped information / conditional self-test button; no sounder |

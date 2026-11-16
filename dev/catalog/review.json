@@ -5238,5 +5238,300 @@
       },
       "physical_tested": false
     }
+  ],
+  "matter_entries": [
+    {
+      "id": "matter-heiman-hs1sa-m",
+      "vendor": "Heiman",
+      "model": "HS1SA-M",
+      "models": [
+        "HS1SA-M"
+      ],
+      "vendors": [
+        "HEIMAN",
+        "Shenzhen Heiman Technology Co.,Ltd."
+      ],
+      "product_id": null,
+      "vendor_id": null,
+      "region": "Europe / China; do not substitute Zigbee HS1SA-E",
+      "kind": "smoke",
+      "aliases": [],
+      "physical_tested": false,
+      "checked": "2026-11-16",
+      "tested_ha": [
+        "2026.10.4",
+        "2026.11.1"
+      ],
+      "evidence_level": "HA fixture and offline HA-description checks; not physical",
+      "providers": {
+        "matter": {
+          "detection": "documented",
+          "information": [
+            "battery",
+            "battery_low",
+            "fault",
+            "end_of_service",
+            "test_in_progress",
+            "muted",
+            "interconnect_smoke"
+          ],
+          "activation": "not_available",
+          "stop": "not_authorized",
+          "self_test": "conditional_request",
+          "profile": null,
+          "requirements": [
+            "Use an existing HA Matter smoke binary sensor. Optional information and SelfTestRequest require actual same-endpoint HA entities.",
+            "The self-test button is accepted-command dependent; no model name grants a command."
+          ],
+          "gaps": [
+            "No reviewed HA sounder/own-stop route; Identify and mute are not substitutes.",
+            "No reliable request-correlated terminal self-test result in the pinned HA mapping.",
+            "Transport stays unknown without reliable HA diagnostic metadata; a bridge is labelled separately."
+          ],
+          "sources": [
+            "https://www.heimantech.com/product/smart-mini-smoke-sensor-heiman-hs1sa-series",
+            "https://www.home-assistant.io/integrations/heiman/",
+            "https://github.com/home-assistant/core/blob/2026.11.1/homeassistant/components/matter/binary_sensor.py",
+            "https://github.com/home-assistant/core/blob/2026.11.1/homeassistant/components/matter/button.py"
+          ]
+        }
+      },
+      "native_interconnect": false
+    },
+    {
+      "id": "matter-heiman-s1-m",
+      "vendor": "Heiman",
+      "model": "S1-M",
+      "models": [
+        "S1-M"
+      ],
+      "vendors": [
+        "HEIMAN",
+        "Shenzhen Heiman Technology Co.,Ltd."
+      ],
+      "product_id": null,
+      "vendor_id": null,
+      "region": "USA; S1-TM is a separate model",
+      "kind": "smoke",
+      "aliases": [],
+      "physical_tested": false,
+      "checked": "2026-11-16",
+      "tested_ha": [
+        "2026.10.4",
+        "2026.11.1"
+      ],
+      "evidence_level": "HA fixture and offline HA-description checks; not physical",
+      "providers": {
+        "matter": {
+          "detection": "documented",
+          "information": [
+            "battery",
+            "battery_low",
+            "fault",
+            "end_of_service",
+            "test_in_progress",
+            "muted",
+            "interconnect_smoke"
+          ],
+          "activation": "not_available",
+          "stop": "not_authorized",
+          "self_test": "conditional_request",
+          "profile": null,
+          "requirements": [
+            "Use an existing HA Matter smoke binary sensor. Optional information and SelfTestRequest require actual same-endpoint HA entities.",
+            "The self-test button is accepted-command dependent; no model name grants a command."
+          ],
+          "gaps": [
+            "No reviewed HA sounder/own-stop route; Identify and mute are not substitutes.",
+            "No reliable request-correlated terminal self-test result in the pinned HA mapping.",
+            "Transport stays unknown without reliable HA diagnostic metadata; a bridge is labelled separately."
+          ],
+          "sources": [
+            "https://www.heimantech.com/product/smart-smoke-fire-alarm-s1-series",
+            "https://www.home-assistant.io/integrations/heiman/",
+            "https://github.com/home-assistant/core/blob/2026.11.1/homeassistant/components/matter/binary_sensor.py",
+            "https://github.com/home-assistant/core/blob/2026.11.1/homeassistant/components/matter/button.py"
+          ]
+        }
+      },
+      "native_interconnect": false
+    },
+    {
+      "id": "matter-sensereo-ms1",
+      "vendor": "Sensereo",
+      "model": "MS-1",
+      "models": [
+        "MS-1",
+        "MS1",
+        "LZ-1956Z"
+      ],
+      "vendors": [
+        "Sensereo",
+        "SENSEREO LIMITED"
+      ],
+      "product_id": 1,
+      "vendor_id": 5526,
+      "region": "Original MS-1; not MS-1 Interlink",
+      "kind": "smoke",
+      "aliases": [],
+      "physical_tested": false,
+      "checked": "2026-11-16",
+      "tested_ha": [
+        "2026.10.4",
+        "2026.11.1"
+      ],
+      "evidence_level": "HA fixture and offline HA-description checks; not physical",
+      "providers": {
+        "matter": {
+          "detection": "documented",
+          "information": [
+            "battery",
+            "battery_low",
+            "fault",
+            "end_of_service",
+            "test_in_progress",
+            "muted",
+            "interconnect_smoke"
+          ],
+          "activation": "not_available",
+          "stop": "not_authorized",
+          "self_test": "conditional_request",
+          "profile": null,
+          "requirements": [
+            "Use an existing HA Matter smoke binary sensor. Optional information and SelfTestRequest require actual same-endpoint HA entities.",
+            "The self-test button is accepted-command dependent; no model name grants a command."
+          ],
+          "gaps": [
+            "No reviewed HA sounder/own-stop route; Identify and mute are not substitutes.",
+            "No reliable request-correlated terminal self-test result in the pinned HA mapping.",
+            "Transport stays unknown without reliable HA diagnostic metadata; a bridge is labelled separately."
+          ],
+          "sources": [
+            "https://csa-iot.org/csa_product/ms1/",
+            "https://www.home-assistant.io/blog/2026/05/28/sensereo-joins-works-with-home-assistant/",
+            "https://github.com/home-assistant/core/blob/2026.11.1/homeassistant/components/matter/binary_sensor.py",
+            "https://github.com/home-assistant/core/blob/2026.11.1/homeassistant/components/matter/button.py"
+          ]
+        }
+      },
+      "native_interconnect": false
+    },
+    {
+      "id": "matter-sensereo-msc1",
+      "vendor": "Sensereo",
+      "model": "MSC-1",
+      "models": [
+        "MSC-1",
+        "AK-960SCM"
+      ],
+      "vendors": [
+        "Sensereo",
+        "SENSEREO LIMITED"
+      ],
+      "product_id": 2,
+      "vendor_id": 5526,
+      "region": "Smoke portion only; CO remains separate",
+      "kind": "smoke_co",
+      "aliases": [],
+      "physical_tested": false,
+      "checked": "2026-11-16",
+      "tested_ha": [
+        "2026.10.4",
+        "2026.11.1"
+      ],
+      "evidence_level": "HA fixture and offline HA-description checks; not physical",
+      "providers": {
+        "matter": {
+          "detection": "documented",
+          "information": [
+            "battery",
+            "battery_low",
+            "fault",
+            "end_of_service",
+            "test_in_progress",
+            "muted",
+            "interconnect_smoke"
+          ],
+          "activation": "not_available",
+          "stop": "not_authorized",
+          "self_test": "conditional_request",
+          "profile": null,
+          "requirements": [
+            "Use an existing HA Matter smoke binary sensor. Optional information and SelfTestRequest require actual same-endpoint HA entities.",
+            "The self-test button is accepted-command dependent; no model name grants a command."
+          ],
+          "gaps": [
+            "No reviewed HA sounder/own-stop route; Identify and mute are not substitutes.",
+            "No reliable request-correlated terminal self-test result in the pinned HA mapping.",
+            "Transport stays unknown without reliable HA diagnostic metadata; a bridge is labelled separately."
+          ],
+          "sources": [
+            "https://csa-iot.org/csa_product/msc-1/",
+            "https://www.home-assistant.io/blog/2026/05/28/sensereo-joins-works-with-home-assistant/",
+            "https://github.com/home-assistant/core/blob/2026.11.1/homeassistant/components/matter/binary_sensor.py",
+            "https://github.com/home-assistant/core/blob/2026.11.1/homeassistant/components/matter/button.py"
+          ]
+        }
+      },
+      "native_interconnect": false
+    },
+    {
+      "id": "matter-sensereo-ms1-interlink",
+      "vendor": "Sensereo",
+      "model": "MS-1 Interlink",
+      "models": [
+        "MS-1 Interlink"
+      ],
+      "vendors": [
+        "Sensereo",
+        "SENSEREO LIMITED"
+      ],
+      "product_id": null,
+      "vendor_id": 5526,
+      "region": "Separate July 2026 variant; native Interlink is not AlarmMesh permission",
+      "kind": "smoke",
+      "aliases": [],
+      "physical_tested": false,
+      "checked": "2026-11-16",
+      "tested_ha": [
+        "2026.10.4",
+        "2026.11.1"
+      ],
+      "evidence_level": "HA fixture and offline HA-description checks; not physical",
+      "providers": {
+        "matter": {
+          "detection": "documented",
+          "information": [
+            "battery",
+            "battery_low",
+            "fault",
+            "end_of_service",
+            "test_in_progress",
+            "muted",
+            "interconnect_smoke"
+          ],
+          "activation": "not_available",
+          "stop": "not_authorized",
+          "self_test": "conditional_request",
+          "profile": null,
+          "requirements": [
+            "Use an existing HA Matter smoke binary sensor. Optional information and SelfTestRequest require actual same-endpoint HA entities.",
+            "The self-test button is accepted-command dependent; no model name grants a command."
+          ],
+          "gaps": [
+            "No reviewed HA sounder/own-stop route; Identify and mute are not substitutes.",
+            "No reliable request-correlated terminal self-test result in the pinned HA mapping.",
+            "Transport stays unknown without reliable HA diagnostic metadata; a bridge is labelled separately."
+          ],
+          "sources": [
+            "https://sensereo.com/product/ms-1/",
+            "https://www.home-assistant.io/blog/2026/05/28/sensereo-joins-works-with-home-assistant/",
+            "https://github.com/home-assistant/core/blob/2026.11.1/homeassistant/components/matter/binary_sensor.py",
+            "https://github.com/home-assistant/core/blob/2026.11.1/homeassistant/components/matter/button.py"
+          ]
+        }
+      },
+      "native_interconnect": true
+    }
   ]
 }

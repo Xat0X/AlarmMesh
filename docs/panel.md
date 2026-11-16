@@ -211,3 +211,18 @@ disconnect disables execution without losing the draft. Self-test confirmations
 follow only their own request's activity/result. Incident details also show groups
 and sources still awaiting explicit no-smoke values. See the
 [finishing review](finish-review.md) for current evidence and open visual checks.
+
+## Matter and local drafts — current unpublished review
+
+Matter smoke entities can join the existing source selection and mixed-provider
+groups. Detector details show endpoint functions, honest transport information,
+separate CO/interconnect information and optional explicit HA self-test requests.
+There is no reviewed Matter sounder, stop or mute action. A completed request is
+not a passed physical test. Follow [Matter setup, model matrix and limitations](matter-support.md)
+and [current automated/visual evidence](matter-review.md).
+
+The main configuration forms can keep an unsent local draft through a full browser
+reload. Continue or discard it explicitly; it expires after two hours and never
+restores confirmation. If identities changed, discard and reopen; if another
+browser saved first, the original revision is still rejected. Private browser
+storage may not retain drafts. See the guide for exact fields and privacy limits.

@@ -1,5 +1,6 @@
 """Read-only hypothetical analysis. No writes, incident updates or HA actions."""
 
+from . import matter
 from .automation import (
     DEFAULT_ACTIONS,
     AutomationError,
@@ -25,6 +26,10 @@ def group_preview(panel, group_id: str, source: str) -> dict:
     source_ok = (
         source in selected
         and not engine.capabilities.source_identity_changed(source)
+        and (
+            engine.capabilities.metadata(source)[2] != "matter"
+            or matter.origin_allowed(panel.hass, source)
+        )
         and (not engine.capabilities.test_blocked(source) or independent(source))
     )
     active = engine.active | {source} if source_ok else set(engine.active)

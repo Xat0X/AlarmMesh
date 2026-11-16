@@ -15,6 +15,7 @@ from homeassistant.helpers.event import async_call_later, async_track_state_chan
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
+from . import matter
 from .automation import AutomationError
 from .capabilities import Capabilities
 from .status import SourceStatus
@@ -151,9 +152,19 @@ class SelfTests:
             profile = MQTT_TESTS.get(catalog["model"])
         elif origin == "zha" and (vendor, model) == ("LUMI", "lumi.sensor_smoke.acn03"):
             profile = ZHA_TEST
+        elif origin == "matter" and matter.origin_allowed(self.hass, source):
+            profile = TestProfile(
+                "self_test_request",
+                flag=None,
+                source_url=matter.HA_SOURCE + "button.py",
+            )
         else:
             return None
-        if profile is None or str(device.sw_version) in {"21", "0021", "0.0.0_0021"}:
+        if (
+            profile is None
+            or origin != "matter"
+            and str(device.sw_version) in {"21", "0021", "0.0.0_0021"}
+        ):
             return None
         rows = [
             e
@@ -184,6 +195,14 @@ class SelfTests:
             if profile.flag
             else []
         )
+        if origin == "matter":
+            flags = [
+                e.entity_id
+                for e in self.cap._property(source, origin, "test_in_progress")
+                if e.domain == "binary_sensor"
+            ]
+            if len(flags) > 1:
+                return None
         results = (
             [
                 e.entity_id
@@ -249,6 +268,8 @@ class SelfTests:
 
     def independent_source(self, source, *, cache=True):
         # These contracts expose smoke separately from self-test/linkage status.
+        if self.cap.metadata(source)[2] == "matter":
+            return matter.origin_allowed(self.hass, source)
         if self.resolve(source, cache=cache) is not None:
             return True
         entity, device, origin, model, vendor, _ = self.cap.metadata(source)
