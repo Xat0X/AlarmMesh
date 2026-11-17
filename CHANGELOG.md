@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.0-beta.10 — 2026-11-17
+
+- Offer source recovery directly beside missing, unavailable or identity-changed sources; verify actual memberships after interrupted saves without automatic retry.
+- Simplify phone-first navigation: one first-use action, a compact overview and
+  named missing sources in the status card. Keep smoke visible inside all dialogs.
+- Put detector alarm routes and notification settings within two navigation clicks;
+  keep optional group outputs and technical details behind explicit disclosures.
+- Improve source recovery steps, duplicate-name identification, notification preview,
+  touch targets, keyboard focus and narrow-screen layout in Dutch and English.
+- Preserve beta.9 recovery reconciliation, confirmations, permissions and status rules.
+  See the [local morning review](docs/morning-review.md) for evidence and limits.
+
 ## 0.1.0-beta.9 — 2026-11-17
 
 - After a lost recovery acknowledgement, show actual group memberships on reconnect without resubmitting.

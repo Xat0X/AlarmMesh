@@ -25,10 +25,16 @@ Local development adds [separate maintenance messages, read-only group action
 examples and anonymized diagnosis](maintenance-tools.md) within the existing
 navigation. All new automatic delivery starts off; no existing setting is enabled.
 
-- **Overview** shows the shared current smoke result, usable/selected source
+- **Overview** starts with one **Choose sources** action when no detector is selected.
+  Once configured, **Set up and check** is collapsed. The source, room and group
+  counts are direct navigation buttons; missing sources are named in the status card.
+  It shows the shared current smoke result, usable/selected source
   counts, assigned room count, group count, attention items and room cards.
   Active smoke is prominent and names the reporting detector and assigned room.
-- **Detectors** lists only selected sources. Open a row for the real HA state,
+- **Detectors** lists only selected sources. Search is immediately available;
+  additional filters are under **More filters**. Each row has **View alarm route**.
+  Technical details are collapsed in the detector dialog; duplicate names in the
+  same area include their source ID so they remain distinguishable. Open a row for the real HA state,
   source entity, assigned area, known device/model/manufacturer and groups. The
   Home Assistant button opens HA's entity information. No model, battery level or
   radio-contact time is guessed. Available cached diagnostics are shown when HA exposes them; missing data stays unavailable.
@@ -38,9 +44,17 @@ navigation. All new automatic delivery starts off; no existing setting is enable
 - **Groups** lets administrators create, rename, edit memberships and delete an
   organizational group. A detector can belong to several groups. Deleting asks
   for confirmation and does not delete any source. Empty groups are allowed.
+  A new group starts with its name and members. **Optional sounding and actions**
+  contains the existing origin, sounder and script controls.
   **Sound together** is optional and off by default. Choose exact controls, review
   the source-to-target preview and acknowledge its limits before saving. The
   [linking guide](linked-sounding.md) lists profiles and stopping restrictions.
+
+**Settings** starts with phone notifications, their saved availability and a
+**Configure notifications** button. The form shows the message preview and delivery
+timing. Saving a recipient while incident notifications are disabled does not enable
+automatic delivery. Installation, catalog and diagnostic tools remain available under
+**Installation and technical help**.
 
 Names are trimmed, nonempty and at most 64 characters. A group can contain at
 most 256 distinct references; at most 100 groups are stored. If another browser
@@ -261,3 +275,9 @@ The self-test dialog's **Refresh data** fetches a fresh authenticated snapshot,
 rechecks whether the test is available and clears the previous acknowledgement.
 It never sends a test request. Only the dialog's own request ID can display a result.
 These are software controls, not physical-device validation.
+
+## Local usability review
+
+See the [morning review](morning-review.md) for the five-minute simulator tour,
+before/after evidence, actual browser coverage and automated validation. No physical
+smoke detection, phone delivery or sounder output was tested in this UI review.

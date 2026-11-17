@@ -568,3 +568,14 @@ existing Store save-before-memory-commit behavior.
 
 Official options-flow guidance checked 2026-11-16:
 https://contributors.home-assistant.io/core/integrations/options-flow/
+
+## Daily-view presentation
+
+The morning UI refinement changes presentation and navigation only. The overview
+keeps setup collapsed and places missing source names beside the existing aggregate
+result. Every open dialog receives a live smoke alert without replacing its form.
+Group controls remain in the same form behind an explicit disclosure, preserving
+stored values, revisions and confirmations. Alarm routes still use the existing
+read-only endpoint. Recovery retains beta.9 lost-acknowledgement reconciliation;
+only its preparation text and ambiguous source labels change. No schema, provider
+contract, status calculation or executor changes. See [review](morning-review.md).

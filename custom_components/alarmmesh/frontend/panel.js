@@ -1,4 +1,4 @@
-import { TEXT } from "./translations.js?v=20261117-recovery-1";
+import { TEXT } from "./translations.js?v=20261117-morning-2";
 import { Drafts } from "./drafts.js?v=20261116-matter-1";
 
 // Safe DOM construction: names, labels and registry data are always text nodes.
@@ -114,11 +114,11 @@ export class AlarmMeshPanel extends HTMLElement {
   }
   updateRecoverySmoke() {
     const dialog=this.shadowRoot.querySelector("dialog");
-    if(!dialog || this.detail?.kind!=="recovery")return;
+    if (!dialog) return;
     let warning=dialog.querySelector(".recovery-smoke");
     if(this.data?.result.smoke!=="SMOKE_REPORTED"){warning?.remove();return;}
     if(!warning){warning=el("p",undefined,"notice recovery-smoke");warning.setAttribute("role","alert");dialog.insertBefore(warning,dialog.children[1]);}
-    warning.textContent=`${this.t.SMOKE_REPORTED}: ${this.data.sources.filter(s=>s.status==="SMOKE_REPORTED").map(s=>s.name).join(", ")}`;
+    warning.textContent=`${this.t.SMOKE_REPORTED}: ${this.data.sources.filter(s=>s.status==="SMOKE_REPORTED").map(s=>`${this.sourceName(s.entity_id)}${s.capability?.matter?.source_kind === "interconnect_smoke" ? ` · ${this.t.forwardedSmoke}` : ""}`).join(", ")}`;
   }
   render() {
     this.updateRecoverySmoke();
@@ -127,7 +127,7 @@ export class AlarmMeshPanel extends HTMLElement {
     const t = this.t;
     const sticky = this.shadowRoot.activeElement;
     const stickyKey = sticky?.dataset.sticky, selection = stickyKey ? [sticky.selectionStart, sticky.selectionEnd] : null;
-    const link = el("link"); link.rel = "stylesheet"; link.href = "/alarmmesh-assets/panel.css?v=20261117-recovery-1";
+    const link = el("link"); link.rel = "stylesheet"; link.href = "/alarmmesh-assets/panel.css?v=20261117-morning-2";
     const shell = el("div", undefined, "shell");
     shell.classList.toggle("dark", Boolean(this._hass?.themes?.darkMode));
     const side = el("aside");
@@ -146,9 +146,10 @@ export class AlarmMeshPanel extends HTMLElement {
     const header = el("header");
     const menu = button("☰", () => this.dispatchEvent(new CustomEvent("hass-toggle-menu", { bubbles: true, composed: true })), "menu-button");
     menu.setAttribute("aria-label", "Home Assistant menu");
-    header.append(menu, icon("home-outline"), el("span", this.page === "diagnostics" ? "AlarmMesh" : this.data?.title || "AlarmMesh"), el("span", ` / ${t[this.page]}`, "muted"));
+    header.append(menu, icon("home-outline"), el("span", this.page === "diagnostics" ? "AlarmMesh" : this.data?.title || "AlarmMesh"), el("span", "", "muted"));
     const main = el("main");
-    main.append(el("div", "ALARMMESH", "eyebrow"), el("h1", this.page === "overview" ? t.title : t[this.page]), el("p", this.page === "groups" ? t.groupIntro : t.subtitle, "subtitle"));
+    main.append(el("h1", t[this.page]));
+    if (this.page === "groups") main.append(el("p", t.groupIntro, "subtitle"));
     if (!this._hass?.user?.is_admin) main.append(el("p", t.restricted, "notice"));
     else if (!this.data) {
       const message = el("div", undefined, "notice"); message.setAttribute("role", "status");
@@ -183,7 +184,7 @@ export class AlarmMeshPanel extends HTMLElement {
         }
         main.append(cards);
       }
-      if (!data.sources.length) main.append(el("p", t.empty, "notice"), button(t.choose, () => this.choose(), "button primary"));
+      if (!data.sources.length && this.page !== "overview") main.append(el("p", t.empty, "notice"), button(t.choose, () => this.choose(), "button primary"));
     }
     main.append(el("footer", t.note)); workspace.append(header, main); shell.append(side, workspace);
     // Keep an open form separate: push updates never erase unsaved input or focus.
@@ -195,19 +196,44 @@ export class AlarmMeshPanel extends HTMLElement {
   section(title, action) { const node = el("div", undefined, "section-head"); if (title) node.append(el("h2", title)); if (action) node.append(action); return node; }
   renderOverview(main) {
     const t = this.t, data = this.data, smoke = data.result.smoke;
+    if (!data.sources.length) {
+      const welcome = el("section", undefined, "notice welcome");
+      welcome.append(icon("smoke-detector"), el("h2", t.firstDetector), el("p", t.firstDetectorNote), button(t.choose, () => this.choose(), "button primary"));
+      main.append(welcome);
+      return;
+    }
     const hero = el("section", undefined, `hero ${smoke === "SMOKE_REPORTED" ? "alarm" : smoke === "INDETERMINATE" ? "uncertain" : ""}`);
     hero.setAttribute("role", "status");
     hero.append(icon(smoke === "SMOKE_REPORTED" ? "fire" : "smoke-detector"), el("h2", t[smoke] || t.unknown));
     hero.append(el("p", t[data.result.availability]));
     const active = data.sources.filter(s => s.status === "SMOKE_REPORTED");
-    for (const source of active) hero.append(button(`${t.alarmFrom}: ${source.name} · ${source.area_name || t.noRoom}`, () => this.openDialog({ kind: "source", id: source.entity_id }), "alarm-source"));
+    for (const source of active) hero.append(button(`${t.alarmFrom}: ${this.sourceName(source.entity_id)}${source.capability?.matter?.source_kind === "interconnect_smoke" ? ` · ${t.forwardedSmoke}` : ""}`, () => this.openDialog({ kind: "source", id: source.entity_id }), "alarm-source"));
+    const attention = data.sources.filter(s => s.identity_changed || !["SMOKE_REPORTED", "NO_SMOKE_REPORTED"].includes(s.status));
+    if (attention.length) {
+      const missing = el("div", undefined, "hero-missing");
+      missing.append(el("p", t.incompleteHelp));
+      for (const source of attention) {
+        const issue = el("section", undefined, "source-problem");
+        issue.append(button(`${this.sourceName(source.entity_id)} · ${t[source.identity_changed ? "recovery_changed" : source.status] || t.UNKNOWN}`, () => this.openDialog({kind:"source", id:source.entity_id})));
+        if (source.identity_changed || ["MISSING", "UNREACHABLE"].includes(source.status)) {
+          if (source.status === "UNREACHABLE" && !source.identity_changed) issue.append(el("p", t.recovery_temporary));
+          const recover = button(t.recoverSource, () => this.openDialog({kind:"recovery", id:source.entity_id}), "button source-recovery");
+          recover.setAttribute("aria-label", `${t.recoverSource}: ${this.sourceName(source.entity_id)}`);
+          issue.append(recover);
+        }
+        missing.append(issue);
+      }
+      hero.append(missing);
+    }
     main.append(hero);
     this.renderDrafts(main);
     hero.append(button(t.viewIncidents, () => this.go("incidents"), "button incident-link"));
     hero.append(button(t.activity, () => this.go("activity")));
+    hero.append(button(t.maintenance, () => this.go("maintenance"), "button maintenance-link"));
     const stats = el("div", undefined, "stats");
     for (const [label, value, note] of [[t.sources, `${data.usable} / ${data.sources.length}`, data.usable === 1 ? t.usableSource : t.usable], [t.rooms, data.rooms.filter(r => r.id).length, "Home Assistant"], [t.groups, data.groups.length, t.organized]]) {
-      const stat = el("div", undefined, "stat"); stat.append(el("span", label), el("strong", value), el("small", note)); stats.append(stat);
+      const destination = label === t.sources ? "devices" : label === t.rooms ? "rooms" : "groups";
+      const stat = button("", () => this.go(destination), "stat"); stat.setAttribute("aria-label", t[destination]); stat.append(el("span", label), el("strong", value), el("small", note)); stats.append(stat);
     }
     main.append(stats);
     const incident = data.incident;
@@ -224,11 +250,8 @@ export class AlarmMeshPanel extends HTMLElement {
       }
       main.append(section);
     }
-    const attention = data.sources.filter(s => !["SMOKE_REPORTED", "NO_SMOKE_REPORTED"].includes(s.status));
-    if (attention.length) { main.append(this.section(t.attention)); this.sourceList(main, attention); }
     this.renderSetupGuide(main);
-    main.append(button(t.maintenance, () => this.go("maintenance"), "button maintenance-link"));
-    main.append(button(t.matterHelp,()=>this.go("matterHelp")));
+
     const allRooms = button("→", () => this.go("rooms"));
     allRooms.setAttribute("aria-label", t.rooms);
     main.append(this.section(t.rooms, allRooms)); this.roomCards(main, data.rooms);
@@ -236,7 +259,7 @@ export class AlarmMeshPanel extends HTMLElement {
   renderSetupGuide(parent) {
     const t = this.t, data = this.data;
     const guide = el("details", undefined, "setup-guide");
-    guide.open = this.setupGuideOpen ?? (!data.sources.length || !data.groups.length);
+    guide.open = this.setupGuideOpen ?? false;
     guide.addEventListener("toggle", () => { this.setupGuideOpen = guide.open; });
     guide.append(el("summary", t.setupTitle), el("p", t.guidanceNote));
     const steps = el("ol", undefined, "setup-steps");
@@ -274,10 +297,18 @@ export class AlarmMeshPanel extends HTMLElement {
   }
   renderMaintenance(parent) {
     const t = this.t, data = this.data;
-    parent.append(el("p", t.maintenanceNote, "notice"));
-    if (data.reminders) this.renderReminders(parent);
+    const unavailable = data.sources.filter(source => source.identity_changed || ["MISSING", "UNREACHABLE", "UNKNOWN"].includes(source.status));
+    for (const source of unavailable) {
+      const issue = el("section", undefined, "notice maintenance-priority");
+      const replacement = source.identity_changed || source.status === "MISSING";
+      issue.append(el("h2", source.name), el("p", source.area_name || t.noRoom), el("p", t[source.identity_changed ? "recovery_changed" : source.status === "MISSING" ? "recovery_missing" : source.status === "UNREACHABLE" ? "recovery_temporary" : "UNKNOWN"]));
+      issue.append(button(replacement ? t.recoverSource : t.inspectDetector, () => this.openDialog({kind:replacement ? "recovery" : "source", id:source.entity_id}), "button primary"));
+      parent.append(issue);
+    }
+    parent.append(el("p", t.maintenanceNote, "section-note"));
     if (data.maintenance) {
-      const section = el("section", undefined, "notice maintenance-delivery");
+      const section = el("details", undefined, "notice maintenance-delivery");
+      section.append(el("summary", t.maintenanceNotifications));
       section.append(el("h2", t.maintenanceNotifications), el("p", t[data.maintenance.settings.enabled ? "enabled" : "disabled"]), button(t.configureMaintenance, () => this.openDialog({kind: "maintenance"})));
       if (data.maintenance.error) section.append(el("p", t[data.maintenance.error] || t.error, "warning-text"));
       for (const issue of data.maintenance.issues) {
@@ -322,6 +353,7 @@ export class AlarmMeshPanel extends HTMLElement {
       card.append(button(t.inspectDetector, () => this.openDialog({kind: "source", id: source.entity_id})));
       parent.append(card);
     }
+    if (data.reminders) this.renderReminders(parent);
     if (!data.sources.length) parent.append(button(t.choose, () => this.choose()));
   }
   renderGroupChecks(parent, group) {
@@ -388,7 +420,13 @@ export class AlarmMeshPanel extends HTMLElement {
       const row = button("", () => this.openDialog({ kind: "source", id: source.entity_id }), "source");
       const name = el("span", undefined, "source-name"); name.append(el("strong", source.name), el("small", [source.area_name || this.t.noRoom, source.manufacturer, source.model].filter(Boolean).join(" · ")));
       if (source.capability) name.append(el("small", `${this.providerLabel(source.capability)} · ${this.capabilityLabel(source.capability)}`));
-      row.append(icon("smoke-detector"), name, this.badge(source), icon("chevron-right")); list.append(row);
+      if (this.data.sources.filter(s => s.name === source.name && s.area_id === source.area_id).length > 1) name.append(el("small", source.entity_id, "source-identity"));
+      row.append(icon("smoke-detector"), name, this.badge(source), icon("chevron-right"));
+      const item = el("section", undefined, "source-entry");
+      const route = button(this.t.alarmRoute, () => this.openDialog({kind:"route", id:source.entity_id}), "button source-route");
+      route.setAttribute("aria-label", `${this.t.alarmRoute} · ${source.name}`);
+      item.append(row, route);
+      list.append(item);
     }
     parent.append(list);
   }
@@ -442,9 +480,17 @@ export class AlarmMeshPanel extends HTMLElement {
       for (const [label, value] of [[t.state, source.ha_state || t.MISSING], [t.room, source.area_name || t.noRoom], [t.device, source.device_name], [t.manufacturer, source.manufacturer], [t.model, source.model]]) {
         props.append(el("dt", label), el("dd", value || t.unavailable));
       }
-      dialog.append(props,button(t.alarmRoute,()=>this.openDialog({kind:"route",id:source.entity_id})),button(t.recoverSource,()=>this.openDialog({kind:"recovery",id:source.entity_id})));
+      dialog.append(el("p", source.area_name || t.noRoom), button(t.alarmRoute, () => this.openDialog({kind:"route", id:source.entity_id}), "button primary"));
+      const recover = button(t.recoverSource, () => this.openDialog({kind:"recovery", id:source.entity_id}));
+      if (source.identity_changed || source.status === "MISSING") dialog.append(el("p", t[source.identity_changed ? "recovery_changed" : "recovery_missing"], "notice"), recover);
+      else if (source.status === "UNREACHABLE") dialog.append(el("p", t.recovery_temporary, "notice"));
+      const technical = el("details", undefined, "advanced-options detector-technical");
+      technical.append(el("summary", t.technicalDetails), props);
+      if (!recover.isConnected) technical.append(recover);
+      dialog.append(technical);
       if (!source.capability) { const technical = el("details"); technical.append(el("summary", t.requirements), el("p", `${t.entity}: ${source.entity_id}`)); dialog.append(technical); }
       if (source.capability) {
+        const technicalStart = [...dialog.children];
         const cap = source.capability;
         dialog.append(el("h3", t.functions), el("p", `${this.providerLabel(cap)} / ${this.capabilityLabel(cap)}`));
         this.detectorDetails(dialog, source);
@@ -457,6 +503,7 @@ export class AlarmMeshPanel extends HTMLElement {
         limitations.append(el("p", `${t.entity}: ${source.entity_id}`));
         for (const control of cap.controls) limitations.append(el("p", `${t.proposedControl}: ${control.target}`));
         dialog.append(limitations);
+        for (const child of [...dialog.children]) if (!technicalStart.includes(child)) technical.append(child);
       }
       if (source.selftest) {
         dialog.append(el("h3", t.selfTests), el("p", t[source.selftest.reason]));
@@ -466,8 +513,8 @@ export class AlarmMeshPanel extends HTMLElement {
           dialog.append(button(t.startSelfTest, () => this.openDialog({ kind: "test", actionKind: "selftest", target: source.entity_id, identity: source.selftest.control.identity, name: source.name }), "button destructive"));
         }
       }
-      dialog.append(el("h3", t.membership));
       if (this.data.reminders) { const reminder = this.data.reminders.items.find(r=>r.source === source.entity_id); dialog.append(el("h3", t.reminders), el("p", reminder ? `${reminder.date} · ${t['reminder_' + reminder.status] || t.guide_unknown}` : t.reminderDisabled), button(t.configureReminder, ()=>this.openDialog({kind:"reminder", id:source.entity_id}))); }
+      dialog.append(el("h3", t.membership));
       if (!source.groups.length) dialog.append(el("p", t.noGroups));
       for (const group of this.data.groups.filter(g => source.groups.includes(g.id))) dialog.append(button(group.name, () => this.openDialog({ kind: "group", id: group.id })));
       const info = button("Home Assistant", () => {
@@ -480,12 +527,18 @@ export class AlarmMeshPanel extends HTMLElement {
       const group = collection.find(g => g.id === detail.id);
       if (!group) { this.closeDialog(); return; }
       dialog.append(el("h2", group.name || t.noRoom), this.badge(group.result), el("p", t[group.result.availability]));
-      if (detail.kind === "group") this.renderGroupChecks(dialog, group);
+      if (detail.kind === "group") {
+        dialog.append(button(t.edit, () => this.openDialog({kind:"edit", group}), "button primary"), button(t.optionalActions, () => this.openDialog({kind:"edit", group, section:"actions"})));
+        const checks = el("details", undefined, "advanced-options");
+        checks.append(el("summary", t.groupCheckTitle));
+        this.renderGroupChecks(checks, group);
+        dialog.append(checks);
+      }
       this.sourceList(dialog, this.data.sources.filter(s => group.members.includes(s.entity_id)));
       if (detail.kind === "group") {
         if (!group.members.length) dialog.append(el("p", t.emptyGroup));
         for (const member of group.unselected) dialog.append(el("p", `${member} · ${t.stale}`, "warning-text"));
-        dialog.append(el("p", t.groupNote), button(t.copyGroup, ()=>this.openDialog({kind:"copy", id:group.id})), button(t.actionExample, () => this.openDialog({kind: "preview", id: group.id})), button(t.edit, () => this.openDialog({ kind: "edit", group })), button(t.remove, () => this.openDialog({ kind: "delete", group }), "button destructive"));
+        dialog.append(el("p", t.groupNote), button(t.copyGroup, ()=>this.openDialog({kind:"copy", id:group.id})), button(t.actionExample, () => this.openDialog({kind: "preview", id: group.id})), button(t.remove, () => this.openDialog({ kind: "delete", group }), "button destructive"));
       }
     } else if (detail.kind === "edit") this.groupForm(dialog, detail.group);
     else if (detail.kind === "settings") this.notificationForm(dialog);
@@ -517,7 +570,7 @@ export class AlarmMeshPanel extends HTMLElement {
   groupForm(dialog, group) {
     const original=group;group=this.detail.restoredDraft?.value || group;
     const t = this.t, revision = this.detail.restoredDraft?.revision ?? this.data.revision;
-    dialog.append(el("h2", group ? t.edit : t.newGroup), el("p", t.groupNote));
+    dialog.append(el("h2", group ? t.edit : t.newGroup), el("p", t.simpleGroupNote));
     const form = el("form"); form.noValidate = true;
     const label = el("label", t.name); label.htmlFor = "group-name";
     const name = el("input"); name.id = "group-name"; name.name = "name"; name.value = group?.name || ""; name.maxLength = 64; name.required = true;
@@ -544,7 +597,7 @@ export class AlarmMeshPanel extends HTMLElement {
     for (const source of bindingSources) {
       const cap = source.capability;
       const row = el("div", undefined, "binding-row");
-      const targetLabel = el("label", `${source.name} · ${source.area_name || t.noRoom}`);
+      const targetLabel = el("label", `${this.sourceName(source.entity_id)}`);
       const select = el("select"); select.id = `binding-${source.entity_id}`; select.name = "link-target"; targetLabel.htmlFor = select.id;
       const empty = el("option", t.detection_only); empty.value = ""; select.append(empty);
       const controls = cap?.controls || [];
@@ -573,15 +626,19 @@ export class AlarmMeshPanel extends HTMLElement {
       row.append(check, el("span", source.name)); row.hidden = !selected.has(source.id); originSection.append(row); originRows.push(check);
       for (const member of form.querySelectorAll('[name="member"]')) if (member.value === source.id) member.addEventListener("change", () => { row.hidden = !member.checked; });
     }
-    form.append(originSection, linkingSection);
-    const updateCounts = ()=> { memberCount.textContent=`${t.members}: ${[...form.querySelectorAll('[name="member"]')].filter(c=>c.checked).length} · ${t.incidentSources}: ${originRows.filter(c=>c.checked && [...form.querySelectorAll('[name="member"]')].some(m=>m.value===c.value && m.checked)).length}`; };
+    const advanced = el("details", undefined, "advanced-options");
+    advanced.open = Boolean(group?.linking?.enabled || group?.actions?.enabled || this.detail.section);
+    advanced.append(el("summary", t.optionalActions), originSection, linkingSection);
+    form.append(advanced);
+    const updateCounts = ()=> { memberCount.textContent=`${t.members}: ${[...form.querySelectorAll('[name="member"]')].filter(c=>c.checked).length}`; };
     form.addEventListener("change", updateCounts); updateCounts();
     memberSearch.addEventListener("input", ()=>{ for(const row of form.querySelectorAll('[data-member-search]')) row.hidden=!row.dataset.memberSearch.includes(memberSearch.value.toLocaleLowerCase()); });
-    const actionFields = this.actionFields(form, group?.actions);
+    const actionFields = this.actionFields(advanced, group?.actions);
     const actions = el("div", undefined, "actions"); const save = el("button", t.save, "button primary"); save.type = "submit";
     actions.append(button(t.cancel, () => this.closeDialog()), save); form.append(error, actions);
     form.addEventListener("submit", async event => {
       event.preventDefault();
+      if (save.disabled) return;
       if (form.querySelector(".request-confirmation,.link-confirmation")) { error.textContent = t.finishConfirmation; return; }
       if (!name.value.trim() || name.value.trim().length > 64) { error.textContent = t.invalid_name; name.setAttribute("aria-invalid", "true"); name.focus(); return; }
       name.removeAttribute("aria-invalid");
@@ -712,16 +769,20 @@ export class AlarmMeshPanel extends HTMLElement {
   }
   renderSettings(parent) {
     const t = this.t, automation = this.data.automation;
-    parent.append(button(t.matterHelp,()=>this.go("matterHelp")),button(t.catalog, () => this.go("catalog")), button(t.viewIncidents, () => this.go("incidents")), button(t.maintenance, () => this.go("maintenance")), button(t.diagnostics, () => this.go("diagnostics")));
-    this.renderSetupGuide(parent);
-    if (!automation) return;
+    if (!automation) { this.renderSetupGuide(parent); return; }
     const section = el("section", undefined, "notice");
-    section.append(el("h2", t.notifications), el("p", `${t.notifications}: ${t[automation.settings.enabled ? "enabled" : "disabled"]}`), el("p", t.notificationNote));
-    for (const recipient of automation.settings.recipients) section.append(el("p", `${recipient.service.replace(/^mobile_app_/, "")}: ${t[recipient.enabled ? "enabled" : "disabled"]}${automation.missing_recipients.includes(recipient.service) ? ' · ' + t.recipient_unavailable : ''}`));
+    section.append(el("h2", t.notifications), el("p", t[automation.settings.enabled ? "enabled" : "disabled"]), el("p", t.notificationNote));
+    for (const recipient of automation.settings.recipients) section.append(el("p", `${automation.recipients.find(r => r.service === recipient.service)?.name || recipient.service.replace(/^mobile_app_/, "")}: ${t[recipient.enabled ? "enabled" : "disabled"]}${automation.missing_recipients.includes(recipient.service) ? ' · ' + t.recipient_unavailable : ''}`));
     section.append(button(t.configureNotifications, () => this.openDialog({ kind: "settings" }), "button primary"));
     if (automation.error) section.append(el("p", t[automation.error] || t.error, "warning-text"));
-    parent.append(section, el("p", t.actionsLocation, "notice"));
+    const scripts = el("section", undefined, "notice");
+    scripts.append(el("h2", t.incidentActions), el("p", t.actionsLocation), button(t.groups, () => this.go("groups")));
+    parent.append(section, scripts);
     if (this.data.maintenance) parent.append(button(t.configureMaintenance, () => this.openDialog({kind: "maintenance"})));
+    this.renderSetupGuide(parent);
+    const tools = el("details", undefined, "advanced-options");
+    tools.append(el("summary", t.installationAndHelp), button(t.choose, () => this.choose()), button(t.matterHelp, () => this.go("matterHelp")), button(t.catalog, () => this.go("catalog")), button(t.diagnostics, () => this.go("diagnostics")));
+    parent.append(button(t.maintenance, () => this.go("maintenance")), button(t.activity, () => this.go("activity")), button(t.viewIncidents, () => this.go("incidents")), tools);
   }
   notificationForm(dialog) {
     const t = this.t, a = this.data.automation;
@@ -742,7 +803,7 @@ export class AlarmMeshPanel extends HTMLElement {
       if (stored.has(recipient.service)) row.append(button(t.forgetRecipient, () => { removed.add(recipient.service); row.remove(); }, "button destructive"));
       form.append(row);
     }
-    const preview = el("details"); preview.append(el("summary", t.messagePreview), el("strong", a.preview.title), el("p", a.preview.message, "message-preview")); form.append(preview);
+    const preview = el("details"); preview.open = true; preview.append(el("summary", t.messagePreview), el("strong", a.preview.title), el("p", a.preview.message, "message-preview")); form.append(el("p", t.notificationTiming, "section-note"), preview);
     const error = el("p", "", "form-error"); error.setAttribute("role", "alert");
     const save = el("button", t.saveSettings, "button primary"); save.type = "submit";
     form.append(error, save, button(t.cancel, () => this.closeDialog()));
@@ -835,21 +896,62 @@ export class AlarmMeshPanel extends HTMLElement {
     select.addEventListener("change",load); dialog.append(label,select,button(t.alarmRoute,()=>this.openDialog({kind:"route",id:select.value})),output); load();
   }
 
-  routeForm(parent,detail) {
-    const t=this.t, source=this.data.sources.find(s=>s.entity_id===detail.id);
-    parent.append(el("h2",t.alarmRoute),el("p",source ? `${source.name} · ${source.area_name || t.noRoom}` : detail.id),el("p",t.exampleNoOutput,"notice"));
-    const output=el("div");let serial=0;
-    const load=async()=>{const n=++serial;output.replaceChildren(el("p",t.loading));try{const r=await this._hass.callWS({type:"alarmmesh/route",source:detail.id});if(n!==serial || !output.isConnected || !this.data)return;if(r.revision!==this.data.revision || !r.readonly){output.replaceChildren(el("p",t.previewStale));return;}
-      output.replaceChildren(el("h3",t.linkTogether));if(!r.targets.length)output.append(el("p",t.checkNoTargets));
-      for(const row of r.targets){output.append(el("h3",this.sourceName(row.source)),el("p",t[row.eligible ? "routeOnce":"routeBlocked"]));for(const via of row.via)output.append(el("p",`${this.data.groups.find(g=>g.id===via.group)?.name || t.groups}: ${t[via.reason] || t.guide_unknown}`));}
-      output.append(el("h3",t.notifications));for(const row of r.phones)output.append(el("p",`${row.target}: ${t[row.reason] || t.guide_unknown}`));if(!r.phones.length)output.append(el("p",t.noRecipients));
-      for(const g of r.groups){output.append(el("h3",this.data.groups.find(x=>x.id===g.group)?.name || t.groups));for(const row of g.scripts)output.append(el("p",`${t['phase_'+row.phase]} ${row.order} · ${row.name}: ${t[row.reason] || t.guide_unknown}`));}
-      output.append(el("p",t.previewRecovery),el("p",t.routeScripts),el("p",t.physicalNotTested));
-    }catch(e){if(output.isConnected)output.replaceChildren(el("p",t[e.code] || t.error));}};
-    parent.append(button(t.refreshData,load),output);load();
+  routeForm(parent, detail) {
+    const t = this.t;
+    parent.append(el("h2", t.alarmRoute), el("p", this.sourceName(detail.id)), el("p", t.exampleNoOutput, "notice"));
+    const output = el("div", undefined, "route-sections");
+    let serial = 0;
+    const load = async () => {
+      const request = ++serial;
+      output.replaceChildren(el("p", t.loading));
+      try {
+        const result = await this._hass.callWS({type:"alarmmesh/route", source:detail.id});
+        if (request !== serial || !output.isConnected || !this.data) return;
+        if (result.revision !== this.data.revision || !result.readonly) {
+          output.replaceChildren(el("p", t.previewStale));
+          return;
+        }
+        output.replaceChildren(el("h3", t.linkTogether));
+        if (!result.targets.length) output.append(el("p", t.checkNoTargets));
+        for (const target of result.targets) {
+          const card = el("section", undefined, "route-target");
+          card.append(el("h4", this.sourceName(target.source)), el("p", t[target.eligible ? "routeOnce" : "routeBlocked"]));
+          for (const via of target.via) {
+            const group = this.data.groups.find(g => g.id === via.group);
+            card.append(el("p", `${group?.name || t.groups} · ${t[via.reason] || t.guide_unknown}`));
+          }
+          output.append(card);
+        }
+        output.append(el("h3", t.notifications));
+        for (const recipient of result.phones) {
+          const name = this.data.automation?.recipients.find(r => r.service === recipient.target)?.name || recipient.target.replace(/^mobile_app_/, "");
+          output.append(el("p", `${name} · ${t[recipient.reason] || t.guide_unknown}`));
+        }
+        if (!result.phones.length) output.append(el("p", t.noRecipients));
+        output.append(button(t.configureNotifications, () => this.openDialog({kind:"settings"})));
+        for (const assessment of result.groups) {
+          const group = this.data.groups.find(g => g.id === assessment.group);
+          const card = el("section", undefined, "route-target");
+          card.append(el("h3", group?.name || t.groups));
+          for (const script of assessment.scripts) card.append(el("p", `${t["phase_" + script.phase]} ${script.order} · ${script.name} · ${t[script.reason] || t.guide_unknown}`));
+          if (!assessment.scripts.length) card.append(el("p", t.noGroupScripts));
+          if (group) card.append(button(t.optionalActions, () => this.openDialog({kind:"edit", group, section:"actions"})));
+          output.append(card);
+        }
+        output.append(el("p", t.previewRecovery), el("p", t.routeScripts), el("small", t.physicalNotTested));
+      } catch (error) {
+        if (output.isConnected) output.replaceChildren(el("p", t[error.code] || t.error));
+      }
+    };
+    parent.append(button(t.refreshData, load), output);
+    load();
   }
   recoveryForm(parent,detail) {
-    const t=this.t;parent.append(el("h2",t.recoverSource),el("p",this.sourceName(detail.id)),el("p",t.recoverySteps,"notice"));
+    const t = this.t;
+    parent.append(el("h2", t.recoverSource), el("p", this.sourceName(detail.id)));
+    const steps = el("ol", undefined, "recovery-steps");
+    for (const step of t.recoveryPreparation) steps.append(el("li", step));
+    parent.append(steps);
     parent.append(button(t.choose,()=>this.choose()),button(t.notifications,()=>this.go("settings")),button(t.groups,()=>this.go("groups")));
     const output=el("div");parent.append(output);
     detail.showMemberships = () => {
@@ -870,7 +972,7 @@ export class AlarmMeshPanel extends HTMLElement {
     };
     const load=async()=>{output.replaceChildren(el("p",t.loading));try{const plan=await this._hass.callWS({type:"alarmmesh/recovery",source:detail.id});if(!output.isConnected || !this.data)return;output.replaceChildren(el("p",plan.selected ? t.recoveryOldSelected:t.recoveryOldRemoved));
       if(plan.blocked || plan.outputs_enabled){output.append(el("p",t[plan.blocked ? "recovery_busy":"recovery_disable"]));return;}
-      const form=el("form"),select=el("select");select.setAttribute("aria-label",t.recoveryCandidate);for(const c of plan.candidates){const o=el("option",`${c.name} · ${c.area_name || t.noRoom}`);o.value=c.entity_id;select.append(o);}form.append(el("label",t.recoveryCandidate),select);const checks=[];
+      const form=el("form"),select=el("select");select.setAttribute("aria-label",t.recoveryCandidate);for(const c of plan.candidates){const o=el("option",this.sourceName(c.entity_id));o.value=c.entity_id;select.append(o);}form.append(el("label",t.recoveryCandidate),select);const checks=[];
       for(const id of plan.groups){const c=this.checkField(form,this.data.groups.find(g=>g.id===id)?.name || id,false,"recovery-group");c.value=id;checks.push(c);}
       const error=el("p", "","form-error");form.append(el("p",t.recoveryAuthority),error);const save=el("button",t.recoveryReview,"button primary");save.type="submit";save.disabled=!plan.candidates.length || !plan.groups.length;form.append(save);
       form.addEventListener("submit",event=>{event.preventDefault();if(form.querySelector('.request-confirmation'))return;const target=select.value,groups=checks.filter(c=>c.checked).map(c=>c.value);if(!groups.length){error.textContent=t.invalid_members;return;}this.confirmRequest(form,{name:t.recoverSource,confirmationOnly:true,note:`${this.sourceName(detail.id)} → ${this.sourceName(target)}\n${groups.map(id=>this.data.groups.find(g=>g.id===id)?.name || id).join(', ')}\n${t.recoveryAuthority}`,execute:async()=>{
@@ -1056,7 +1158,9 @@ export class AlarmMeshPanel extends HTMLElement {
   }
   sourceName(id) {
     const source = this.data.sources.find(s => s.entity_id === id);
-    return source ? `${source.name} · ${source.area_name || this.t.noRoom}` : id;
+    if (!source) return id;
+    const duplicate = this.data.sources.some(other => other.entity_id !== id && other.name === source.name && other.area_id === source.area_id);
+    return `${source.name} · ${source.area_name || this.t.noRoom}${duplicate ? ` · ${id}` : ""}`;
   }
   draftKey(detail=this.detail) {return detail ? detail.kind+":"+(detail.id || detail.group?.id || "new") : "";}
   draftSignature() {const d=this.data;if(!d)return "";return JSON.stringify([d.sources.map(s=>[s.entity_id,s.reminder_identity || null,s.capability?.matter?.fingerprint || null,s.capability?.controls?.map(c=>[c.target,c.identity]) || [],s.selftest?.control?.identity || null]),(d.automation?.scripts || []).map(s=>[s.entity_id,s.identity]),(d.automation?.recipients || []).map(r=>r.service).sort()]);}
@@ -1125,11 +1229,16 @@ export class AlarmMeshPanel extends HTMLElement {
     const field=(label,key,choices)=>this.filterField(bar,label,`device-${key}`,f[key],choices,value=>{ f[key]=value; draw(); });
     field(t.findDetector,"name"); field(t.room,"room",data.rooms.map(r=>[r.id || "none",r.name || t.noRoom])); field(t.groups,"group",data.groups.map(g=>[g.id,g.name])); field(t.provider,"provider",[["mqtt",t.zigbee2mqtt],["zha",t.zha],["matter",t.matter],["zwave_js",t.zwave_js],["unknown_origin",t.unknown_origin]]);
     field(t.state,"status",[["SMOKE_REPORTED",t.SMOKE_REPORTED],["unusable",t.unavailable],["UNKNOWN",t.UNKNOWN]]); field(t.maintenance,"maintenance",[["attention",t.attention],["unknown",t.missingInformation]]);
-    bar.append(button(t.clearFilters,()=>{for(const key of Object.keys(f)) f[key]=""; this.render();})); parent.append(bar,results); draw();
+    const filters = el("details", undefined, "more-filters");
+    filters.open = Object.entries(f).some(([key, value]) => key !== "name" && value);
+    filters.append(el("summary", t.moreFilters));
+    for (const field of [...bar.children].slice(1)) filters.append(field);
+    filters.append(button(t.clearFilters, () => { for (const key of Object.keys(f)) f[key] = ""; this.render(); }));
+    bar.append(filters); parent.append(bar,results); draw();
   }
   renderActivity(parent) {
     const t=this.t, history=this.data.activity, f=this.activityFilters;
-    parent.append(el("p",t.activityLimit,"notice"));
+    parent.append(el("p",t.activityLimit,"section-note"));
     if(!history) {parent.append(el("p",t.guide_unknown));return;}
     if(history.incomplete) parent.append(el("p",t.activityIncomplete,"notice warning-text"));
     if(!history.events.length) {parent.append(el("p",t.activityEmpty,"notice"));return;}
@@ -1138,7 +1247,11 @@ export class AlarmMeshPanel extends HTMLElement {
     const unique=key=>[...new Set(history.events.flatMap(r=>key==="group" ? r.groups : r[key]).filter(Boolean))];
     const field=(label,key,choices)=>this.filterField(bar,label,`activity-${key}`,f[key],choices,value=>{f[key]=value;draw();});
     field(t.detector,"source",unique("source").map(id=>[id,this.sourceName(id)])); field(t.groups,"group",unique("group").map(id=>[id,this.data.groups.find(g=>g.id===id)?.name || id])); field(t.activityKind,"kind",unique("kind").map(id=>[id,t['activity_'+id] || id])); field(t.activityResultLabel,"result",unique("result").map(id=>[id,this.activityResult({kind:"",result:id})])); field(t.activityCategory,"category",unique("category").map(id=>[id,t['category_'+id]]));
-    bar.append(button(t.clearFilters,()=>{for(const key of Object.keys(f)) f[key]="";this.render();})); parent.append(bar,list); draw();
+    bar.append(button(t.clearFilters,()=>{for(const key of Object.keys(f)) f[key]="";this.render();}));
+    const filters = el("details", undefined, "more-filters");
+    filters.open = Object.values(f).some(Boolean);
+    filters.append(el("summary", t.moreFilters), bar);
+    parent.append(filters, list); draw();
   }
   activityResult(row) { const t=this.t; return t['activity_result_'+row.result] || (row.kind==="selftest" ? t['test_'+row.result] : t['delivery_'+row.result]) || t['test_'+row.result] || t[row.result] || t.guide_unknown; }
   activityDetail(parent,row) {

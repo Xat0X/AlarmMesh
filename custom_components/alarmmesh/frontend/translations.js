@@ -546,3 +546,44 @@ Object.assign(TEXT.nl,{alarmRoute:'Bekijk alarmroute',refreshData:'Gegevens vern
 
 Object.assign(TEXT.nl,{recoveryCurrent:"Actuele groepsindeling",recoveryLostReply:"De opslagbevestiging ontbreekt. Hieronder zie je welke van de twee melders nu bij elke gekozen groep horen.",recoveryNeither:"Geen van beide melders",recoveryGroupGone:"Groep niet meer aanwezig"});
 Object.assign(TEXT.en,{recoveryCurrent:"Current group membership",recoveryLostReply:"The save acknowledgement is missing. The selected groups below show which of the two detectors they currently contain.",recoveryNeither:"Neither detector",recoveryGroupGone:"Group no longer present"});
+
+Object.assign(TEXT.nl, {
+  firstDetector: "Voeg je eerste rookmelder toe",
+  firstDetectorNote: "Kies een rookmelder die al in Home Assistant staat. Daarna zie je hier de actuele meldingen.",
+  incompleteHelp: "Van deze melders ontbreekt bruikbare rookinformatie. Open een melder om de oorzaak te bekijken.",
+  simpleGroupNote: "Geef de groep een naam en kies de melders die erbij horen.",
+  optionalActions: "Optioneel samen afgaan en acties",
+  installationAndHelp: "Installatie en technische hulp",
+  moreFilters: "Meer filters",
+  notificationTiming: "Een melding bij het begin van een rookincident. Het herstelbericht kun je apart kiezen.",
+  noGroupScripts: "Voor deze groep zijn geen scripts ingesteld.",
+  forwardedSmoke: "Doorgemelde rook"
+});
+Object.assign(TEXT.en, {
+  firstDetector: "Add your first smoke detector",
+  firstDetectorNote: "Choose a smoke detector already available in Home Assistant. Its current reports will appear here.",
+  incompleteHelp: "Usable smoke information is missing from these detectors. Open a detector to investigate.",
+  simpleGroupNote: "Name the group and choose its detectors.",
+  optionalActions: "Optional sounding and actions",
+  installationAndHelp: "Installation and technical help",
+  moreFilters: "More filters",
+  notificationTiming: "A message when a smoke incident starts. You can choose a recovery message separately.",
+  noGroupScripts: "No scripts are configured for this group.",
+  forwardedSmoke: "Forwarded smoke"
+});
+
+Object.assign(TEXT.nl, {notificationNote: "Stuur gewone meldingen via de Home Assistant-app. Sta meldingen toe op de gekozen telefoon. Automatische verzending staat standaard uit."});
+Object.assign(TEXT.en, {notificationNote: "Send standard notifications through the Home Assistant app. Allow notifications on the selected phone. Automatic delivery starts off."});
+
+Object.assign(TEXT.nl, {recoveryPreparation: [
+  "Zet betrokken groepsacties en incidentmeldingen uit.",
+  "Voeg de vervanger toe via Bronnen kiezen in Home Assistant. Behoud de oude bron nog.",
+  "Kies hieronder welke groepslidmaatschappen overgaan.",
+  "Beoordeel daarna bedieningen en oorsprongen opnieuw. Verwijder pas dan de oude bron via Home Assistant."
+]});
+Object.assign(TEXT.en, {recoveryPreparation: [
+  "Turn off affected group actions and incident notifications.",
+  "Add the replacement using Choose sources in Home Assistant. Keep the old source for now.",
+  "Choose which group memberships to transfer below.",
+  "Review controls and incident origins afterwards. Only then remove the old source in Home Assistant."
+]});

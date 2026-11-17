@@ -261,7 +261,7 @@ class PanelController:
             "alarmmesh-panel",
             sidebar_title="AlarmMesh",
             sidebar_icon="mdi:smoke-detector",
-            module_url=f"{ASSET_URL}/panel.js?v=20261117-recovery-1",
+            module_url=f"{ASSET_URL}/panel.js?v=20261117-recovery-review-1",
             require_admin=True,
         )
         self.hub.controller = self

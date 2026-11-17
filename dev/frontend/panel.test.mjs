@@ -88,7 +88,7 @@ test("empty, unloaded and disconnected data never retain an old current status",
   const { panel, root, transport, listeners } = setup();
   const data = normal(); data.sources = []; data.rooms = []; data.result = { smoke: "INDETERMINATE", availability: "NOT_CONFIGURED" }; data.usable = 0;
   transport.callbacks.at(-1)(data);
-  assert.ok([...root.childNodes].map(n => n.textContent).join("").includes("Choose existing smoke detectors"));
+  assert.ok([...root.childNodes].map(n => n.textContent).join("").includes("Choose a smoke detector already available in Home Assistant"));
   transport.event("disconnected"); assert.equal(panel.data, null);
   assert.ok([...root.childNodes].map(n => n.textContent).join("").includes("Connection lost"));
   const old = transport.callbacks.at(-1); old(normal()); assert.equal(panel.data, null);
@@ -145,7 +145,7 @@ test("a lost save acknowledgement does not claim the server made no change", asy
 test("language, theme and unauthorized session react to HA context", () => {
   const { panel, root } = setup();
   panel.hass = { ...panel._hass, language: "nl", themes: { darkMode: true } };
-  assert.ok([...root.childNodes].map(n => n.textContent).join("").includes("Alles in beeld")); assert.ok(root.querySelector(".shell.dark"));
+  assert.ok([...root.childNodes].map(n => n.textContent).join("").includes("Overzicht")); assert.ok(root.querySelector(".shell.dark"));
   panel.hass = { ...panel._hass, user: { is_admin: false } };
   assert.equal(panel.data, null); assert.ok([...root.childNodes].map(n => n.textContent).join("").includes("beheerders"));
   panel.remove();
@@ -318,7 +318,10 @@ test("setup guide handles empty sources and only navigates to existing configura
   const { panel, root, transport, calls } = setup();
   const data = normal(); data.sources = []; data.groups = []; data.rooms = []; data.usable = 0;
   transport.callbacks.at(-1)(data);
-  assert.ok(root.querySelector(".setup-guide").open);
+  assert.equal(root.querySelectorAll(".welcome .primary").length, 1);
+  assert.equal(root.querySelector(".setup-guide"), null);
+  panel.go("settings");
+  assert.equal(root.querySelector(".setup-guide").open, false);
   assert.equal(root.querySelectorAll(".setup-steps li").length, 7);
   assert.ok(root.querySelector('[data-step="sources"]').textContent.includes("existing Home Assistant"));
   root.querySelector('[data-step="groups"] button').click();
@@ -897,6 +900,7 @@ test("combined detector filters retain global smoke and survive pushes", () => {
 test("activity empty state, filters and detail are read-only and retained",()=>{
  const {panel,root,transport,calls}=setup('nl');const data=normal();data.activity={events:[],incomplete:false};transport.callbacks.at(-1)(data);panel.go('activity');assert.ok(root.querySelector('main').textContent.includes('Nog geen gebeurtenissen'));
  data.activity.events=[{id:'observed',observed_at:'2026-11-15T12:00:00Z',category:'alarm',kind:'source',result:'SMOKE_REPORTED',source:source.entity_id,groups:[],target:'',correlation:'incident-observation'}];transport.callbacks.at(-1)(data);
+ assert.equal(root.querySelector(".more-filters").open,false);assert.ok(root.querySelector(".activity-row"));
  const filter=root.querySelector('[name="activity-source"]');filter.querySelector(`[value="${source.entity_id}"]`).selected=true;filter.dispatchEvent(new Event('change'));root.querySelector('.activity-row').click();assert.ok(root.querySelector('dialog').textContent.includes('Waargenomen door AlarmMesh'));panel.closeDialog();assert.equal(panel.activityFilters.source,source.entity_id);assert.deepEqual(calls,[]);panel.remove();
 });
 
@@ -1092,6 +1096,115 @@ for (const committed of [false, true]) {
     assert.ok(summary.textContent.includes("Hall · " + v.panel.sourceName(data.groups[0].members[0])));
     assert.equal(v.root.querySelector(".confirm-execute"), null);
     assert.equal(v.calls.filter(command => command.confirmed).length, 1);
+    v.panel.remove();
+  });
+}
+
+test("daily overview keeps setup collapsed and navigation read only", async () => {
+  const view = setup();
+  assert.equal(view.root.querySelector(".setup-guide").open, false);
+  view.root.querySelector('.stat[aria-label="Detectors"]').click();
+  assert.equal(view.panel.page, "devices");
+  view.panel._hass.callWS = async command => {
+    view.calls.push(command);
+    return {readonly:true, revision:0, targets:[], groups:[], phones:[]};
+  };
+  view.root.querySelector(".source-route").click();
+  await tick();
+  assert.deepEqual(view.calls, [{type:"alarmmesh/route", source:source.entity_id}]);
+  view.panel.closeDialog();
+  assert.equal(view.panel.page, "devices");
+  view.panel.remove();
+});
+
+test("ordinary group hides optional controls and duplicate submits save once", async () => {
+  const view = setup();
+  view.panel.openDialog({kind:"edit", group:null});
+  const form = view.root.querySelector("form");
+  assert.equal(form.querySelector(".advanced-options").open, false);
+  assert.equal(form.querySelector('[name="link-enabled"]').checked, false);
+  form.querySelector('#group-name').value = "Upstairs";
+  form.querySelector('[name="member"]').checked = true;
+  let finish;
+  view.panel._hass.callWS = command => { view.calls.push(command); return new Promise(resolve => {finish=resolve;}); };
+  form.dispatchEvent(new Event("submit", {cancelable:true}));
+  form.dispatchEvent(new Event("submit", {cancelable:true}));
+  assert.equal(view.calls.length, 1);
+  assert.equal(view.calls[0].linking, undefined);
+  assert.equal(view.calls[0].actions, undefined);
+  finish({revision:1}); await tick();
+  view.panel.remove();
+});
+
+test("smoke remains visible in settings with area and forwarded provenance", () => {
+  const view = setup();
+  const data = featureData();
+  view.transport.callbacks.at(-1)(data);
+  view.panel.openDialog({kind:"settings"});
+  const form = view.root.querySelector("form");
+  const input = form.querySelector('[name="notifications-enabled"]');
+  input.checked = true;
+  data.result.smoke = "SMOKE_REPORTED";
+  Object.assign(data.sources[0], {status:"SMOKE_REPORTED", area_name:"Landing", capability:{...data.sources[0].capability, matter:{source_kind:"interconnect_smoke"}}});
+  view.transport.callbacks.at(-1)(data);
+  assert.equal(view.root.querySelector("form"), form);
+  assert.equal(input.checked, true);
+  const warning = view.root.querySelector("dialog .recovery-smoke");
+  assert.ok(warning.textContent.includes("Landing"));
+  assert.ok(warning.textContent.includes("Forwarded smoke"));
+  assert.deepEqual(view.calls, []);
+  view.panel.remove();
+});
+
+test("duplicate detector names expose identity and notification preview is visible", () => {
+  const view = setup();
+  const data = featureData();
+  data.sources[1].name = data.sources[0].name;
+  data.sources[1].area_id = data.sources[0].area_id;
+  view.transport.callbacks.at(-1)(data);
+  view.panel.go("devices");
+  assert.equal(view.root.querySelectorAll(".source-identity").length, 2);
+  view.panel.openDialog({kind:"settings"});
+  assert.ok(view.root.querySelector(".message-preview").parentNode.open);
+  data.result.smoke = "SMOKE_REPORTED";
+  data.sources[0].status = "SMOKE_REPORTED";
+  view.transport.callbacks.at(-1)(data);
+  assert.ok(view.root.querySelector(".recovery-smoke").textContent.includes(data.sources[0].entity_id));
+  assert.deepEqual(view.calls, []);
+  view.panel.remove();
+});
+
+
+test("incomplete overview names the affected source before summaries", () => {
+  const view = setup();
+  const data = normal();
+  data.result = {smoke:"INDETERMINATE", availability:"INCOMPLETE"};
+  Object.assign(data.sources[0], {status:"UNREACHABLE", area_name:"Landing"});
+  view.transport.callbacks.at(-1)(data);
+  const affected = view.root.querySelector(".hero-missing button");
+  assert.ok(affected.textContent.includes("Detector A"));
+  assert.ok(affected.textContent.includes("Landing"));
+  assert.ok(affected.textContent.includes(view.panel.t.UNREACHABLE));
+  affected.click();
+  assert.ok(view.root.querySelector("dialog").textContent.includes(view.panel.t.recovery_temporary));
+  assert.deepEqual(view.calls, []);
+  view.panel.remove();
+});
+
+for (const state of ["MISSING", "UNREACHABLE", "changed"]) {
+  test(`overview offers direct source recovery for ${state} without dispatch`, async () => {
+    const v = setup("nl"), data = normal();
+    data.sources[0].status = state === "changed" ? "NO_SMOKE_REPORTED" : state;
+    data.sources[0].identity_changed = state === "changed";
+    v.transport.callbacks.at(-1)(data);
+    const action = v.root.querySelector(".hero-missing .source-recovery");
+    assert.ok(action);
+    assert.ok(action.getAttribute("aria-label").includes("Detector A"));
+    if (state === "UNREACHABLE") assert.ok(v.root.querySelector(".hero-missing").textContent.includes(v.panel.t.recovery_temporary));
+    v.panel._hass.callWS = async c => { v.calls.push(c); return {selected:true,groups:[],candidates:[]}; };
+    action.click(); await tick();
+    assert.equal(v.panel.detail.kind, "recovery");
+    assert.deepEqual(v.calls, [{type:"alarmmesh/recovery",source:source.entity_id}]);
     v.panel.remove();
   });
 }
