@@ -261,7 +261,7 @@ class PanelController:
             "alarmmesh-panel",
             sidebar_title="AlarmMesh",
             sidebar_icon="mdi:smoke-detector",
-            module_url=f"{ASSET_URL}/panel.js?v=20261117-recovery-review-1",
+            module_url=f"{ASSET_URL}/panel.js?v=20261117-notify-review-2",
             require_admin=True,
         )
         self.hub.controller = self
@@ -685,6 +685,11 @@ async def ws_test(hass, connection, msg):
                 msg["request_id"],
             )
         else:
+            if msg["kind"] == "notification" and (
+                not msg["identity"]
+                or msg["identity"] != controller.effects.confirmation(msg["target"])
+            ):
+                raise AutomationError("notification_confirmation_stale")
             result = await controller.effects.manual(
                 msg["kind"],
                 msg["target"],

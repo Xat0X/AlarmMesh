@@ -5,6 +5,7 @@ from .automation import (
     DEFAULT_ACTIONS,
     AutomationError,
     notification_plan,
+    notification_route,
     recipients,
     script_receipt_key,
     script_target,
@@ -74,22 +75,17 @@ def group_preview(panel, group_id: str | None, source: str) -> dict:
     settings = panel.effects.settings.value
     available = {row["service"] for row in recipients(panel.hass)}
     phones = [
-        {
-            "target": row["service"],
-            "eligible": source_ok
-            and settings["enabled"]
-            and row["enabled"]
-            and row["service"] in available
-            and not panel.effects.fault,
-            "reason": "disabled"
-            if not settings["enabled"] or not row["enabled"]
-            else "recipient_unavailable"
-            if row["service"] not in available
-            else "preview_origin_blocked"
-            if not source_ok
-            else panel.effects.fault or "preview_eligible",
-        }
-        for row in settings["recipients"]
+        notification_route(
+            panel.hass,
+            settings,
+            target,
+            source_allowed=source_ok,
+            paused=engine._paused or engine._closed or panel.effects.closed,
+            fault=panel.effects.fault,
+        )
+        for target in sorted(
+            available | {row["service"] for row in settings["recipients"]}
+        )
     ]
     notification_episode = panel.effects.episodes.get("notifications")
     if notification_episode and notification_episode["phase"] == "start":
@@ -165,6 +161,9 @@ def group_preview(panel, group_id: str | None, source: str) -> dict:
         ],
         "targets": targets,
         "phones": phones,
+        "notification_preview": panel.effects.message(
+            {"origins": [source], "phase": "start", "id": "preview"}, example=True
+        ),
         "scripts": scripts,
         "linking_enabled": group["linking"]["enabled"],
         "notifications_enabled": settings["enabled"],

@@ -587,3 +587,24 @@ Object.assign(TEXT.en, {recoveryPreparation: [
   "Choose which group memberships to transfer below.",
   "Review controls and incident origins afterwards. Only then remove the old source in Home Assistant."
 ]});
+
+Object.assign(TEXT.nl, {
+  notificationsNotConfigured: "Nog geen telefoon gekozen", notificationsOff: "Automatische meldingen uit", notificationsReady: "Klaar om een aanvraag te versturen",
+  phoneAvailable: "Dienst beschikbaar", phoneSelected: "Gekozen", recipient_not_selected: "Deze telefoon is niet gekozen voor automatische meldingen.",
+  phoneDeliveryUnconfirmed: "Verwerking door Home Assistant bewijst geen bezorging op de telefoon.",
+  phoneSetupHelp: "Stel de Companion App in voor deze Home Assistant en geef de app meldingsrechten. Controleer daarna opnieuw of de telefoon verschijnt.",
+  phoneMissingHelp: "De opgeslagen keuze blijft behouden. Controleer de Companion App of kies bewust een andere ontvanger.",
+  refreshRecipients: "Telefoons opnieuw controleren", refreshRecipientsNote: "Dit ververst alleen de lijst. Je keuzes blijven staan; er wordt niets verzonden.",
+  refreshConfirmation: "Voorbeeld opnieuw bekijken", notification_confirmation_stale: "Ontvanger of bericht is gewijzigd. Bekijk het voorbeeld opnieuw en bevestig opnieuw.",
+  delivery_accepted: "Aanvraag door Home Assistant verwerkt; resultaat niet bevestigd"
+});
+Object.assign(TEXT.en, {
+  notificationsNotConfigured: "No phone selected yet", notificationsOff: "Automatic notifications off", notificationsReady: "Ready to send a request",
+  phoneAvailable: "Service available", phoneSelected: "Selected", recipient_not_selected: "This phone is not selected for automatic notifications.",
+  phoneDeliveryUnconfirmed: "Processing by Home Assistant does not prove delivery to the phone.",
+  phoneSetupHelp: "Set up the Companion App for this Home Assistant and allow notifications. Then check again for your phone.",
+  phoneMissingHelp: "The saved choice is retained. Check the Companion App or explicitly choose another recipient.",
+  refreshRecipients: "Check phones again", refreshRecipientsNote: "Only refreshes the list. Your choices remain; nothing is sent.",
+  refreshConfirmation: "Review preview again", notification_confirmation_stale: "Recipient or message changed. Review the preview and confirm again.",
+  delivery_accepted: "HA accepted the request; physical result unconfirmed"
+});

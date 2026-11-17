@@ -31,6 +31,13 @@ behouden; bijwerken schakelt geen nieuwe uitvoer in.
    de selectie. Ontbrekende opgeslagen ontvangers blijven zichtbaar. Voorbeeldtitel
    en bericht staan in het formulier. Een testknop vraagt afzonderlijk bevestiging
    voor de genoemde ontvanger; het bewaren van instellingen verstuurt geen test.
+   **Telefoons opnieuw controleren** ververst alleen de lijst en behoudt onverzonden
+   keuzes. De test werkt ook als automatische meldingen uitstaan. Bij een gewijzigd
+   doel of bericht moet je het voorbeeld opnieuw beoordelen en bevestigen.
+   **Aanvraag verwerkt** betekent uitsluitend verwerking door Home Assistant;
+   telefoonbezorging blijft onbevestigd. Bij een eigen timeout of verloren antwoord
+   toont AlarmMesh een onbekende uitkomst, zonder opnieuw te versturen. Zie de
+   [meldingshulp en actuele controle](notification-review.md).
 5. Voor acties: bewerk een groep, kies **Acties bij incident**, voeg bestaande
    HA-scripts voor begin en/of bevestigd herstel toe en stel hun volgorde in.
    Bevestig de exacte configuratie. Een test van een script vraagt opnieuw

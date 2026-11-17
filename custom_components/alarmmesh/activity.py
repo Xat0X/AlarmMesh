@@ -364,6 +364,15 @@ class Activity:
                         groups=[] if group == "notifications" else [group],
                         correlation=episode["id"],
                     )
+            for row in panel.effects.manual_results:
+                add(
+                    ("manual", row["request_id"]),
+                    "configuration",
+                    row["kind"],
+                    row["status"],
+                    target=row["target"],
+                    correlation=row["request_id"],
+                )
             if row := panel.selftests.record:
                 add(
                     ("selftest", row["request_id"]),

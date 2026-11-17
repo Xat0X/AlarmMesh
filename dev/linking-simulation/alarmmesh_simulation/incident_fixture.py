@@ -1,7 +1,10 @@
 """No transport/phones/sound: explicit mock self-check and notification endpoints."""
 
+import asyncio
 import json
 from pathlib import Path
+
+import voluptuous as vol
 
 from homeassistant.const import EVENT_HOMEASSISTANT_STARTED
 from homeassistant.core import callback
@@ -17,6 +20,7 @@ async def async_setup_incidents(hass, entry):
     await async_setup_catalog(hass, entry)
     fixtures = hass.data["alarmmesh_simulation"]["fixtures"]
     calls = []
+    notification_mode = "normal"
     registry = er.async_get(hass)
     tests = {}
     from .matter_fixture import async_setup_matter_fixture
@@ -141,6 +145,8 @@ async def async_setup_incidents(hass, entry):
     async def notify(call):
         calls.append({"kind": "notification", "target": call.service})
         update()
+        if call.service.endswith("phone_b") and notification_mode == "timeout":
+            await asyncio.sleep(15)
         if call.service.endswith("phone_b") and hass.states.is_state(
             "input_boolean.incident_notify_failure", "on"
         ):
@@ -195,6 +201,25 @@ async def async_setup_incidents(hass, entry):
 
     for phone in ("phone_a", "phone_b"):
         hass.services.async_register("notify", "mobile_app_simulated_" + phone, notify)
+
+    async def set_notification_mode(call):
+        """Test-only fault injection; never connects to a phone or external provider."""
+        nonlocal notification_mode
+        notification_mode = call.data["mode"]
+        target = "mobile_app_simulated_phone_b"
+        if notification_mode == "missing":
+            hass.services.async_remove("notify", target)
+        else:
+            hass.services.async_register("notify", target, notify)
+
+    hass.services.async_register(
+        "alarmmesh_simulation",
+        "notification_mode",
+        set_notification_mode,
+        schema=vol.Schema(
+            {vol.Required("mode"): vol.In(["normal", "timeout", "missing"])}
+        ),
+    )
     hass.services.async_register("button", "press", press)
     hass.services.async_register("select", "select_option", select)
     entry.async_on_unload(

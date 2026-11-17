@@ -59,6 +59,47 @@ async def send_notification(hass: HomeAssistant, target: str, message: dict) -> 
     await hass.services.async_call("notify", target, message, blocking=True)
 
 
+def notification_route(
+    hass,
+    settings,
+    target,
+    *,
+    phase="start",
+    source_allowed=True,
+    paused=False,
+    fault=None,
+):
+    """Shared configuration gate for execution and read-only route inspection."""
+    chosen = next((r for r in settings["recipients"] if r["service"] == target), None)
+    selected = bool(chosen and chosen["enabled"])
+    available = target in {row["service"] for row in recipients(hass)}
+    reason = (
+        "execution_paused"
+        if paused
+        else fault
+        or (
+            "recipient_not_selected"
+            if not selected
+            else "disabled"
+            if not settings["enabled"]
+            or (phase == "recovery" and not settings["recovery"])
+            else "recipient_unavailable"
+            if not available
+            else "preview_origin_blocked"
+            if not source_allowed
+            else "preview_eligible"
+        )
+    )
+    return {
+        "target": target,
+        "selected": selected,
+        "enabled": settings["enabled"],
+        "available": available,
+        "eligible": reason == "preview_eligible",
+        "reason": reason,
+    }
+
+
 def script_target(hass: HomeAssistant, entity_id: str) -> dict | None:
     """Bind an existing script to registry identity, not just its displayed ID."""
     if not isinstance(entity_id, str) or not entity_id.startswith("script."):

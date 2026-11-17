@@ -1,6 +1,8 @@
 """Notifications/scripts consume the existing incident engine, with durable receipts."""
 
 import asyncio
+import hashlib
+import json
 import re
 from contextlib import suppress
 from copy import deepcopy
@@ -19,6 +21,7 @@ from .automation import (
     AutomationError,
     NotificationStore,
     notification_plan,
+    notification_route,
     recipients,
     script_receipt_key,
     script_target,
@@ -26,6 +29,8 @@ from .automation import (
     send_notification,
 )
 from .status import SourceStatus
+
+REQUEST_TIMEOUT = 10
 
 
 class IncidentEffects:
@@ -239,7 +244,7 @@ class IncidentEffects:
         )
         return f"{name} ({area.name})" if area else name
 
-    def message(self, episode=None, *, test=False):
+    def message(self, episode=None, *, test=False, example=False, include_time=True):
         nl = self.hass.config.language.startswith("nl")
         phase = episode["phase"] if episode else "start"
         title = "AlarmMesh · " + (
@@ -254,7 +259,7 @@ class IncidentEffects:
             if episode
             else list(self.entry.runtime_data.source_entity_ids)[:1]
         )
-        if episode and phase == "start":
+        if episode and phase == "start" and not example:
             ids = [
                 s
                 for s in ids
@@ -273,7 +278,9 @@ class IncidentEffects:
             for r in self.linking.records.values()
         )
         time = dt_util.as_local(dt_util.utcnow()).isoformat(timespec="seconds")
-        body = f"{names}\n{('Groepen' if nl else 'Groups')}: {groups or '—'}\n{time}"
+        body = f"{names}\n{('Groepen' if nl else 'Groups')}: {groups or '—'}"
+        if include_time:
+            body += f"\n{time}"
         body += f"\n{('Zoemerproblemen' if nl else 'Sounder problems')}: {problems}. "
         body += (
             "Fysieke uitvoering niet bevestigd."
@@ -311,17 +318,13 @@ class IncidentEffects:
             return False
         if receipt["kind"] == "notification":
             cfg = self.settings.value
-            return (
-                cfg["enabled"]
-                and (receipt["phase"] != "recovery" or cfg["recovery"])
-                and any(
-                    r["service"] == receipt["target"] and r["enabled"]
-                    for r in cfg["recipients"]
-                )
-                and any(
-                    r["service"] == receipt["target"] for r in recipients(self.hass)
-                )
-            )
+            return notification_route(
+                self.hass,
+                cfg,
+                receipt["target"],
+                phase=receipt["phase"],
+                fault=self.fault,
+            )["eligible"]
         group = next((g for g in self.groups.groups if g["id"] == key), None)
         cfg = group.get("actions", DEFAULT_ACTIONS) if group else DEFAULT_ACTIONS
         if (
@@ -355,8 +358,9 @@ class IncidentEffects:
                 await self._persist()
                 return
             self.publish()
+            deadline = asyncio.timeout(REQUEST_TIMEOUT)
             try:
-                async with asyncio.timeout(10):
+                async with deadline:
                     if receipt["kind"] == "notification":
                         await send_notification(
                             self.hass, receipt["target"], self.message(episode)
@@ -373,6 +377,10 @@ class IncidentEffects:
             except asyncio.CancelledError:
                 receipt["status"] = "outcome_unknown"
                 raise
+            except TimeoutError:
+                receipt["status"] = (
+                    "outcome_unknown" if deadline.expired() else "failed"
+                )
             except Exception:
                 receipt["status"] = "failed"
             else:
@@ -489,6 +497,19 @@ class IncidentEffects:
         finally:
             self._task = None
 
+    def confirmation(self, target):
+        """Bind a browser acknowledgement to current recipient and message context."""
+        service = self.hass.services.async_services().get("notify", {}).get(target)
+        if service is None or target not in {
+            r["service"] for r in recipients(self.hass)
+        }:
+            return ""
+        message = self.message(test=True, include_time=False)
+        # The time of dispatch changes naturally; substantive content must not.
+        return hashlib.sha256(
+            json.dumps([target, id(service), self.settings.revision, message]).encode()
+        ).hexdigest()
+
     def snapshot(self):
         available = {r["service"] for r in recipients(self.hass)}
         return {
@@ -508,6 +529,23 @@ class IncidentEffects:
                 for key, value in self.episodes.items()
             ],
             "preview": self.message(),
+            "test_preview": self.message(test=True),
+            "confirmations": {
+                target: self.confirmation(target) for target in available
+            },
+            "notification_routes": [
+                notification_route(
+                    self.hass,
+                    self.settings.value,
+                    target,
+                    paused=self.closed or self.linking._paused,
+                    fault=self.fault,
+                )
+                for target in sorted(
+                    available
+                    | {r["service"] for r in self.settings.value["recipients"]}
+                )
+            ],
             "error": self.fault,
             "manual_results": deepcopy(self.manual_results),
         }
@@ -528,6 +566,8 @@ class IncidentEffects:
         if kind == "notification":
             if target not in {r["service"] for r in recipients(self.hass)}:
                 raise AutomationError("recipient_unavailable")
+            if identity and identity != self.confirmation(target):
+                raise AutomationError("notification_confirmation_stale")
         elif kind == "script":
             current = script_target(self.hass, target)
             if current is None or current["identity"] != identity:
@@ -537,16 +577,26 @@ class IncidentEffects:
         if len(self.manual_ids) >= 100:
             raise AutomationError("test_limit")
         self.manual_ids.add(request_id)
-        row = {"kind": kind, "target": target, "status": "sending"}
+        row = {
+            "kind": kind,
+            "target": target,
+            "status": "sending",
+            "request_id": request_id,
+            "started": dt_util.utcnow().isoformat(),
+        }
         self.manual_results = [row]  # Only the last explicit test; no message contents.
 
+        deadline = asyncio.timeout(REQUEST_TIMEOUT)
+
         async def dispatch():
-            async with self.linking._semaphore, asyncio.timeout(10):
+            async with self.linking._semaphore, deadline:
                 if self.closed or self.linking._paused or not authorized():
                     raise AutomationError("not_loaded")
                 if kind == "notification":
                     if target not in {r["service"] for r in recipients(self.hass)}:
                         raise AutomationError("recipient_unavailable")
+                    if identity and identity != self.confirmation(target):
+                        raise AutomationError("notification_confirmation_stale")
                     await send_notification(self.hass, target, self.message(test=True))
                 else:
                     current = script_target(self.hass, target)
@@ -566,6 +616,11 @@ class IncidentEffects:
         except asyncio.CancelledError:
             row["status"] = "outcome_unknown"
             raise
+        except TimeoutError:
+            row["status"] = "outcome_unknown" if deadline.expired() else "failed"
+        except AutomationError as err:
+            row["status"] = "failed"
+            row["error"] = str(err)
         except Exception:
             row["status"] = "failed"
         else:

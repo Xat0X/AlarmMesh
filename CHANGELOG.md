@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.0-beta.11 — 2026-11-17
+
+- Preserve newer phone settings and active confirmations when recipient refresh replies arrive late, after reopening or reconnecting.
+
+- Distinguish an AlarmMesh request deadline from a definitive provider failure;
+  interrupted notification requests remain unknown and are never automatically replayed.
+- Bind notification-test confirmation to the current service and message context,
+  reconcile lost replies by request ID, and retain bounded test receipts in activity.
+- Show phone availability, automatic-send readiness, safe list refresh, actual test
+  previews and shared non-executing route decisions in Dutch and English.
+- Verify the real HA legacy notify service adapter with a local recording transport.
+  See [notification review and evidence limits](docs/notification-review.md).
+
 ## 0.1.0-beta.10 — 2026-11-17
 
 - Offer source recovery directly beside missing, unavailable or identity-changed sources; verify actual memberships after interrupted saves without automatic retry.

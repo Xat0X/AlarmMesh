@@ -1,5 +1,22 @@
 # Architecture and scope
 
+## Notification request diagnosis
+
+The existing `notify.mobile_app_*` route remains the only Companion route.
+`notification_route` shares the configuration gate between execution and read-only
+source previews; the existing `notification_plan` still controls receipt deduplication.
+Test requests carry a current server context digest bound to the registered service,
+notification-settings revision and substantive message content (not its clock line).
+The WebSocket boundary requires this digest; dispatch rechecks it after waiting for
+an execution slot. It is ephemeral, not an authentication token or persisted identity.
+
+A manual receipt exposes its request ID, start time and allowlisted error code,
+without storing message contents. The existing bounded activity store captures
+receipt transitions. Reconnect reconciles the matching request and never replays it.
+AlarmMesh's own deadline yields `outcome_unknown`; a provider-raised exception remains
+`failed`. Neither `accepted` nor a successful transport call proves phone delivery.
+See the [notification review](notification-review.md) for the actual test boundary.
+
 ## Local activity and calendar reminders
 
 `activity.py` observes already-published runtime transitions. Initial capture is a

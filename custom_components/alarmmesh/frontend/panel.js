@@ -1,4 +1,4 @@
-import { TEXT } from "./translations.js?v=20261117-morning-2";
+import { TEXT } from "./translations.js?v=20261117-notify-1";
 import { Drafts } from "./drafts.js?v=20261116-matter-1";
 
 // Safe DOM construction: names, labels and registry data are always text nodes.
@@ -33,7 +33,7 @@ export class AlarmMeshPanel extends HTMLElement {
     let storage;try{storage=globalThis.localStorage;}catch{storage=null;}this.drafts=new Drafts(storage);
     this.deviceFilters = {name:"", room:"", group:"", provider:"", status:"", maintenance:""};
     this.activityFilters = {source:"", group:"", kind:"", result:"", category:""};
-    this.onDisconnected = () => { this.generation++; this.unsubscribe?.()?.catch?.(() => {}); this.unsubscribe = null; this.data = null; this.diagnostics = null; this.transport = "offline"; this.offlineDraft(); this.render(); };
+    this.onDisconnected = () => { this.generation++; this.unsubscribe?.()?.catch?.(() => {}); this.unsubscribe = null; this.data = null; this.diagnostics = null; this.transport = "offline"; this.offlineDraft(); this.updateTestResult(); this.render(); };
     this.onReady = () => this.subscribe();
   }
   set hass(value) {
@@ -127,7 +127,7 @@ export class AlarmMeshPanel extends HTMLElement {
     const t = this.t;
     const sticky = this.shadowRoot.activeElement;
     const stickyKey = sticky?.dataset.sticky, selection = stickyKey ? [sticky.selectionStart, sticky.selectionEnd] : null;
-    const link = el("link"); link.rel = "stylesheet"; link.href = "/alarmmesh-assets/panel.css?v=20261117-morning-2";
+    const link = el("link"); link.rel = "stylesheet"; link.href = "/alarmmesh-assets/panel.css?v=20261117-notify-1";
     const shell = el("div", undefined, "shell");
     shell.classList.toggle("dark", Boolean(this._hass?.themes?.darkMode));
     const side = el("aside");
@@ -771,9 +771,10 @@ export class AlarmMeshPanel extends HTMLElement {
     const t = this.t, automation = this.data.automation;
     if (!automation) { this.renderSetupGuide(parent); return; }
     const section = el("section", undefined, "notice");
-    section.append(el("h2", t.notifications), el("p", t[automation.settings.enabled ? "enabled" : "disabled"]), el("p", t.notificationNote));
+    section.append(el("h2", t.notifications), el("p", t[!automation.settings.recipients.some(r=>r.enabled) ? "notificationsNotConfigured" : !automation.settings.enabled ? "notificationsOff" : automation.notification_routes?.some(r=>r.eligible) ? "notificationsReady" : "delivery_blocked"]), el("p", t.notificationNote));
     for (const recipient of automation.settings.recipients) section.append(el("p", `${automation.recipients.find(r => r.service === recipient.service)?.name || recipient.service.replace(/^mobile_app_/, "")}: ${t[recipient.enabled ? "enabled" : "disabled"]}${automation.missing_recipients.includes(recipient.service) ? ' · ' + t.recipient_unavailable : ''}`));
     section.append(button(t.configureNotifications, () => this.openDialog({ kind: "settings" }), "button primary"));
+    for (const row of (automation.manual_results || []).filter(r=>r.kind==="notification").slice(-3)) this.notificationReceipt(section,row);
     if (automation.error) section.append(el("p", t[automation.error] || t.error, "warning-text"));
     const scripts = el("section", undefined, "notice");
     scripts.append(el("h2", t.incidentActions), el("p", t.actionsLocation), button(t.groups, () => this.go("groups")));
@@ -794,11 +795,12 @@ export class AlarmMeshPanel extends HTMLElement {
     const stored = new Map(cfg.recipients.map(r => [r.service, r]));
     const choices = [...a.recipients, ...cfg.recipients.filter(r => !a.recipients.some(n => n.service === r.service)).map(r => ({ ...r, name: r.service, missing: true }))];
     const recipients = [], removed = new Set();
-    if (!choices.length) form.append(el("p", t.noRecipients, "notice"));
+    if (!choices.length) form.append(el("p", t.noRecipients, "notice"), el("p", t.phoneSetupHelp));
     for (const recipient of choices) {
       const row = el("section", undefined, "recipient-row");
       const input = this.checkField(row, `${recipient.name}${recipient.missing ? ' · ' + t.recipient_unavailable : ''}`, stored.get(recipient.service)?.enabled || false, "recipient");
       input.value = recipient.service; recipients.push(input);
+      row.append(el("small", t[recipient.missing ? "phoneMissingHelp" : "phoneAvailable"]));
       if (!recipient.missing) row.append(button(t.testNotification, () => this.confirmRequest(form, { actionKind: "notification", target: recipient.service, name: recipient.name }), "button"));
       if (stored.has(recipient.service)) row.append(button(t.forgetRecipient, () => { removed.add(recipient.service); row.remove(); }, "button destructive"));
       form.append(row);
@@ -806,6 +808,19 @@ export class AlarmMeshPanel extends HTMLElement {
     const preview = el("details"); preview.open = true; preview.append(el("summary", t.messagePreview), el("strong", a.preview.title), el("p", a.preview.message, "message-preview")); form.append(el("p", t.notificationTiming, "section-note"), preview);
     const error = el("p", "", "form-error"); error.setAttribute("role", "alert");
     const save = el("button", t.saveSettings, "button primary"); save.type = "submit";
+    const read = () => ({enabled:toggle.checked,recovery:recovery.checked,recipients:recipients.filter(r=>!removed.has(r.value) && (r.checked || stored.has(r.value))).map(r=>({service:r.value,enabled:r.checked}))});
+    const detail = this.detail;
+    let refreshSerial = 0;
+    form.append(button(t.refreshRecipients, async () => {
+      const serial = ++refreshSerial, generation = this.generation;
+      const current = () => form.isConnected && this.detail === detail && generation === this.generation && serial === refreshSerial && !form.querySelector(".request-confirmation");
+      try {
+        const data=await this._hass.callWS({type:"alarmmesh/current"});
+        if (!data.available || !current()) return;
+        // Read at completion: edits made while the request was pending are newer.
+        this.data=data; detail.restoredDraft={value:read(),revision}; this.renderDialog();
+      } catch { if (current()) error.textContent=t.offline; }
+    }), el("small",t.refreshRecipientsNote));
     form.append(error, save, button(t.cancel, () => this.closeDialog()));
     form.addEventListener("submit", async event => {
       event.preventDefault();
@@ -821,7 +836,7 @@ export class AlarmMeshPanel extends HTMLElement {
       if (!value.enabled) { await send(false); return; }
       this.confirmRequest(form, { name: t.confirmAutomation, confirmationOnly: true, note: `${t.notificationNote}\n${value.recipients.filter(r => r.enabled).map(r => r.service).join(', ')}`, execute: () => send(true) });
     });
-    this.trackDraft(form,revision,()=>({enabled:toggle.checked,recovery:recovery.checked,recipients:recipients.filter(r=>!removed.has(r.value) && (r.checked || stored.has(r.value))).map(r=>({service:r.value,enabled:r.checked}))}));
+    this.trackDraft(form,revision,read);
     dialog.append(form);
   }
   maintenanceForm(dialog) {
@@ -926,8 +941,10 @@ export class AlarmMeshPanel extends HTMLElement {
         for (const recipient of result.phones) {
           const name = this.data.automation?.recipients.find(r => r.service === recipient.target)?.name || recipient.target.replace(/^mobile_app_/, "");
           output.append(el("p", `${name} · ${t[recipient.reason] || t.guide_unknown}`));
+          output.append(el("small", `${t.phoneSelected}: ${t[recipient.selected ? 'enabled':'disabled']} · ${t.enableNotifications}: ${t[recipient.enabled ? 'enabled':'disabled']} · ${t.phoneAvailable}: ${t[recipient.available ? 'enabled':'disabled']}`));
         }
         if (!result.phones.length) output.append(el("p", t.noRecipients));
+        if (result.notification_preview) { const preview=el("details"); preview.append(el("summary",t.messagePreview),el("strong",result.notification_preview.title),el("p",result.notification_preview.message,"message-preview"),el("small",t.phoneDeliveryUnconfirmed));output.append(preview); }
         output.append(button(t.configureNotifications, () => this.openDialog({kind:"settings"})));
         for (const assessment of result.groups) {
           const group = this.data.groups.find(g => g.id === assessment.group);
@@ -1043,30 +1060,60 @@ export class AlarmMeshPanel extends HTMLElement {
     const restore = this.lockControls(parent);
     const box = el("section", undefined, "notice request-confirmation");
     box.restore = restore;
+    if (detail.actionKind === "notification") {
+      box.dataset.notificationTarget = detail.target;
+      box.dataset.notificationToken = this.data?.automation?.confirmations?.[detail.target] || "";
+      detail.identity = box.dataset.notificationToken;
+    }
     box.append(el("h3", detail.name || t.explicitTest), el("p", detail.note || (detail.actionKind === "selftest" ? t.selfTestWarning : detail.actionKind === "script" ? t.scriptConsequences : t.notifyTestWarning)));
     const ack = this.checkField(box, t.confirmExactTarget, false, "confirm-request");
     const error = el("p", "", "form-error"); error.setAttribute("role", "alert");
     const status = el("p", "", "request-status"); status.setAttribute("role", "status");
     const execute = button(t.confirmRequest, async () => {
+      if (execute.disabled || execute.dataset.started) return;
+      if (detail.actionKind === "notification" && (!detail.identity || detail.identity !== this.data?.automation?.confirmations?.[detail.target])) {
+        ack.checked = false; status.textContent = t.notification_confirmation_stale; return;
+      }
       if (!ack.checked) { error.textContent = t.test_confirmation_required; ack.focus(); return; }
       if (!this.data) { error.textContent = t.offline; return; }
       error.textContent = "";
       execute.disabled = true;
       execute.dataset.started = "true";
+      status.textContent = t.delivery_sending;
       if (detail.execute) { await detail.execute(); return; }
       try {
         if (typeof globalThis.crypto?.getRandomValues !== "function") throw Object.assign(new Error("Secure random values unavailable"), { code: "request_random_unavailable" });
         // getRandomValues also works on local HTTP; randomUUID requires a secure context.
         const request = Array.from(globalThis.crypto.getRandomValues(new Uint8Array(16)), byte => byte.toString(16).padStart(2, "0")).join("");
         if (detail.actionKind === "selftest") box.dataset.selftestRequest = request;
+        if (detail.actionKind === "notification") box.dataset.deliveryRequest = request;
         const result = await this._hass.callWS({ type: "alarmmesh/test", kind: detail.actionKind, target: detail.target, identity: detail.identity || "", confirmed: true, request_id: request });
         status.textContent = t[(detail.actionKind === "selftest" ? "test_" : "delivery_") + result.status] || t.error;
         this.updateTestResult();
-      } catch (e) { error.textContent = t[e.code] || t.error; }
+      } catch (e) {
+        if (detail.actionKind === "notification") status.textContent = t[e.code] || t.delivery_outcome_unknown;
+        else error.textContent = t[e.code] || t.error;
+      }
     }, "button destructive confirm-execute");
     box.append(status, error, button(t.cancel, () => { box.remove(); restore(); if (parent.tagName === "DIALOG" && this.detail?.kind === "test") this.closeDialog(); }), execute); parent.append(box); ack.focus();
+    if (detail.actionKind === "notification" && this.data?.automation?.test_preview) {
+      const preview = this.data.automation.test_preview;
+      box.insertBefore(el("p", `${preview.title}\n${preview.message}`, "message-preview"), ack.parentElement);
+      box.append(el("small", t.phoneDeliveryUnconfirmed), button(t.refreshConfirmation, () => this.confirmRequest(parent, detail)));
+    }
   }
   updateTestResult() {
+    for (const box of this.shadowRoot.querySelectorAll("[data-notification-target]")) {
+      const status = box.querySelector(".request-status");
+      if (box.dataset.deliveryRequest) {
+        const receipt = this.data?.automation?.manual_results?.find(row => row.request_id === box.dataset.deliveryRequest);
+        if (receipt) status.textContent = this.t['delivery_' + receipt.status] + (receipt.error ? ` · ${this.t[receipt.error] || this.t.deliveryAdvice}` : "");
+        else if (!this.data) status.textContent = this.t.delivery_outcome_unknown;
+      } else if (this.data?.automation?.confirmations?.[box.dataset.notificationTarget] !== box.dataset.notificationToken) {
+        box.querySelector('[name="confirm-request"]').checked = false;
+        status.textContent = this.t.notification_confirmation_stale;
+      }
+    }
     const result = this.data?.selftest;
     for (const box of this.shadowRoot.querySelectorAll("[data-selftest-request]")) {
       if (result?.request_id === box.dataset.selftestRequest) box.querySelector(".request-status").textContent = this.t["test_" + result.status] || this.t.error;
@@ -1151,7 +1198,7 @@ export class AlarmMeshPanel extends HTMLElement {
       card.append(el("small", t.incidentEvidenceLimit, "muted"));
       parent.append(card);
     }
-    for (const row of data.automation?.manual_results || []) parent.append(el("p", `${t.explicitTest} · ${row.target}: ${t['delivery_' + row.status]}`));
+    for (const row of data.automation?.manual_results || []) this.notificationReceipt(parent,row);
     if (data.selftest) parent.append(el("section", undefined, "notice selftest-result"));
     const self = parent.querySelector(".selftest-result");
     if (self) self.append(el("h2", t.selfTests), el("p", `${data.sources.find(s => s.entity_id === data.selftest.source)?.name || data.selftest.source}: ${t['test_' + data.selftest.status]}`), el("p", t.deviceResultNote));
@@ -1161,6 +1208,15 @@ export class AlarmMeshPanel extends HTMLElement {
     if (!source) return id;
     const duplicate = this.data.sources.some(other => other.entity_id !== id && other.name === source.name && other.area_id === source.area_id);
     return `${source.name} · ${source.area_name || this.t.noRoom}${duplicate ? ` · ${id}` : ""}`;
+  }
+  notificationReceipt(parent,row) {
+    const t=this.t,card=el("section",undefined,"notice");
+    card.append(el("strong",`${t.explicitTest} · ${row.target.replace(/^mobile_app_/,"")}`),el("p",t['delivery_'+row.status] || t.guide_unknown),el("small",this.formatTime(row.started)));
+    if(row.kind==="notification") {
+      card.append(el("p",t.phoneDeliveryUnconfirmed));
+      if(["failed","blocked","outcome_unknown"].includes(row.status)) card.append(el("p",t[row.error] || t.deliveryAdvice),button(t.configureNotifications,()=>this.openDialog({kind:"settings"})));
+    }
+    const details=el("details");details.append(el("summary",t.requestContext),el("p",row.request_id || t.guide_unknown));card.append(details);parent.append(card);
   }
   draftKey(detail=this.detail) {return detail ? detail.kind+":"+(detail.id || detail.group?.id || "new") : "";}
   draftSignature() {const d=this.data;if(!d)return "";return JSON.stringify([d.sources.map(s=>[s.entity_id,s.reminder_identity || null,s.capability?.matter?.fingerprint || null,s.capability?.controls?.map(c=>[c.target,c.identity]) || [],s.selftest?.control?.identity || null]),(d.automation?.scripts || []).map(s=>[s.entity_id,s.identity]),(d.automation?.recipients || []).map(r=>r.service).sort()]);}
@@ -1260,6 +1316,7 @@ export class AlarmMeshPanel extends HTMLElement {
     if(this.data.sources.some(s=>s.entity_id===row.source)) parent.append(button(t.inspectDetector,()=>this.openDialog({kind:"source",id:row.source})));
     for(const group of this.data.groups.filter(g=>row.groups.includes(g.id))) parent.append(button(group.name,()=>this.openDialog({kind:"group",id:group.id})));
     if(row.category==="alarm") parent.append(button(t.viewIncidents,()=>this.go("incidents")));
+    if(row.kind==="notification") parent.append(el("p",row.category==="configuration" ? t.explicitTest : t.phoneRequest),el("p",t.phoneDeliveryUnconfirmed),button(t.configureNotifications,()=>this.openDialog({kind:"settings"})));
   }
   renderReminders(parent) {
     const t=this.t, data=this.data.reminders, section=el("section",undefined,"notice reminder-list"); section.append(el("h2",t.reminders),el("p",t.reminderNote));

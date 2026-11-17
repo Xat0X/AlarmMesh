@@ -395,7 +395,7 @@ test("group check keeps active smoke and request failure distinct and closes on 
 
 function featureData() {
   const data = linkedData();
-  data.automation = { settings: { revision: 0, enabled: false, recovery: false, recipients: [] }, recipients: [{ service: "mobile_app_simulated_phone", name: "SIMULATED phone" }], scripts: [{ entity_id: "script.simulated_start", identity: "c".repeat(64), name: "SIMULATED action" }], missing_recipients: [], episodes: [], manual_results: [], preview: { title: "AlarmMesh preview", message: "Example source and room" } };
+  data.automation = { confirmations: {mobile_app_simulated_phone: "a".repeat(64)}, settings: { revision: 0, enabled: false, recovery: false, recipients: [] }, recipients: [{ service: "mobile_app_simulated_phone", name: "SIMULATED phone" }], scripts: [{ entity_id: "script.simulated_start", identity: "c".repeat(64), name: "SIMULATED action" }], missing_recipients: [], episodes: [], manual_results: [], preview: { title: "AlarmMesh preview", message: "Example source and room" } };
   data.sources[0].selftest = { available: true, reason: "selftest_supported", control: { source: source.entity_id, identity: "d".repeat(64) }, record: null };
   data.sources[1].selftest = { available: false, reason: "selftest_unsupported", control: null, record: null };
   return data;
@@ -1191,6 +1191,54 @@ test("incomplete overview names the affected source before summaries", () => {
   view.panel.remove();
 });
 
+test("notification acknowledgement expires with its server confirmation context", async () => {
+  const v = setup(), data = featureData(), target = "mobile_app_simulated_phone";
+  data.automation.confirmations = {[target]: "a".repeat(64)};
+  v.transport.callbacks.at(-1)(data);
+  v.panel.openDialog({kind:"test", actionKind:"notification", target, name:"Phone"});
+  v.root.querySelector('[name="confirm-request"]').checked = true;
+  data.automation.confirmations[target] = "b".repeat(64);
+  v.transport.callbacks.at(-1)(data);
+  v.root.querySelector('.confirm-execute').click(); await tick();
+  assert.equal(v.calls.length, 0);
+  assert.equal(v.root.querySelector('[name="confirm-request"]').checked, false);
+  assert.ok(v.root.querySelector('.request-status').textContent.includes(v.panel.t.notification_confirmation_stale));
+  v.panel.remove();
+});
+
+test("lost notification reply reconciles only its matching receipt without replay", async () => {
+  const v = setup(), data = featureData(), target = "mobile_app_simulated_phone";
+  data.automation.confirmations = {[target]: "a".repeat(64)};
+  v.transport.callbacks.at(-1)(data);
+  v.panel._hass.callWS = async c => {v.calls.push(c);throw {code:"connection_lost"};};
+  v.panel.openDialog({kind:"settings"});
+  [...v.root.querySelectorAll('button')].find(b=>b.textContent==='Send test notification').click();
+  v.root.querySelector('[name="confirm-request"]').checked = true;
+  v.root.querySelector('.confirm-execute').click();await tick();
+  assert.ok(v.root.querySelector('.request-status').textContent.includes(v.panel.t.delivery_outcome_unknown));
+  data.automation.manual_results = [{kind:"notification",target,request_id:v.calls[0].request_id,status:"accepted"}];
+  v.transport.callbacks.at(-1)(data);
+  assert.ok(v.root.querySelector('.request-status').textContent.includes(v.panel.t.delivery_accepted));
+  assert.equal(v.calls.length,1);
+  assert.equal(v.root.querySelector('.confirm-execute').disabled,true);
+  v.panel.remove();
+});
+
+test("phone refresh retains unsaved choices and original revision without sending", async () => {
+  const v=setup(),data=featureData();v.transport.callbacks.at(-1)(data);
+  v.panel.openDialog({kind:"settings"});
+  v.root.querySelector('[name="recipient"]').checked=true;
+  v.root.querySelector('[name="notifications-recovery"]').checked=true;
+  const updated=structuredClone(data);updated.automation.settings.revision=8;updated.automation.recipients=[];
+  v.panel._hass.callWS=async m=>{v.calls.push(m);return updated;};
+  [...v.root.querySelectorAll('button')].find(b=>b.textContent===v.panel.t.refreshRecipients).click();await tick();
+  assert.equal(v.root.querySelector('[name="recipient"]').checked,true);
+  assert.equal(v.root.querySelector('[name="notifications-recovery"]').checked,true);
+  assert.ok(v.root.querySelector('dialog').textContent.includes(v.panel.t.phoneMissingHelp));
+  assert.equal(v.panel.detail.restoredDraft.revision,0);
+  assert.deepEqual(v.calls,[{type:"alarmmesh/current"}]);v.panel.remove();
+});
+
 for (const state of ["MISSING", "UNREACHABLE", "changed"]) {
   test(`overview offers direct source recovery for ${state} without dispatch`, async () => {
     const v = setup("nl"), data = normal();
@@ -1205,6 +1253,25 @@ for (const state of ["MISSING", "UNREACHABLE", "changed"]) {
     action.click(); await tick();
     assert.equal(v.panel.detail.kind, "recovery");
     assert.deepEqual(v.calls, [{type:"alarmmesh/recovery",source:source.entity_id}]);
+    v.panel.remove();
+  });
+}
+for (const scenario of ['edit', 'reopen', 'confirmation', 'reconnect']) {
+  test(`late phone refresh preserves ${scenario}`, async () => {
+    const v=setup(), data=featureData();
+    data.automation.confirmations={mobile_app_simulated_phone:'a'.repeat(64)};
+    v.transport.callbacks.at(-1)(data);v.panel.openDialog({kind:'settings'});
+    let resolve;v.panel._hass.callWS=()=>new Promise(r=>{resolve=r;});
+    [...v.root.querySelectorAll('button')].find(b=>b.textContent===v.panel.t.refreshRecipients).click();
+    if(scenario==='reopen'){v.panel.closeDialog();v.panel.openDialog({kind:'settings'});}
+    if(scenario==='confirmation') [...v.root.querySelectorAll('button')].find(b=>b.textContent===v.panel.t.testNotification).click();
+    if(scenario==='reconnect'){v.transport.event('disconnected');v.transport.event('ready');await tick();v.transport.callbacks.at(-1)(data);}
+    const form=v.root.querySelector('dialog form');
+    form.querySelector('[name=notifications-recovery]').checked=true;
+    resolve(data);await tick();
+    assert.equal(v.root.querySelector('[name=notifications-recovery]').checked,true);
+    if(scenario!=='edit')assert.equal(v.root.querySelector('dialog form'),form);
+    if(scenario==='confirmation')assert.ok(v.root.querySelector('.request-confirmation'));
     v.panel.remove();
   });
 }
