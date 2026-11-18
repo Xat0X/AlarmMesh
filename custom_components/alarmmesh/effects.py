@@ -60,6 +60,7 @@ class IncidentEffects:
         self.manual_tasks = set()
         self.manual_ids = set()
         self.manual_results = []
+        self.phone_evidence = None
         self.dirty = False
         self.closed = False
         self.fault = None
@@ -673,7 +674,17 @@ class IncidentEffects:
             raise AutomationError("invalid_request")
         if self.closed or self.linking._paused:
             raise AutomationError("not_loaded")
-        if self.manual_tasks or request_id in self.manual_ids:
+        if (
+            self.manual_tasks
+            or request_id in self.manual_ids
+            or (
+                kind == "notification"
+                and self.phone_evidence is not None
+                and any(
+                    row["request_id"] == request_id for row in self.phone_evidence.rows
+                )
+            )
+        ):
             raise AutomationError("test_busy")
         if kind == "notification":
             if self.phone_profile(target) is not None and not identity:
@@ -730,9 +741,20 @@ class IncidentEffects:
                         )
                     ):
                         raise AutomationError("notification_confirmation_stale")
-                    await send_notification(
-                        self.hass, target, self.phone_plan(target, test=True)["message"]
-                    )
+                    if self.phone_evidence:
+                        await self.phone_evidence.register(row)
+                    if self.closed or self.linking._paused or not authorized():
+                        raise AutomationError("not_loaded")
+                    if identity and identity not in {
+                        self.confirmation(target, request_id),
+                        self.confirmation(target)
+                        if self.phone_profile(target) is None
+                        else "",
+                    }:
+                        raise AutomationError("notification_confirmation_stale")
+                    message = self.phone_plan(target, test=True)["message"]
+                    row["attempted"] = True
+                    await send_notification(self.hass, target, message)
                 else:
                     current = script_target(self.hass, target)
                     if current is None or current["identity"] != identity:
@@ -762,6 +784,8 @@ class IncidentEffects:
             row["status"] = "accepted"
         finally:
             self.manual_tasks.discard(task)
+            if kind == "notification" and self.phone_evidence:
+                await self.phone_evidence.finish(row)
             if not self.closed:
                 self.publish()
         return deepcopy(row)

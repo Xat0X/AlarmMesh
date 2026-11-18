@@ -627,3 +627,31 @@ recovery remain ordinary. No new retry, timer, device command or token storage.
 Manual latest-per-recipient receipts are bounded to 20 in runtime; existing
 bounded activity provides history. Nothing claims phone delivery or sound.
 See [phone contracts and limitations](phone-alerts.md).
+
+### Read-only inventory and user-observed tests
+
+`alarmmesh/alarm_settings` aggregates `source_preview` for each selected source;
+it reuses the existing execution assessment, deduplicated targets and global
+notification plan. It never simulates an incident or sends an action. The panel
+shows optional disabled routes as disabled, not as a household safety rating.
+
+The optional version-1 `alarmmesh.phone_evidence.<entry-id>` HA Store holds at
+most 100 manual requests and five observations per request. The displayed window
+is 30 days; pruning is persisted on load/write, without a new timer. Existing
+settings/activity stores and config-entry schema are unchanged. An absent store
+starts empty; damaged data blocks observation writes, not notification dispatch.
+An interrupted request loads as outcome unknown, never accepted or delivered.
+
+Each observation binds to a server-generated request ID, captured profile and
+hashed registration identity. Received/heard are independent nullable booleans;
+simulation is explicit. Admin authorization, lifecycle and revision checks guard
+atomic writes. There are no tokens, full messages or observer account names in
+this store. Preserved request IDs cannot be dispatched again after reload;
+this prevents a new recipient from inheriting another request's observations.
+Profile/identity changes retain history but make it noncurrent;
+unobservable phone permission changes remain a limitation. Recording emits an
+existing configuration activity event, never an external command.
+
+Incident chronology reads the existing bounded alarm activity records and their
+timestamps/correlation. It does not reconstruct missing events or infer delivery.
+See [current local review](alarm-settings-review.md).

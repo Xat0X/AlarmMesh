@@ -105,5 +105,6 @@ async def async_remove_entry(hass: HomeAssistant, entry: AlarmMeshConfigEntry) -
         "activity",
         "reminders",
         "matter_sources",
+        "phone_evidence",
     ):
         await Store(hass, 1, f"alarmmesh.{purpose}.{entry.entry_id}").async_remove()

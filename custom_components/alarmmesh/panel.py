@@ -30,7 +30,8 @@ from .groups import GroupError, GroupStore
 from .linking_runtime import LinkingRuntime
 from .maintenance import Maintenance
 from .matter import MatterSources, is_co_source
-from .preview import group_preview, source_preview
+from .phone_evidence import PhoneEvidence
+from .preview import alarm_settings, group_preview, source_preview
 from .recovery import recover_groups, recovery_plan
 from .reminders import Reminders
 from .runtime import AlarmMeshConfigEntry
@@ -222,6 +223,8 @@ class PanelController:
         self.selftests = SelfTests(hass, entry, self.linking, hub.publish)
         self.maintenance = Maintenance(hass, entry, self.linking, hub.publish)
         self.activity = Activity(hass, entry, hub.publish)
+        self.phone_evidence = PhoneEvidence(hass, entry, self.effects, hub.publish)
+        self.effects.phone_evidence = self.phone_evidence
         self.reminders = Reminders(
             hass, entry, self.linking, hub.publish, self.activity
         )
@@ -243,6 +246,7 @@ class PanelController:
         await self.selftests.load()
         await self.maintenance.load()
         await self.activity.load()
+        await self.phone_evidence.load()
         await self.reminders.load()
         self.unsubscribers.append(self.runtime.async_add_observer(self.hub.publish))
         for event in (
@@ -261,7 +265,7 @@ class PanelController:
             "alarmmesh-panel",
             sidebar_title="AlarmMesh",
             sidebar_icon="mdi:smoke-detector",
-            module_url=f"{ASSET_URL}/panel.js?v=20261118-independent-1",
+            module_url=f"{ASSET_URL}/panel.js?v=20261118-settings-1",
             require_admin=True,
         )
         self.hub.controller = self
@@ -319,6 +323,7 @@ class PanelController:
         await self.maintenance.close()
         await self.reminders.close()
         await self.effects.close()
+        await self.phone_evidence.close()
         await self.linking.close()
         await self.groups.async_close()
         await self.activity.close()
@@ -520,6 +525,7 @@ class PanelController:
             "selftest": deepcopy(self.selftests.record),
             "maintenance": maintenance,
             "activity": self.activity.snapshot(),
+            "phone_evidence": self.phone_evidence.snapshot(),
             "reminders": self.reminders.snapshot(),
             "review": review,
             "matter_revision": self.matter_sources.revision,
@@ -550,6 +556,8 @@ async def async_prepare(hass: HomeAssistant) -> PanelHub:
         websocket_api.async_register_command(hass, ws_maintenance)
         websocket_api.async_register_command(hass, ws_preview)
         websocket_api.async_register_command(hass, ws_route)
+        websocket_api.async_register_command(hass, ws_alarm_settings)
+        websocket_api.async_register_command(hass, ws_phone_observation)
         websocket_api.async_register_command(hass, ws_current)
         websocket_api.async_register_command(hass, ws_recovery)
         websocket_api.async_register_command(hass, ws_diagnostics)
@@ -994,3 +1002,67 @@ def ws_current(hass, connection, msg):
     connection.send_result(
         msg["id"], panel.snapshot() if panel else {"available": False}
     )
+
+
+@websocket_api.websocket_command({vol.Required("type"): "alarmmesh/alarm_settings"})
+@websocket_api.require_admin
+@callback
+def ws_alarm_settings(hass, connection, msg):
+    panel = hass.data[DATA_HUB].controller
+    if panel is None:
+        connection.send_error(msg["id"], "not_loaded", "not_loaded")
+        return
+    connection.send_result(msg["id"], alarm_settings(panel))
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "alarmmesh/phone_observation",
+        vol.Required("request_id"): vol.Match(r"^[a-f0-9]{32}$"),
+        vol.Required("revision"): int,
+        vol.Required("received"): vol.Any(None, bool),
+        vol.Required("heard"): vol.Any(None, bool),
+        vol.Required("simulation"): bool,
+    }
+)
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_phone_observation(hass, connection, msg):
+    panel = hass.data[DATA_HUB].controller
+    if panel is None or panel.linking._paused or panel.effects.closed:
+        connection.send_error(msg["id"], "not_loaded", "not_loaded")
+        return
+    try:
+        changed = await panel.phone_evidence.observe(
+            msg["request_id"],
+            msg["revision"],
+            msg["received"],
+            msg["heard"],
+            msg["simulation"],
+            lambda: bool(
+                connection.user
+                and connection.user.is_admin
+                and not panel.linking._paused
+                and not panel.effects.closed
+            ),
+        )
+        if changed:
+            row = next(
+                r
+                for r in panel.phone_evidence.rows
+                if r["request_id"] == msg["request_id"]
+            )
+            panel.activity.record(
+                "configuration",
+                "phone_observation",
+                "user_observed",
+                target=row["target"],
+                correlation=row["request_id"],
+            )
+    except (AutomationError, OSError) as err:
+        code = (
+            str(err) if isinstance(err, AutomationError) else "phone_evidence_storage"
+        )
+        connection.send_error(msg["id"], code, code)
+        return
+    connection.send_result(msg["id"], panel.phone_evidence.snapshot())

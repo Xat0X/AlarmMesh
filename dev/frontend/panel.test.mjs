@@ -1385,3 +1385,73 @@ for (const when of ['before-check', 'pending-check', 'after-check']) {
     assert.deepEqual(v.calls,['alarmmesh/settings','alarmmesh/current']);v.panel.remove();
   });
 }
+
+
+test("all-detector alarm settings use only the read-only endpoint and refresh problems",async()=>{
+  const v=setup('nl'),d=phoneData();v.transport.callbacks.at(-1)(d);let unavailable=false;
+  v.panel._hass.callWS=async m=>{v.calls.push(m);return {readonly:true,revision:d.revision,rows:[{source:source.entity_id,status:unavailable?'UNREACHABLE':'NO_SMOKE_REPORTED',targets:[],groups:[],phones:[{target:'mobile_app_simulated_phone',profile:null,eligible:false,reason:'disabled'}]}]};};
+  v.panel.openDialog({kind:'alarmsettings'});await tick();assert.deepEqual(v.calls.map(c=>c.type),['alarmmesh/alarm_settings']);
+  assert.equal(v.root.querySelectorAll('.alarm-setting-card').length,1);assert.match(v.root.querySelector('dialog').textContent,/alle geselecteerde melders/);
+  unavailable=true;v.transport.callbacks.at(-1)(d);await tick();assert.match(v.root.querySelector('dialog').textContent,/tijdelijk onbereikbaar/);
+  unavailable=false;v.transport.callbacks.at(-1)(d);await tick();assert.ok(!v.root.querySelector('dialog').textContent.includes('tijdelijk onbereikbaar'));
+  assert.ok(v.calls.every(c=>c.type==='alarmmesh/alarm_settings'));v.panel.remove();
+});
+function evidenceData(){const d=phoneData();d.phone_evidence={revision:2,error:null,requests:[{request_id:'a'.repeat(32),target:'mobile_app_simulated_phone',profile:null,started:'2026-11-18T10:00:00Z',attempted:true,status:'accepted',current:true,reason:'phone_request_current',observations:[]}]};return d;}
+test("own observations are independent, request-bound and send no phone command",async()=>{
+  const v=setup(),d=evidenceData();v.transport.callbacks.at(-1)(d);v.panel.openDialog({kind:'phoneObservation',id:'a'.repeat(32)});
+  v.root.querySelector('[name=received]').querySelector('[value=yes]').selected=true;v.root.querySelector('[name=heard]').querySelector('[value=no]').selected=true;v.root.querySelector('[name=simulation-observation]').checked=true;
+  const form=v.root.querySelector('form');form.dispatchEvent(new Event('submit',{cancelable:true}));form.dispatchEvent(new Event('submit',{cancelable:true}));await tick();
+  assert.deepEqual(v.calls,[{type:'alarmmesh/phone_observation',request_id:'a'.repeat(32),revision:2,received:true,heard:false,simulation:true}]);
+  assert.match(v.root.querySelector('.observation-status').textContent,/observation is saved/);assert.equal(v.root.querySelector('[type=submit]').disabled,true);v.panel.remove();
+});
+test("observation readback compares the latest edits and stays read-only after reconnect",async()=>{
+  const v=setup(),d=evidenceData();v.transport.callbacks.at(-1)(d);let finish;
+  v.panel._hass.callWS=async m=>{v.calls.push(m);if(m.type==='alarmmesh/phone_observation')throw {code:'connection_lost'};return new Promise(r=>{finish=r;});};
+  v.panel.openDialog({kind:'phoneObservation',id:'a'.repeat(32)});v.root.querySelector('[name=received]').querySelector('[value=yes]').selected=true;v.root.querySelector('form').dispatchEvent(new Event('submit',{cancelable:true}));await tick();
+  [...v.root.querySelectorAll('button')].find(b=>b.textContent===v.panel.t.checkSavedPhones).click();await tick();
+  v.root.querySelector('[name=heard]').querySelector('[value=yes]').selected=true;d.phone_evidence.requests[0].observations=[{at:'2026-11-18T10:01:00Z',received:true,heard:null,simulation:false}];finish(d);await tick();
+  assert.match(v.root.querySelector('.observation-status').textContent,/not confirmed saved/);
+  v.transport.event('disconnected');v.transport.event('ready');await tick();v.transport.callbacks.at(-1)(d);
+  assert.equal(v.root.querySelector('[name=heard]').value,'yes');assert.equal(v.root.querySelector('[type=submit]').disabled,true);assert.equal(v.calls.filter(c=>c.type==='alarmmesh/phone_observation').length,1);v.panel.remove();
+});
+test("old-profile observations remain history and simulation is explicit",()=>{
+  const v=setup('nl'),d=evidenceData();d.phone_evidence.requests[0].current=false;d.phone_evidence.requests[0].reason='phone_observation_old_profile';d.phone_evidence.requests[0].observations=[{at:'2026-11-18T10:01:00Z',received:true,heard:false,simulation:true}];
+  v.transport.callbacks.at(-1)(d);v.panel.go('settings');const text=v.root.querySelector('.phone-user-evidence').textContent;assert.match(text,/Eerdere test/);assert.match(text,/Simulatie: geen echte telefoon/);assert.match(text,/gehoord: Nee/);assert.equal(v.calls.length,0);v.panel.remove();
+});
+test("change summary distinguishes additions, disabled choices and unchanged forms",()=>{
+  const v=setup('nl'),d=phoneData();v.transport.callbacks.at(-1)(d);const original=d.automation.settings;
+  assert.deepEqual(v.panel.changeRows('phones',original,structuredClone(original)),[]);
+  const modified=structuredClone(original);modified.enabled=true;modified.recipients=[{service:'mobile_app_new',enabled:true,profile:{platform:'ios',critical:true,sound:'default',volume:1}}];
+  const rows=v.panel.changeRows('phones',original,modified);assert.ok(rows.some(r=>r.includes('Toegevoegd: new')));assert.ok(rows.some(r=>r.includes('Gewijzigd:')));assert.deepEqual(d.automation.settings,original);assert.deepEqual(v.calls,[]);v.panel.remove();
+});
+test("incident timeline shows recorded transitions once and keeps unknown separate",()=>{
+  const v=setup(),d=evidenceData();d.activity={incomplete:true,events:[{id:'new',category:'alarm',kind:'notification',result:'outcome_unknown',target:'mobile_app_simulated_phone',correlation:'episode',observed_at:'2026-11-18T10:01:00Z'},{id:'old',category:'alarm',kind:'source',result:'SMOKE_REPORTED',source:source.entity_id,groups:[],correlation:'source',observed_at:'2026-11-18T10:00:00Z'}]};
+  v.transport.callbacks.at(-1)(d);v.panel.go('incidents');for(let i=0;i<3;i++)v.transport.callbacks.at(-1)(d);
+  const rows=v.root.querySelectorAll('.incident-timeline li');assert.equal(rows.length,2);assert.match(rows[0].textContent,/unknown/);assert.match(rows[1].textContent,/Smoke reported/);assert.equal(v.calls.length,0);v.panel.remove();
+});
+
+test("configuration summary cannot authorize a revision changed while open",async()=>{
+ const v=setup(),d=phoneData();v.transport.callbacks.at(-1)(d);let executed=0;
+ v.panel.openDialog({kind:'settings'});const form=v.root.querySelector('form');
+ v.panel.confirmRequest(form,{changes:{kind:'phones',before:d.automation.settings,after:{...d.automation.settings,enabled:true}},confirmationOnly:true,execute:async()=>{executed++;}});
+ v.root.querySelector('[name=confirm-request]').checked=true;
+ const next=structuredClone(d);next.automation.settings.revision++;v.transport.callbacks.at(-1)(next);
+ v.root.querySelector('.confirm-execute').click();await tick();assert.equal(executed,0);assert.equal(v.root.querySelector('[name=confirm-request]').checked,false);v.panel.remove();
+});
+
+test("phone volume stays readable and reloadable without binary floating-point noise",()=>{
+ const v=setup(),d=phoneData();d.automation.settings.recipients=[{service:d.automation.recipients[0].service,enabled:true,profile:{version:1,platform:'ios',origin:'metadata',identity:'b'.repeat(64),critical:true,sound:'default',sound_source:'bundled',volume:0.55}}];v.transport.callbacks.at(-1)(d);
+ assert.match(v.panel.phoneSummary(d.automation.settings.recipients[0].profile),/55%/);
+ assert.doesNotMatch(v.panel.phoneSummary(d.automation.settings.recipients[0].profile),/000000/);
+ v.panel.openDialog({kind:'settings'});assert.equal(v.root.querySelector('[name=phone-volume]').value,'55');v.panel.remove();
+});
+
+test("lost confirmed-save response never leaves a fictional running request after readback",async()=>{
+ const v=setup(),data=phoneData();v.transport.callbacks.at(-1)(data);let saved;
+ v.panel._hass.callWS=async m=>{if(m.type==='alarmmesh/settings'){saved=m.notifications;throw {code:'connection_lost'};}return {...data,automation:{...data.automation,settings:{...saved,revision:1}}};};
+ v.panel.openDialog({kind:'settings'});v.root.querySelector('[name=recipient]').checked=true;
+ const critical=v.root.querySelector('[name=phone-critical]');critical.checked=true;critical.dispatchEvent(new Event('change',{bubbles:true}));
+ v.root.querySelector('form').dispatchEvent(new Event('submit',{cancelable:true}));v.root.querySelector('[name=confirm-request]').checked=true;v.root.querySelector('.confirm-execute').click();await tick();
+ assert.notEqual(v.root.querySelector('.request-status').textContent,v.panel.t.delivery_sending);
+ v.root.querySelector('[data-check-saved-phones]').click();await tick();assert.equal(v.root.querySelector('.request-status').textContent,'');assert.match(v.root.querySelector('.save-reconcile').textContent,/These choices are saved/);v.panel.remove();
+});

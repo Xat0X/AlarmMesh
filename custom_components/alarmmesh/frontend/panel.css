@@ -136,3 +136,11 @@ dialog .recovery-smoke { border: 2px solid var(--alarm); }
 .episode-phase { font-weight:600; margin-bottom:12px; }
 summary:focus-visible,select:focus-visible,a:focus-visible { outline:3px solid #008e9c; outline-offset:3px; }
 @media(max-width:700px){.settings-grid{grid-template-columns:1fr}.settings-grid .settings-task{padding:20px}}
+
+.alarm-setting-card,.phone-user-evidence section { border:1px solid var(--line);border-radius:12px;padding:16px;margin:16px 0;overflow-wrap:anywhere; }
+.alarm-setting-card summary {min-height:44px;cursor:pointer;font-weight:600;}
+.alarm-setting-card h3,.alarm-setting-card h4 {margin:18px 0 8px;}
+.alarm-setting-card p,.phone-user-evidence p {margin:8px 0;}
+.change-summary {margin:16px 0;border-left:3px solid var(--teal);padding-left:14px;}
+.change-summary li,.incident-timeline li {margin:10px 0;overflow-wrap:anywhere;}
+form>label>select {display:block;min-height:44px;width:100%;font:inherit;color:var(--primary-text-color);background:var(--card-background-color);margin:8px 0 16px;}

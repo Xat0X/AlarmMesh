@@ -1,6 +1,19 @@
 # Changelog
 
-## 0.1.0-beta.12 — 2026-11-18
+## 0.1.0-beta.13 — 2026-11-18
+
+- Add My alarm settings, a read-only per-detector overview using the existing
+  backend route decisions, shared targets and global phone choices.
+- Record administrator observations of exact phone test requests separately
+  for received and heard; retain bounded history and flag changed profiles.
+- Reject reused recorded phone request IDs after reload, preserving the original
+  request/recipient binding without dispatching a second test.
+- Show changes before phone/group saves and reject a stale confirmation in
+  the interface as well as at the backend revision gate.
+- Present recorded incident events separately from current smoke status.
+  No new automatic output, retry or physical acceptance claim.
+
+## 0.1.0-beta.12 â€” 2026-11-18
 
 - Correct saved-choice verification after a lost response: compare the current
   form and invalidate the success message when it is edited. Three regressions
@@ -24,7 +37,7 @@
 - Add simulated service-layer regressions and inspect all eight language/theme/
   phone-tablet combinations. See [local review](docs/critical-notification-review.md).
 
-## 0.1.0-beta.11 — 2026-11-17
+## 0.1.0-beta.11 â€” 2026-11-17
 
 - Preserve newer phone settings and active confirmations when recipient refresh replies arrive late, after reopening or reconnecting.
 
@@ -37,7 +50,7 @@
 - Verify the real HA legacy notify service adapter with a local recording transport.
   See [notification review and evidence limits](docs/notification-review.md).
 
-## 0.1.0-beta.10 — 2026-11-17
+## 0.1.0-beta.10 â€” 2026-11-17
 
 - Offer source recovery directly beside missing, unavailable or identity-changed sources; verify actual memberships after interrupted saves without automatic retry.
 - Simplify phone-first navigation: one first-use action, a compact overview and
@@ -49,7 +62,7 @@
 - Preserve beta.9 recovery reconciliation, confirmations, permissions and status rules.
   See the [local morning review](docs/morning-review.md) for evidence and limits.
 
-## 0.1.0-beta.9 — 2026-11-17
+## 0.1.0-beta.9 â€” 2026-11-17
 
 - After a lost recovery acknowledgement, show actual group memberships on reconnect without resubmitting.
 
@@ -61,7 +74,7 @@
 - Add fresh self-test-dialog data review with new acknowledgement and no dispatch.
   See [local review evidence](docs/route-recovery-review.md).
 
-## 0.1.0-beta.8 — 2026-11-16
+## 0.1.0-beta.8 â€” 2026-11-16
 
 - Add Z-Wave JS smoke sources and device health details in mixed groups. Z-Wave sounder control and remote self-test are unsupported.
 
@@ -82,7 +95,7 @@
 - See [current results and remaining visual/physical acceptance](docs/matter-review.md).
   Existing smoke rules, 79 status tests, identities and branding stay unchanged.
 
-## 0.1.0-beta.7 — 2026-11-16
+## 0.1.0-beta.7 â€” 2026-11-16
 
 - Complete eight language/theme/device browser dialog combinations; correct detector
   search and reminder wording, exact reminder confirmation, copy-field styling and
@@ -101,7 +114,7 @@
   See [behavior and current evidence](docs/activity-reminders.md). No physical
   output, version change or publication is part of this work.
 
-## 0.1.0-beta.6 — 2026-11-15
+## 0.1.0-beta.6 â€” 2026-11-15
 
 - Complete the eight maintenance/example/diagnosis visual combinations and real
   five-minute mock outage flow. Distinguish unassessed stop support for blocked
@@ -122,7 +135,7 @@
   unavailable secure randomness explicitly and show test warnings only once.
   The HTTP-like regression failed before correction; no physical outputs tested.
 
-## 0.1.0-beta.5 — 2026-11-15
+## 0.1.0-beta.5 â€” 2026-11-15
 
 - Complete the eight EN/NL light/dark phone/tablet visual checks for setup,
   maintenance, long-name dialogs and incident details. Reset reading position
@@ -144,7 +157,7 @@
 - Extend Dutch/English text, touch targets, wrapping and existing simulation
   controls. See [current checks and completed visual review](docs/usability-review.md).
 
-## 0.1.0-beta.4 — 2026-11-15
+## 0.1.0-beta.4 â€” 2026-11-15
 
 - Complete visual simulation checks for group actions, smoke/outage/recovery and
   built-in self-test activity, timeout and explicit results; see the
@@ -187,7 +200,7 @@
   source/mapping/prerequisite explanations and existing navigation only. Keep
   explicit confirmation, action execution and default-off behavior unchanged.
 
-## 0.1.0-beta.3 — 2026-11-14
+## 0.1.0-beta.3 â€” 2026-11-14
 
 - Block Bosch BSD-2 linked activation unless its same-device broadcast switch
   explicitly reports off. Recheck before dispatch and invalidate earlier broader
@@ -219,7 +232,7 @@ Validation: 367 backend tests, 20 frontend tests and, on each tested HA version,
 20 runtime plus 14 driver checks. No physical tests or live device access performed.
 
 
-## 0.1.0-beta.2 — 2026-11-14
+## 0.1.0-beta.2 â€” 2026-11-14
 
 - Add optional, administrator-confirmed group sounder mappings, default off, with
   registry-bound MQTT/ZHA capability profiles and independent incident/action results.
@@ -240,7 +253,7 @@ Validation: 367 backend tests, 20 frontend tests and, on each tested HA version,
 No physical sounder/detection validation or production installation was performed.
 Dependencies and minimum HA version remain unchanged.
 
-## 0.1.0-beta.1 — 2026-11-13
+## 0.1.0-beta.1 â€” 2026-11-13
 
 First opt-in interface test release. See [release notes](docs/releases/0.1.0-beta.1.md)
 for update instructions and known limits.
@@ -260,9 +273,9 @@ standalone smoke detectors. Historical development and acceptance evidence is
 retained under docs/; physical-device and production-upgrade acceptance remain
 separate from technical simulation checks.
 
-### 0.1.0-beta.8 — 2026-11-16
+### 0.1.0-beta.8 â€” 2026-11-16
 
-- Add Z-Wave JS smoke sources and device health details in mixed groups. Z-Wave sounder control and remote self-test are unsupported. — Z-Wave JS sources
+- Add Z-Wave JS smoke sources and device health details in mixed groups. Z-Wave sounder control and remote self-test are unsupported. â€” Z-Wave JS sources
 
 - Add cached Z-Wave JS smoke sources, provider filtering, exact-device maintenance and setup help.
 - Reject overridden CO/heat/diagnostic sources, including invalid saved selections.

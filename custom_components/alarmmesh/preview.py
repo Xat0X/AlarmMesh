@@ -205,3 +205,33 @@ def source_preview(panel, source: str) -> dict:
                 }
             )
     return {**base, "groups": groups, "targets": list(targets.values())}
+
+
+def alarm_settings(panel) -> dict:
+    """One read-only inventory using the same hypothetical execution decisions."""
+    settings = panel.effects.settings.value
+    stored = {r["service"]: r for r in settings["recipients"]}
+    rows = []
+    for source in panel.runtime.source_entity_ids:
+        route = source_preview(panel, source)
+        rows.append(
+            {
+                "source": source,
+                "status": panel.runtime.source_statuses[source].name,
+                "targets": route["targets"],
+                "phones": [
+                    {**phone, "profile": stored[phone["target"]].get("profile")}
+                    for phone in route["phones"]
+                    if phone["target"] in stored
+                ],
+                "groups": [
+                    {
+                        "id": group["group"],
+                        "can_start": group["can_start"],
+                        "scripts": group["scripts"],
+                    }
+                    for group in route["groups"]
+                ],
+            }
+        )
+    return {"readonly": True, "rows": rows, "revision": panel.groups.revision}

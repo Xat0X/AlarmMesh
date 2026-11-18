@@ -78,6 +78,29 @@ bewijs van geluid, toestemming of fysieke rookdetectie.
 | Registratiemetadata | [Core 2026.11.1 mobile_app notify](https://github.com/home-assistant/core/blob/2026.11.1/homeassistant/components/mobile_app/notify.py) | Unieke device_name/dienst-koppeling plus os_name; identiteit gebonden aan registratie. Geen webhook of token gekopieerd. |
 
 De payload is lokaal getest via Home Assistants echte notify-servicelaag met een
-nagebootste eindtransportfunctie. Werkelijke iPhone/Android-aflevering, stilte,
-Niet storen, volume en hoorbaarheid blijven afzonderlijke fysieke acceptatie.
+nagebootste eindtransportfunctie. De inmiddels gerapporteerde iPhone-test staat
+hieronder apart. Zelfstandige controle van telefoonaflevering, stilte, Niet
+storen, volume en hoorbaarheid blijft afzonderlijke fysieke acceptatie.
 Zie [review en bewijs](critical-notification-review.md).
+
+## Zelf een test waarnemen
+
+Bij Instellingen en Incidenten staat **Tests die je zelf hebt beoordeeld**. Open de
+concrete aanvraag en leg ontvangen en gehoord afzonderlijk vast, of laat een
+antwoord op niet gecontroleerd staan. Dit verzendt niets en verandert geen
+telefoonrechten of automatische instellingen. Een HA-aanvraag die is verwerkt
+is op zichzelf geen bewijs van ontvangst of hoorbaarheid.
+
+De registratie bewaart datum en het gebruikte profiel. Een gewijzigd platform,
+kritieke instelling, geluid, volume of ontvangeridentiteit maakt die eerdere
+waarneming niet actueel voor de nieuwe instelling. Historie blijft zichtbaar
+binnen de begrensde bewaarruimte: 100 aanvragen, vijf waarnemingen per aanvraag,
+30 dagen zichtbaar; opschonen gebeurt bij laden of schrijven. Wijzigingen in
+telefoonrechten kan AlarmMesh niet vanzelf zien. Na een verloren opslagantwoord
+kun je teruglezen wat is opgeslagen; opnieuw verzenden gebeurt niet automatisch.
+
+De gebruiker meldt inmiddels een geslaagde kritieke melding op zijn iPhone met
+de geteste instellingen. Dat is gebruikersrapportage, geen zelfstandige controle
+en geen bewijs voor Android, andere iPhones, alle geluiden of Focus/Niet storen.
+Er wordt hierdoor geen telefoon automatisch als getest gemarkeerd.
+Zie de [actuele lokale review en rondleiding](alarm-settings-review.md).

@@ -4,6 +4,11 @@ The local interface organizes existing Home Assistant smoke reports. The local
 review build also offers explicitly confirmed, default-off [linked sounding](linked-sounding.md)
 through supported existing HA controls. No smoke reported is not a safety guarantee.
 
+The current local changes add **My alarm settings** to Overview and Settings,
+with per-detector routes and links to the existing configuration screens.
+Phone test observations are explicitly user-reported; incident chronology stays
+separate from current smoke. See the [five-minute tour and local evidence](alarm-settings-review.md).
+
 ## Open and choose sources
 
 After configuring AlarmMesh, administrators see **AlarmMesh** in the HA sidebar

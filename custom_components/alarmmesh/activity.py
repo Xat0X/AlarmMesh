@@ -16,6 +16,7 @@ LIMIT = 1000
 PENDING_LIMIT = 128
 CATEGORIES = {"alarm", "maintenance", "selftest", "configuration"}
 KINDS = {
+    "phone_observation",
     "end_of_service",
     "source",
     "sounder",
@@ -29,6 +30,7 @@ KINDS = {
     "configuration",
 }
 RESULTS = {
+    "user_observed",
     "SMOKE_REPORTED",
     "NO_SMOKE_REPORTED",
     "UNKNOWN",

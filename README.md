@@ -3,12 +3,12 @@
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="custom_components/alarmmesh/brand/dark_logo@2x.png">
   <source media="(prefers-color-scheme: light)" srcset="custom_components/alarmmesh/brand/logo@2x.png">
-  <img src="custom_components/alarmmesh/brand/logo.png" alt="AlarmMesh — read-only smoke reports and source availability for Home Assistant" width="560">
+  <img src="custom_components/alarmmesh/brand/logo.png" alt="AlarmMesh â€” read-only smoke reports and source availability for Home Assistant" width="560">
 </picture>
 
 Smoke reports and source availability from existing Home Assistant smoke detector
 entities, with a local panel for detectors, rooms and groups. This test release adds [optional linked sounding](docs/linked-sounding.md), off by default.
-Version 0.1.0-beta.12 also offers [Companion notifications, group
+Version 0.1.0-beta.13 also offers [Companion notifications, group
 script actions, incident details and reviewed built-in self-test requests](docs/incident-features.md).
 New automatic behavior defaults off; existing explicit choices are preserved.
 It includes [opt-in maintenance messages, non-executing action
@@ -22,9 +22,12 @@ The local [notification correction and review](docs/notification-review.md) adds
 request diagnosis and safer confirmation/reconnect handling. Actual phone delivery
 and the originally reported live failure remain unverified in that historical review.
 The current local work adds [per-phone critical smoke alerts and phone setup help](docs/phone-alerts.md).
-Ordinary delivery is now user-reported; audible behavior on a real phone remains
-unverified. [Current review evidence](docs/critical-notification-review.md) separates
-mock transport, browser observations and remaining phone acceptance.
+The user reports a successful critical notification on the tested iPhone and
+settings. This does not establish other phones, sounds or Focus modes.
+The local [alarm settings and phone observation review](docs/alarm-settings-review.md)
+adds one read-only overview, request-bound user observations, change summaries
+and an incident timeline. Earlier [critical-alert evidence](docs/critical-notification-review.md)
+remains a dated record of simulation, not a physical test.
 Earlier [finishing checks](docs/finish-review.md) remain dated historical evidence.
 
 > AlarmMesh is not a certified fire alarm system and must not replace certified standalone smoke detectors.
@@ -48,11 +51,11 @@ BSD-2 activation requires its broadcast setting to explicitly report off;
 AlarmMesh never changes that setting. The original branding, two overview
 entities, source-selection schema and smoke rules remain unchanged.
 
-## Test release: 0.1.0-beta.12
+## Test release: 0.1.0-beta.13
 
 For opt-in testing, enable **Pre-release** in the AlarmMesh Marketplace page and
-choose **0.1.0-beta.12**. Back up before updating and follow the restart prompt.
-Read the [release notes](docs/releases/0.1.0-beta.12.md) before installing.
+choose **0.1.0-beta.13**. Back up before updating and follow the restart prompt.
+Read the [release notes](docs/releases/0.1.0-beta.13.md) before installing.
 
 ## Current status: local panel and two read-only overviews
 
@@ -64,7 +67,7 @@ Previously enabled groups retain their explicit configuration: switch them off i
 AlarmMesh before updating if any are enabled. Installing this beta must not be used
 as a physical alarm test.
 Back up before updating: the new group format requires the pre-update backup for rollback. See [support, lifecycle and simulation
-evidence](docs/linked-sounding.md). All physical acceptance remains unperformed.
+evidence](docs/linked-sounding.md). Physical linked-sounding acceptance remains unperformed.
 
 The interface adds **AlarmMesh** to the Home Assistant sidebar for
 administrators: overview, detectors and details, HA rooms, and persistent
