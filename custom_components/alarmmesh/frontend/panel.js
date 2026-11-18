@@ -1,6 +1,6 @@
-import { exercise, incidentDetail, careView } from "./family.js?v=family-beta14";
-import { TEXT } from "./translations.js?v=family-beta14";
-import { Drafts } from "./drafts.js?v=family-beta14";
+import { exercise, incidentDetail, careView } from "./family.js?v=family-beta15";
+import { TEXT } from "./translations.js?v=family-beta15";
+import { Drafts } from "./drafts.js?v=family-beta15";
 
 // Safe DOM construction: names, labels and registry data are always text nodes.
 const el = (tag, text, cls) => {
@@ -134,7 +134,7 @@ export class AlarmMeshPanel extends HTMLElement {
     const t = this.t;
     const sticky = this.shadowRoot.activeElement;
     const stickyKey = sticky?.dataset.sticky, selection = stickyKey ? [sticky.selectionStart, sticky.selectionEnd] : null;
-    const link = el("link"); link.rel = "stylesheet"; link.href = "/alarmmesh-assets/panel.css?v=family-beta14";
+    const link = el("link"); link.rel = "stylesheet"; link.href = "/alarmmesh-assets/panel.css?v=family-beta15";
     const shell = el("div", undefined, "shell");
     shell.classList.toggle("dark", Boolean(this._hass?.themes?.darkMode));
     const side = el("aside");
@@ -1132,6 +1132,13 @@ export class AlarmMeshPanel extends HTMLElement {
     routeDetails.append(el("summary",this._hass.language?.startsWith("nl") ? "Bekijk de route-instellingen" : "View route settings"));
     const output = el("div", undefined, "route-sections");
     let serial = 0;
+    // A group revision alone does not cover receiver settings, source loss or changed control identities.
+    const routeContext = data => JSON.stringify([
+      data.entry_id, data.revision, data.matter_revision, data.groups, data.sources,
+      data.incident, data.selftest, data.automation?.settings, data.automation?.notification_routes,
+      data.automation?.recipients, data.automation?.scripts, data.automation?.episodes, data.automation?.error
+    ]);
+    let context = routeContext(this.data);
     const load = async () => {
       if (!this.data) return;
       const request = ++serial;
@@ -1172,15 +1179,26 @@ export class AlarmMeshPanel extends HTMLElement {
         }
         output.append(el("p", t.previewRecovery), el("p", t.routeScripts), el("small", t.physicalNotTested));
       } catch (error) {
-        if (output.isConnected) output.replaceChildren(el("p", t[error.code] || t.error));
+        if (request === serial && output.isConnected) output.replaceChildren(el("p", t[error.code] || t.error));
       }
     };
     detail.suspend = () => {
       ++serial;
-      routeDetails.open = true;
-      routeDetails.querySelector("button").disabled = true;
+      detail.pauseExercise?.();
+      if (!detail.pauseExercise) routeDetails.open = true;
+      routeDetails.querySelector("button").disabled = !this.data;
+      output.replaceChildren(el("p", t.previewStale));
     };
-    detail.resumed = () => {routeDetails.querySelector("button").disabled = false;};
+    detail.resumed = () => {
+      const next = routeContext(this.data);
+      routeDetails.querySelector("button").disabled = false;
+      if (next !== context) {
+        context = next;
+        detail.suspend();
+      } else {
+        detail.resumeExercise?.();
+      }
+    };
     routeDetails.append(button(t.refreshData, load), output);parent.append(routeDetails);
     load();
   }

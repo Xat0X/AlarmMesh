@@ -1,8 +1,9 @@
 param(
     [ValidateSet('2026.10.4', '2026.11.1')]
     [string]$HaVersion = '2026.10.4',
-    [ValidateSet('0e7ba38', 'b2f3d7')]
-    [string]$PreviousRevision = 'b2f3d7'
+    [ValidateSet('0e7ba38', 'b2f3d7', '0.1.0-beta.14')]
+    [string]$PreviousRevision = 'b2f3d7',
+    [switch]$CommittedCandidate
 )
 
 $ErrorActionPreference = 'Stop'
@@ -24,7 +25,7 @@ $report = [ordered]@{
     scope = 'file replacement and stopped-file snapshot recovery; not Marketplace/HACS or HA backup acceptance'
     stages = [ordered]@{}
 }
-$extended = $PreviousRevision -eq 'b2f3d7'
+$extended = $PreviousRevision -ne '0e7ba38'
 $stage = 'packages'
 $networkCreated = $false
 $cleanupFailed = $false
@@ -60,7 +61,8 @@ function Invoke-Phase {
 }
 
 try {
-    & python (Join-Path $PSScriptRoot 'package.py') --output (Join-Path $packageRoot 'current') > (Join-Path $root 'package-current.log') 2>&1
+    $candidateArgs = if ($CommittedCandidate) { @('--revision', $report.base_commit) } else { @() }
+    & python (Join-Path $PSScriptRoot 'package.py') @candidateArgs --output (Join-Path $packageRoot 'current') > (Join-Path $root 'package-current.log') 2>&1
     if ($LASTEXITCODE -ne 0) { throw 'Current package failed.' }
     & python (Join-Path $PSScriptRoot 'package.py') --revision $PreviousRevision --output (Join-Path $packageRoot 'previous') > (Join-Path $root 'package-previous.log') 2>&1
     if ($LASTEXITCODE -ne 0) { throw 'Previous package failed.' }

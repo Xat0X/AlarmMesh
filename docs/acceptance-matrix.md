@@ -1,4 +1,8 @@
-# Current test release — 0.1.0-beta.7
+# Acceptatieoverzicht
+
+De [vrijgaveaudit voor bèta 15](release-readiness.md) beschrijft de kandidaat en de resterende praktijkcontroles. Hieronder staan eerdere beoordelingen op datum.
+
+## Historical test release — 0.1.0-beta.7
 
 The current release scope and installation instructions are in the
 [beta.7 release notes](releases/0.1.0-beta.7.md). Activity/reminder work and the

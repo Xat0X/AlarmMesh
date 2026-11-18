@@ -33,6 +33,24 @@ async def check_features(hass, entry, phase, root, helper, require, checks):
     fixtures = hass.data["alarmmesh_simulation"]["fixtures"]
     a, b = (fixtures[n]["source"] for n in "ab")
     saved_path = root / "published-groups.json"
+    journal_path = root / "baseline-journal.json"
+    if phase == "seed" and hasattr(panel, "care"):
+        row = {
+            "id": "a" * 32,
+            "identity": panel.reminders.identity(a),
+            "date": "2026-11-18",
+            "kind": "battery",
+            "note": "SIMULATION",
+        }
+        await panel.care.append(row, lambda: True)
+        journal_path.write_text(json.dumps(row), encoding="utf-8")
+    if phase == "fresh":
+        require(not panel.care.rows, "Fresh installation inherited a journal")
+    elif phase != "seed" and journal_path.exists():
+        row = json.loads(journal_path.read_text(encoding="utf-8"))
+        require(panel.care.rows == [row], "Journal missing, changed or duplicated")
+        require(panel.reminders.identity(a) == row["identity"], "Detector changed")
+        checks.append("retained_exact_single_maintenance_row_and_detector_identity")
     if phase == "seed":
         controls = Capabilities(hass).describe(a)["controls"]
         require(len(controls) == 1, "Mock PLUS control missing")

@@ -1,6 +1,39 @@
-# Release readiness
+# Vrijgaveaudit voor 0.1.0-beta.15
 
-## Proposed next test release: 0.1.0-beta.4
+**19 november 2026.** Deze kandidaat volgt op de gepubliceerde bèta 14. De praktijkcontrole door de beheerder en zijn beslissing over stabiele publicatie staan open. De [release-instructies](releases/0.1.0-beta.15.md) bevatten een korte rondleiding.
+
+| Onderdeel | Hoe je de controle kunt herhalen | Wat wordt gecontroleerd |
+| --- | --- | --- |
+| Rookstatus en uitval | Volledige backendtests, inclusief de bestaande statustests | Rook en ontbrekende gegevens, overlappende groepen, sensoridentiteit en herstelvoorwaarden |
+| Melders en uitvoer | Runtime- en drivercontroles met testapparaten op HA 2026.10.4 en 2026.11.1 | Zigbee-, Matter- en Z-Wave-paden, ontbrekende mogelijkheden, testaanvragen, start en herstel. Koppeling begint uit. |
+| Telefoons, onderhoud en scripts | Backendtests en het geïsoleerde update- en herstartscenario | Profielgebonden meldingen, bevestigingen, mockaanvragen, volgorde van scriptacties, onderhoud en uitblijven van dubbele uitvoer na herstart |
+| Paneel, gezin en incidentlinks | Frontendtests en lokale Chromium-simulator | Oude incidentlink met huidige rook, pauzeren en hervatten van een gewijzigde oefenroute, opgeslagen onderhoud na wegvallen van het antwoord |
+| Toegang en gegevens | Admincontroles bij WebSocket-opdrachten, tests voor rolverlies, diagnostiek en opslag, gesloten pakketlijst | Beheerderstoegang, wegvallen van oude gegevens, begrensde historie en toegestane pakketbestanden |
+| Installeren en herstellen | `dev/release/check-update.ps1 -PreviousRevision 0.1.0-beta.14 -CommittedCandidate` op beide geteste HA-versies | Schone installatie, update vanaf het vorige pakket, bestaande groepskeuzes en melderidentiteiten, bewaard logboek, procesherstart, terugzetten van gestopte simulatorbestanden |
+| Distribueren | Twee ZIP-builds met `dev/release/package.py --revision` vanaf dezelfde commit, controles op main en tag, controle van de gepubliceerde hash | Zelfde pakketinhoud als getest, versie in manifest en een afzonderlijke bètarelease |
+
+## Gevonden en hersteld
+
+1. Bij wijziging van telefooninstellingen kon de open oefenkaart de oude route blijven tonen. Een wijziging met dezelfde groepsrevisie is afzonderlijk gereproduceerd. Ook de onderliggende route-informatie verliest haar oude uitkomst.
+2. Een opslagcontrole kon al lopen tijdens een onderhoudsaanvraag. De interface laat verificatie na een onzeker antwoord toe en controleert aanvraag, inhoud, installatie en melder. Een onleesbaar logboek geeft geen toestemming om opnieuw te schrijven.
+3. Een geopende oude incidentlink kon de actuele rokende melder aan het zicht onttrekken. De actuele melding staat nu boven de bewaarde historie. De eerste geregistreerde bron blijft bij het vrijgegeven incident zichtbaar.
+
+Alle drie kregen een eerst falende frontendtest. In de browser is de oefening in Nederlands en Engels, licht en donker, op telefoon- en tabletbreedte doorlopen. De onderhoudsproef gebruikte echte opslag in de lokale mockinstallatie met een onderschept antwoord en daarna een herladen pagina. De weergave van gelijktijdige actuele rook en een oud vrijgegeven incident en de gewijzigde instellingen gebruikten gecontroleerde schermgegevens. Tijdens deze browserproeven bleven de uitvoertellers van de simulator gelijk.
+
+## Beslissing na de praktijktest
+
+Controleer de update via je eigen installer, de bewaarde keuzes en de stille oefening. Een onderhoudsnotitie moet na herladen één keer terugkomen. Beoordeel of de Nederlandse teksten en alarmroutes kloppen voor jouw gezin. Meld afwijkingen met de versie en het precieze klikpad, zonder telefoonnummers of toegangscodes.
+
+De updateproef vervangt bestanden in een geïsoleerde installatie en herstelt een kopie van normaal gestopte testbestanden. De installer op je eigen systeem en herstel van een echte Home Assistant-back-up zijn aparte praktijkcontroles. Radiobereik, fysieke detectie, werkelijk meeklinken en hoorbare telefoonbezorging zijn in deze audit niet getest. Eerdere gebruikerservaring met een kritieke melding op één iPhone staat los van deze kandidaat.
+
+De repository bevat geen algemeen licentiebestand. De herkomst van de door de gebruiker aangeleverde afbeeldingen staat in [branding](../assets/branding/README.md). De eerdere open keuzes over licentie en distributie van artwork blijven bij de eigenaar. De publicatie van deze bèta kiest daarvoor geen voorwaarden.
+
+---
+
+
+## Historische vrijgavebeoordelingen
+
+### Historical proposal: 0.1.0-beta.4
 
 The unpublished working tree adds ordinary Companion notifications, existing HA
 script actions and reviewed self-test requests to the beta.3 linking/catalog base.

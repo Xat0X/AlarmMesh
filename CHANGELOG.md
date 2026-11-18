@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.0-beta.15 — 2026-11-19
+
+- Show current smoke above the history when an earlier notification opens a past incident. Retain its first recorded source after recovery.
+- Pause an open family drill when source, receiver or group conditions change. Refresh the route explicitly before continuing.
+- Protect maintenance entries while a save is in flight. After a lost reply, verify the exact saved entry against the same detector before allowing a retry.
+- Exercise the upgrade from beta.14, restart and file-based rollback on isolated Home Assistant instances.
+
 ## 0.1.0-beta.14 — 2026-11-18
 
 - Add a silent, interactive family drill with two practice detectors and the existing route assessments.

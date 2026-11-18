@@ -1572,3 +1572,76 @@ test("practice draws only eligible branches and keeps disabled destinations in t
   assert.ok(v.calls.every(message => message.type === 'alarmmesh/route'));
   v.panel.remove();
 });
+
+test("open practice drops the previous phone route when notification settings change", async () => {
+  const v = setup(), model = normal();
+  model.automation = featureData().automation;
+  v.transport.callbacks.at(-1)(model);
+  v.panel._hass.callWS = async message => {
+    v.calls.push(message);
+    return {readonly:true, revision:0, targets:[], groups:[], phones:[]};
+  };
+  v.panel.openDialog({kind:"route", id:source.entity_id});
+  await tick();
+  const drill = v.root.querySelector(".exercise");
+  drill.querySelector(".exercise-controls button").click();
+  assert.ok(drill.querySelector(".exercise-branches"));
+  const changed = structuredClone(model);
+  changed.automation.settings.revision++;
+  v.transport.callbacks.at(-1)(changed);
+  assert.ok(!drill.querySelector(".exercise-branches"));
+  assert.match(drill.textContent, /Paused/);
+  assert.equal(v.root.querySelector(".route-sections .phone-route-active"), null);
+  assert.equal(v.calls.length,1);
+  v.panel.remove();
+});
+
+test("maintenance readback can only unlock an uncertain save after an authoritative result", async () => {
+  const v = setup(), model = normal(), identity = "a".repeat(64);
+  model.sources[0].reminder_identity = identity;
+  v.transport.callbacks.at(-1)(model);
+  let rejectSave, current = {...model,care_error:true,care_log:[]};
+  v.panel._hass.callWS = message => {
+    v.calls.push(message);
+    if (message.type === "alarmmesh/current") return Promise.resolve(current);
+    return new Promise((resolve,reject) => { rejectSave=reject; });
+  };
+  v.panel.openDialog({kind:"care", id:source.entity_id});
+  const form = v.root.querySelector("dialog form"), save = form.querySelector('[type="submit"]'), check = form.querySelector('button[type="button"]');
+  form.querySelector("option").selected = true;
+  form.querySelector('input[type="date"]').value = "2026-11-19";
+  form.querySelectorAll("input")[1].value = "";
+  form.dispatchEvent(new Event("submit",{cancelable:true}));
+  check.click(); await tick();
+  assert.equal(v.calls.filter(c=>c.type==="alarmmesh/current").length,0);
+  assert.equal(save.disabled,true);
+  rejectSave(Error("lost reply")); await tick();
+  check.click(); await tick();
+  assert.equal(save.disabled,true);
+  current = {...current,care_error:false};
+  check.click(); await tick();
+  assert.equal(save.disabled,false);
+  assert.equal(v.calls.filter(c=>c.type==="alarmmesh/care").length,1);
+  v.panel.remove();
+});
+
+
+test("old incident link shows current smoke before the cleared history", () => {
+  const v = setup("nl"), model = normal();
+  const time = "2026-11-19T00:00:00Z";
+  model.result.smoke = model.sources[0].status = "SMOKE_REPORTED";
+  model.activity = {events:[
+    {category:"alarm",kind:"incident_clear",result:"NO_SMOKE_REPORTED",correlation:"old",observed_at:time},
+    {category:"alarm",kind:"incident_origin",result:"SMOKE_REPORTED",correlation:"old",source:"old-source",observed_at:time}
+  ]};
+  v.panel.linkedIncident = "old";
+  v.panel.page = "incidents";
+  v.transport.callbacks.at(-1)(model);
+  const content = v.root.querySelector("main").textContent;
+  assert.ok(content.includes("Detector A"));
+  assert.ok(content.indexOf("Detector A") < content.indexOf("vrijgegeven"));
+  assert.ok(content.includes("Eerst vastgelegd"));
+  assert.equal(v.panel.linkedIncident, "old");
+  assert.deepEqual(v.calls, []);
+  v.panel.remove();
+});

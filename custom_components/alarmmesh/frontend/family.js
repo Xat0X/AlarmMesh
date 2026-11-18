@@ -24,7 +24,7 @@ export function exercise(panel, host, detail, initial) {
   let routes = [initial], phase = 0, timer, generation = 0, paused = false;
   const stop = () => { clearTimeout(timer); timer = undefined; };
   detail.dispose = () => { generation++; stop(); };
-  detail.suspend = () => { generation++; stop(); paused = true; routes = []; draw(); };
+  detail.pauseExercise = () => { generation++; stop(); paused = true; routes = []; draw(); };
   const groupName = id => panel.data?.groups.find(g => g.id === id)?.name || id;
   async function refresh() {
     stop();
@@ -42,10 +42,7 @@ export function exercise(panel, host, detail, initial) {
     } catch { if (request === generation) paused = true; }
     if (request === generation) draw();
   }
-  detail.resumed = () => {
-    if(routes.some(route=>route.revision!==panel.data?.revision))detail.suspend();
-    else if(paused)draw();
-  };
+  detail.resumeExercise = () => { if (paused) draw(); };
   function draw() {
     const badge = node("span", say("Stille oefening", "Silent practice"));
     badge.className = "exercise-label";
@@ -228,11 +225,20 @@ export function exercise(panel, host, detail, initial) {
 
 export function incidentDetail(panel, parent, id) {
   const say=language(panel), events=(panel.data.activity?.events || []).filter(e=>e.category==="alarm" && e.correlation===id);
+  if (panel.data.result.smoke === "SMOKE_REPORTED") {
+    const current = node("section");
+    current.className = "notice incident-now";
+    current.append(node("h2", panel.t.currentSituation), panel.badge(panel.data.result));
+    for (const source of panel.data.sources.filter(s => s.status === "SMOKE_REPORTED")) {
+      current.append(node("p", panel.sourceName(source.entity_id)));
+    }
+    parent.append(current);
+  }
   parent.append(node("h2",say("Incident uit deze melding","Incident from this alert")));
   if(!events.length)parent.append(node("p",say("Geen bewaarde gebeurtenissen bij deze verwijzing. De historie kan verlopen zijn.","No retained events match this link. Its history may have expired.")));
   const origins=events.filter(e=>e.kind==="incident_origin" || e.kind==="source" && e.result==="SMOKE_REPORTED").reverse();
   if(events.some(e=>e.kind==="incident_clear" || e.kind==="source" && e.result==="NO_SMOKE_REPORTED"))parent.append(node("strong",say("De geregistreerde rookmelding is vrijgegeven.","The recorded smoke report has cleared.")));
-  else if(origins.length){
+  if(origins.length){
     const first=origins.filter(e=>e.observed_at===origins[0].observed_at);
     parent.append(node("strong",say("Eerst vastgelegd: ","First recorded: ")+first.map(e=>panel.sourceName(e.source)).join(" + ")+" · "+panel.formatTime(origins[0].observed_at)));
     const active=panel.data.automation?.episodes?.find(e=>e.id===id && e.phase==="start");
@@ -251,6 +257,7 @@ export function incidentDetail(panel, parent, id) {
 export function careView(panel,parent,source,edit=false) {
   const say=language(panel), t=panel.t, identity=source.reminder_identity;
   const health=source.capability?.details?.maintenance, record=source.selftest?.record;
+  const entryId = panel.data.entry_id;
   const kinds={battery:say("Batterij vervangen","Battery replaced"),clean:say("Melder schoongemaakt","Detector cleaned"),note:say("Notitie","Note")};
   parent.append(node("h3",t.maintenance));
   const percent=health?.battery_percent;
@@ -268,16 +275,58 @@ export function careView(panel,parent,source,edit=false) {
   for(const [field,title] of [[kind,t.maintenance],[day,say("Datum","Date")],[note,kinds.note]]){const label=node("label",title);label.append(field);form.append(label);}
   const save=node("button",say("Vermelding opslaan","Save entry"));save.type="submit";save.className="button primary";form.append(save,status);parent.append(form);
   const id=Array.from(crypto.getRandomValues(new Uint8Array(16)),v=>v.toString(16).padStart(2,"0")).join("");
-  let pending=null;
-  form.onsubmit=async ev=>{ev.preventDefault();if(!panel.data || save.disabled || pending)return;
-    pending={id,identity,date:day.value,kind:kind.value,note:note.value.trim()};
-    save.disabled=true;save.dataset.started="true";
-    try{await panel._hass.callWS({type:"alarmmesh/care",source:source.entity_id,record:pending});status.textContent=say("Opgeslagen","Saved");}
-    catch{status.textContent=t.saveResultUnknown;}
+  let pending = null;
+  let uncertain = false;
+  const check = action(say("Controleer opgeslagen vermelding","Check saved entry"), async () => {
+    if (!uncertain || !pending || check.disabled || !panel.data) return;
+    check.disabled = true;
+    try {
+      const fresh = await panel._hass.callWS({type:"alarmmesh/current"});
+      if (!fresh.available || fresh.entry_id !== entryId || fresh.care_error || !Array.isArray(fresh.care_log) ||
+          !fresh.sources?.some(s => s.entity_id === source.entity_id && s.reminder_identity === identity)) {
+        status.textContent = t.saveResultUnknown;
+        return;
+      }
+      const row = fresh.care_log.find(r => r.id === id);
+      if (row && Object.keys(pending).every(key => row[key] === pending[key])) {
+        status.textContent = [say("Opgeslagen","Saved"),row.date,kinds[row.kind],row.note].filter(Boolean).join(" · ");
+        uncertain = false;
+      } else if (!row) {
+        status.textContent = say("Geen opgeslagen vermelding gevonden. Je kunt opnieuw opslaan.","No saved entry found. You can save again.");
+        pending = null;
+        uncertain = false;
+        delete save.dataset.started;
+        for (const field of [day,kind,note,save]) field.disabled = false;
+      } else {
+        status.textContent = t.saveResultUnknown;
+      }
+    } catch {
+      status.textContent = t.saveResultUnknown;
+    } finally {
+      check.disabled = !uncertain;
+    }
+  });
+  check.disabled = true;
+  status.setAttribute("role", "status");
+  form.append(check);
+  form.onsubmit = async ev => {
+    ev.preventDefault();
+    if (!panel.data || save.disabled || pending) return;
+    if (!day.value || (kind.value === "note" && !note.value.trim())) {
+      status.textContent = say("Vul de datum en de gevraagde notitie in.","Enter the date and the requested note.");
+      return;
+    }
+    pending = {id,identity,date:day.value,kind:kind.value,note:note.value.trim()};
+    save.dataset.started = "true";
+    for (const field of [day,kind,note,save]) field.disabled = true;
+    status.textContent = say("Bezig met opslaan…","Saving…");
+    try {
+      await panel._hass.callWS({type:"alarmmesh/care",source:source.entity_id,record:pending});
+      status.textContent = say("Opgeslagen","Saved");
+    } catch {
+      uncertain = true;
+      check.disabled = false;
+      status.textContent = t.saveResultUnknown;
+    }
   };
-  form.append(action(say("Controleer opgeslagen vermelding","Check saved entry"),async()=>{try{const fresh=await panel._hass.callWS({type:"alarmmesh/current"});
-    const found=fresh.care_log?.find(r=>r.id===id && r.identity===identity);
-    status.textContent=found ? [say("Opgeslagen","Saved"),found.date,kinds[found.kind],found.note].filter(Boolean).join(" · ") : say("Geen opgeslagen vermelding gevonden.","No saved entry found.");
-    if(!found && pending){pending=null;delete save.dataset.started;save.disabled=false;}
-  }catch{status.textContent=t.offline;}}));
 }
