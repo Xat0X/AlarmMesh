@@ -14,7 +14,7 @@ from .linking import Activation
 from .status import SourceStatus
 
 
-def group_preview(panel, group_id: str | None, source: str) -> dict:
+def group_preview(panel, group_id: str | None, source: str, other_sources=()) -> dict:
     group = next((g for g in panel.groups.groups if g["id"] == group_id), None)
     if (group_id is not None and group is None) or source not in (
         group["members"] if group else panel.runtime.source_entity_ids
@@ -32,16 +32,22 @@ def group_preview(panel, group_id: str | None, source: str) -> dict:
         return panel.selftests.independent_source(origin, cache=False)
 
     selected = set(engine.runtime.source_entity_ids)
-    source_ok = (
-        source in selected
-        and not engine.capabilities.source_identity_changed(source)
-        and (
-            engine.capabilities.metadata(source)[2] != "matter"
-            or matter.origin_allowed(panel.hass, source)
+
+    def origin_allowed(origin):
+        return (
+            origin in selected
+            and not engine.capabilities.source_identity_changed(origin)
+            and (
+                engine.capabilities.metadata(origin)[2] != "matter"
+                or matter.origin_allowed(panel.hass, origin)
+            )
+            and (not engine.capabilities.test_blocked(origin) or independent(origin))
         )
-        and (not engine.capabilities.test_blocked(source) or independent(source))
-    )
-    active = engine.active | {source} if source_ok else set(engine.active)
+
+    source_ok = origin_allowed(source)
+    active = set(engine.active) | {s for s in other_sources if origin_allowed(s)}
+    if source_ok:
+        active.add(source)
     can_start = source_ok and source in group.get("origins", group["members"])
     targets = []
     for binding in group["linking"]["bindings"]:
@@ -176,11 +182,11 @@ def group_preview(panel, group_id: str | None, source: str) -> dict:
     }
 
 
-def source_preview(panel, source: str) -> dict:
+def source_preview(panel, source: str, other_sources=()) -> dict:
     """Aggregate the same group assessment; phones are global, scripts per group."""
-    base = group_preview(panel, None, source)
+    base = group_preview(panel, None, source, other_sources)
     groups = [
-        group_preview(panel, g["id"], source)
+        group_preview(panel, g["id"], source, other_sources)
         for g in panel.groups.groups
         if source in g["members"]
     ]
@@ -202,6 +208,7 @@ def source_preview(panel, source: str) -> dict:
                     "group": group["group"],
                     "reason": row["reason"],
                     "eligible": row["eligible"],
+                    "safe_stop": row["safe_stop"],
                 }
             )
     return {**base, "groups": groups, "targets": list(targets.values())}

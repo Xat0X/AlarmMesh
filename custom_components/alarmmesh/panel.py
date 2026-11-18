@@ -23,6 +23,7 @@ from homeassistant.helpers.event import async_track_state_change_event
 
 from .activity import Activity
 from .automation import AutomationError
+from .care import CareJournal
 from .catalog import CATALOG
 from .diagnostics import support_report
 from .effects import IncidentEffects
@@ -223,6 +224,8 @@ class PanelController:
         self.selftests = SelfTests(hass, entry, self.linking, hub.publish)
         self.maintenance = Maintenance(hass, entry, self.linking, hub.publish)
         self.activity = Activity(hass, entry, hub.publish)
+        self.effects.record_activity = self.activity.record
+        self.care = CareJournal(hass, entry)
         self.phone_evidence = PhoneEvidence(hass, entry, self.effects, hub.publish)
         self.effects.phone_evidence = self.phone_evidence
         self.reminders = Reminders(
@@ -246,6 +249,7 @@ class PanelController:
         await self.selftests.load()
         await self.maintenance.load()
         await self.activity.load()
+        await self.care.load()
         await self.phone_evidence.load()
         await self.reminders.load()
         self.unsubscribers.append(self.runtime.async_add_observer(self.hub.publish))
@@ -265,7 +269,7 @@ class PanelController:
             "alarmmesh-panel",
             sidebar_title="AlarmMesh",
             sidebar_icon="mdi:smoke-detector",
-            module_url=f"{ASSET_URL}/panel.js?v=20261118-settings-1",
+            module_url=f"{ASSET_URL}/panel.js?v=family-beta14",
             require_admin=True,
         )
         self.hub.controller = self
@@ -318,6 +322,7 @@ class PanelController:
             )
 
     async def async_close(self) -> None:
+        await self.care.close()
         await self.async_pause()
         await self.selftests.close()
         await self.maintenance.close()
@@ -520,6 +525,8 @@ class PanelController:
             "rooms": list(rooms.values()),
             "groups": groups,
             "revision": self.groups.revision,
+            "care_log": deepcopy(self.care.rows),
+            "care_error": self.care.damaged,
             "incident": self.linking.snapshot(),
             "automation": automation,
             "selftest": deepcopy(self.selftests.record),
@@ -555,6 +562,7 @@ async def async_prepare(hass: HomeAssistant) -> PanelHub:
         websocket_api.async_register_command(hass, ws_test)
         websocket_api.async_register_command(hass, ws_maintenance)
         websocket_api.async_register_command(hass, ws_preview)
+        websocket_api.async_register_command(hass, ws_care)
         websocket_api.async_register_command(hass, ws_route)
         websocket_api.async_register_command(hass, ws_alarm_settings)
         websocket_api.async_register_command(hass, ws_phone_observation)
@@ -936,7 +944,11 @@ async def ws_matter_review(hass, connection, msg):
 
 
 @websocket_api.websocket_command(
-    {vol.Required("type"): "alarmmesh/route", vol.Required("source"): str}
+    {
+        vol.Required("type"): "alarmmesh/route",
+        vol.Required("source"): str,
+        vol.Optional("other_sources"): vol.All([str], vol.Length(max=1)),
+    }
 )
 @websocket_api.require_admin
 @callback
@@ -946,7 +958,10 @@ def ws_route(hass, connection, msg):
         connection.send_error(msg["id"], "not_loaded", "AlarmMesh is not loaded")
         return
     try:
-        result = source_preview(controller, msg["source"])
+        others = msg.get("other_sources", [])
+        if any(s not in controller.runtime.source_entity_ids for s in others):
+            raise AutomationError("invalid_preview")
+        result = source_preview(controller, msg["source"], others)
     except AutomationError as err:
         connection.send_error(msg["id"], str(err), str(err))
         return
@@ -1066,3 +1081,39 @@ async def ws_phone_observation(hass, connection, msg):
         connection.send_error(msg["id"], code, code)
         return
     connection.send_result(msg["id"], panel.phone_evidence.snapshot())
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "alarmmesh/care",
+        vol.Required("source"): str,
+        vol.Required("record"): {
+            vol.Required(key): str for key in ("id", "identity", "date", "kind", "note")
+        },
+    }
+)
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_care(hass, connection, msg):
+    hub = hass.data[DATA_HUB]
+    panel = hub.controller
+    if panel is None:
+        connection.send_error(msg["id"], "not_loaded", "not_loaded")
+        return
+    try:
+        await panel.care.append(
+            msg["record"],
+            lambda: (
+                hub.controller is panel
+                and not panel.effects.closed
+                and not panel.linking._paused
+                and connection.user.is_admin
+                and panel.reminders.identity(msg["source"]) == msg["record"]["identity"]
+            ),
+        )
+    except (AutomationError, OSError) as err:
+        code = str(err) if isinstance(err, AutomationError) else "error"
+        connection.send_error(msg["id"], code, code)
+        return
+    hub.publish()
+    connection.send_result(msg["id"], {"saved": msg["record"]["id"]})

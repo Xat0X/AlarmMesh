@@ -1007,3 +1007,61 @@ Object.assign(TEXT.en, {
 
 Object.assign(TEXT.nl,{activity_phone_observation:"Eigen beoordeling telefoontest",activity_result_user_observed:"Door gebruiker beoordeeld; zie testdetails"});
 Object.assign(TEXT.en,{activity_phone_observation:"Own phone test observation",activity_result_user_observed:"Reviewed by user; see test details"});
+
+// Task labels distinguish smoke input from optional remotely requested sound.
+Object.assign(TEXT.nl, {
+ batteryUnknown:'Batterij onbekend', batteryLowShort:'Batterij bijna leeg', lowBatteryShort:'bijna leeg',
+ soundAlong:'Ook laten afgaan bij rook elders', detection_only:'Niet laten meeklinken',
+ soundRoleHelp:'De rookmelding van deze melder blijft bruikbaar. Kies of AlarmMesh hem ook mag laten afgaan als een andere melder in deze groep rook meldt. Dit schakelt zijn eigen rookalarm niet uit.',
+ linkIntro:'Laat ondersteunde melders in deze groep meeklinken wanneer een andere melder rook meldt. Kies hieronder welke melders mogen meeklinken. Dit staat standaard uit.',
+ groupNote:'Kies welke melders mogen meeklinken bij rook elders. Samen afgaan staat standaard uit.',
+ setupGroups:'Groepen en acties instellen', settingsGroups:'Groepen en acties',
+ groupSetupNote:'Deel melders in per verdieping of zone. Binnen een groep kun je ook samen afgaan en extra acties instellen. Beide zijn optioneel.',
+ guidanceNote:'Stel in wat je nodig hebt. Groepen en extra acties zijn optioneel. De status hieronder volgt je opgeslagen instellingen.',
+ setupNotificationsNote:'Kies welke telefoons een rookmelding krijgen en stel per telefoon het geluid in.',
+ setupCheck:'Problemen controleren', setupCheckNote:'Bekijk ontbrekende melders, batterijwaarschuwingen en instellingen die aandacht vragen.',
+ savedCount:'Aantal',
+ checkNoTargets:'Er zijn geen melders ingesteld om bij rook elders mee af te gaan. Je kunt dit instellen bij Groepen.',
+ noConfiguredTargets:'Geen melders ingesteld om mee af te gaan. Dit is optioneel.',
+ routeOnce:'Deze melder kan via de onderstaande groepen mee afgaan.', routeBlocked:'Deze melder kan nu niet mee afgaan.',
+ otherPhones:'Niet gekozen telefoons', phoneNotChosenShort:'Niet gekozen', phoneUnavailableShort:'Niet beschikbaar',
+ phoneAutoOffShort:'Automatische meldingen uit', phoneReadyShort:'Ingesteld voor rookmeldingen', phoneBlockedShort:'Kan nu niet melden',
+ phoneServiceFound:'Telefoondienst beschikbaar',
+ globalPhones:'Deze telefooninstellingen gelden voor alle geselecteerde rookmelders.',
+ phoneDeliveryUnconfirmed:'Ingesteld betekent niet dat ontvangst of geluid op de telefoon is bevestigd.',
+ heiman_mqtt:'Heiman · geluid op afstand', externalActivation:'Meeklinken op afstand', controlAvailability:'Bediening voor meeklinken',
+ setupSounders:'Samen afgaan',
+ invalid_linking:'Kies minstens twee melders en selecteer minstens één ondersteunde melder die mag meeklinken.',
+ no_verified_profile:'Deze melder kan rook melden. AlarmMesh kan hem via deze verbinding niet op afstand laten meeklinken.',
+ previewRecovery:'Een incident eindigt pas als alle betrokken melders geen rook meer melden. AlarmMesh kan alleen geluid stoppen dat het zelf heeft gestart, en alleen als de melder die functie ondersteunt.',
+ routeScripts:'Extra acties horen bij een groep. Telefoonmeldingen gelden voor alle geselecteerde rookmelders.'
+});
+Object.assign(TEXT.en, {
+ batteryUnknown:'Battery unknown', batteryLowShort:'Low battery', lowBatteryShort:'low',
+ soundAlong:'Also sound when smoke is detected elsewhere', detection_only:'Do not sound along',
+ soundRoleHelp:'This detector still reports smoke. Choose whether AlarmMesh may also sound it when another detector in this group reports smoke. This does not disable its own smoke alarm.',
+ linkIntro:'Let supported detectors in this group sound when another detector reports smoke. Choose which detectors may sound along below. This is off by default.',
+ groupNote:'Choose which detectors may sound when smoke is detected elsewhere. Linked sounding is off by default.',
+ setupGroups:'Set up groups and actions', settingsGroups:'Groups and actions',
+ groupSetupNote:'Organize detectors by floor or zone. Within a group you can also set up linked sounding and extra actions. Both are optional.',
+ guidanceNote:'Set up what you need. Groups and extra actions are optional. The status below follows your saved settings.',
+ setupNotificationsNote:'Choose which phones receive smoke alerts and set the sound for each phone.',
+ setupCheck:'Check problems', setupCheckNote:'Review missing detectors, battery warnings and settings needing attention.', savedCount:'Count',
+ checkNoTargets:'No detectors are set to sound when smoke is detected elsewhere. You can configure this in Groups.',
+ noConfiguredTargets:'No detectors set to sound along. This is optional.',
+ routeOnce:'This detector can sound along through the groups below.', routeBlocked:'This detector cannot sound along right now.',
+ otherPhones:'Phones not selected', phoneNotChosenShort:'Not selected', phoneUnavailableShort:'Unavailable',
+ phoneAutoOffShort:'Automatic alerts off', phoneReadyShort:'Configured for smoke alerts', phoneBlockedShort:'Cannot notify right now',
+ phoneServiceFound:'Phone service available', globalPhones:'These phone settings apply to all selected smoke detectors.',
+ phoneDeliveryUnconfirmed:'Configured does not confirm delivery or audible sound on the phone.',
+ heiman_mqtt:'Heiman · remote sound', externalActivation:'Sound along remotely', controlAvailability:'Control for linked sound',
+ setupSounders:'Linked sounding', invalid_linking:'Choose at least two detectors and select at least one supported detector to sound along.',
+ no_verified_profile:'This detector can report smoke. AlarmMesh cannot make it sound remotely through this connection.',
+ previewRecovery:'An incident ends only when all involved detectors report no smoke. AlarmMesh can only stop sound it started itself, and only if the detector supports that function.',
+ routeScripts:'Extra actions belong to a group. Phone alerts apply to all selected smoke detectors.'
+});
+
+Object.assign(TEXT.nl,{smokeOnlyRole:"Niet laten meeklinken",detection_only:"Rookmelding beschikbaar",linkable:"Meeklinken ondersteund",activation_only:"Meeklinken zonder automatische stop",not_confirmed:"Meeklinken nog niet bevestigd"});
+Object.assign(TEXT.en,{smokeOnlyRole:"Do not sound along",detection_only:"Smoke reporting available",linkable:"Linked sounding supported",activation_only:"Linked sounding without automatic stop",not_confirmed:"Linked sounding not confirmed"});
+Object.assign(TEXT.nl,{silentDrill:"Stille oefening",chooseDrillSource:"Welke melder meldt rook in de oefening?",activity_incident_origin:"Rook waargenomen",activity_incident_clear:"Incident vrijgegeven"});
+Object.assign(TEXT.en,{silentDrill:"Silent practice",chooseDrillSource:"Which detector reports smoke in this practice?",activity_incident_origin:"Smoke observed",activity_incident_clear:"Incident cleared"});

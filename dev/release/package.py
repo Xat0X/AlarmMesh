@@ -41,6 +41,9 @@ REQUIRED_FILES = FOUNDATION_FILES | {
     "automation.py",
     "notification_profiles.py",
     "phone_evidence.py",
+    "care.py",
+    "frontend/family.js",
+    "frontend/dashboard.js",
     "effects.py",
     "self_test.py",
     "maintenance.py",
@@ -59,6 +62,9 @@ REQUIRED_FILES = FOUNDATION_FILES | {
 }
 CATALOG_FILES = REQUIRED_FILES - {
     "phone_evidence.py",
+    "care.py",
+    "frontend/family.js",
+    "frontend/dashboard.js",
     "notification_profiles.py",
     "frontend/drafts.js",
     "matter.py",

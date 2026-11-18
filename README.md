@@ -8,7 +8,7 @@
 
 Smoke reports and source availability from existing Home Assistant smoke detector
 entities, with a local panel for detectors, rooms and groups. This test release adds [optional linked sounding](docs/linked-sounding.md), off by default.
-Version 0.1.0-beta.13 also offers [Companion notifications, group
+Version 0.1.0-beta.14 also offers [Companion notifications, group
 script actions, incident details and reviewed built-in self-test requests](docs/incident-features.md).
 New automatic behavior defaults off; existing explicit choices are preserved.
 It includes [opt-in maintenance messages, non-executing action
@@ -28,6 +28,8 @@ The local [alarm settings and phone observation review](docs/alarm-settings-revi
 adds one read-only overview, request-bound user observations, change summaries
 and an incident timeline. Earlier [critical-alert evidence](docs/critical-notification-review.md)
 remains a dated record of simulation, not a physical test.
+Explore the silent family drill under **Overview → Silent practice**, follow a smoke alert to its incident, and record detector maintenance. See the [panel guide](docs/panel.md).
+
 Earlier [finishing checks](docs/finish-review.md) remain dated historical evidence.
 
 > AlarmMesh is not a certified fire alarm system and must not replace certified standalone smoke detectors.
@@ -51,11 +53,11 @@ BSD-2 activation requires its broadcast setting to explicitly report off;
 AlarmMesh never changes that setting. The original branding, two overview
 entities, source-selection schema and smoke rules remain unchanged.
 
-## Test release: 0.1.0-beta.13
+## Test release: 0.1.0-beta.14
 
 For opt-in testing, enable **Pre-release** in the AlarmMesh Marketplace page and
-choose **0.1.0-beta.13**. Back up before updating and follow the restart prompt.
-Read the [release notes](docs/releases/0.1.0-beta.13.md) before installing.
+choose **0.1.0-beta.14**. Back up before updating and follow the restart prompt.
+Read the [release notes](docs/releases/0.1.0-beta.14.md) before installing.
 
 ## Current status: local panel and two read-only overviews
 

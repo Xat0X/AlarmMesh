@@ -16,6 +16,8 @@ LIMIT = 1000
 PENDING_LIMIT = 128
 CATEGORIES = {"alarm", "maintenance", "selftest", "configuration"}
 KINDS = {
+    "incident_origin",
+    "incident_clear",
     "phone_observation",
     "end_of_service",
     "source",
@@ -151,7 +153,16 @@ class Activity:
         ][-LIMIT:]
 
     def record(
-        self, category, kind, result, *, source="", groups=(), target="", correlation=""
+        self,
+        category,
+        kind,
+        result,
+        *,
+        source="",
+        groups=(),
+        target="",
+        correlation="",
+        observed_at=None,
     ):
         if self.closed or self.paused:
             return
@@ -160,7 +171,7 @@ class Activity:
             return
         row = {
             "id": uuid4().hex,
-            "observed_at": dt_util.utcnow().isoformat(),
+            "observed_at": observed_at or dt_util.utcnow().isoformat(),
             "category": category,
             "kind": kind,
             "result": result,
@@ -454,6 +465,7 @@ class Activity:
     def snapshot(self):
         self._prune()
         return {
+            "source_incidents": self.source_incidents.copy(),
             "events": deepcopy(
                 list(reversed((self.rows + list(self.pending))[-LIMIT:]))
             ),

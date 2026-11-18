@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.0-beta.14 — 2026-11-18
+
+- Add a silent, interactive family drill with two practice detectors and the existing route assessments.
+- Show eligible routes in the drill, explain where inactive routes stop, and provide a separate example home for family practice.
+- Link mobile smoke alerts to retained incident details. Add an administrator dashboard card for current smoke or missing information.
+- Add dated, identity-bound maintenance entries to each detector, separately from measurements and self-test results.
+- Show available battery percentages and explicit unknown/low-battery states on detector cards.
+- Present phone routes as cards with chosen phones first and other phones collapsed.
+- Explain optional linked sounding without confusing it with the detector own smoke alarm.
+- Consolidate group setup and optional actions into one destination while retaining separate assessments.
+
 ## 0.1.0-beta.13 — 2026-11-18
 
 - Add My alarm settings, a read-only per-detector overview using the existing

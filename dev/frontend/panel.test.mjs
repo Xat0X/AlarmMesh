@@ -322,7 +322,7 @@ test("setup guide handles empty sources and only navigates to existing configura
   assert.equal(root.querySelector(".setup-guide"), null);
   panel.go("settings");
   assert.equal(root.querySelector(".setup-guide").open, false);
-  assert.equal(root.querySelectorAll(".setup-steps li").length, 7);
+  assert.equal(root.querySelectorAll(".setup-steps li").length, 5);
   assert.ok(root.querySelector('[data-step="sources"]').textContent.includes("existing Home Assistant"));
   root.querySelector('[data-step="groups"] button').click();
   assert.equal(panel.page, "groups"); assert.deepEqual(calls, []); panel.remove();
@@ -374,7 +374,7 @@ test("organizer-only groups and missing selections get actionable explanations",
   data.groups[0].unselected = ["binary_sensor.removed"];
   data.sources[0].status = "UNREACHABLE";
   transport.callbacks.at(-1)(data); panel.openDialog({ kind: "group", id: "guide-group" });
-  assert.ok(root.querySelector('[data-check="targets"]').textContent.includes("alleen rookbronnen"));
+  assert.ok(root.querySelector('[data-check="targets"]').textContent.includes("geen melders ingesteld"));
   assert.ok(root.querySelector('[data-check="unselected"]'));
   assert.ok(root.querySelector('[data-check="source"]'));
   root.querySelector('[data-check="source"] button').click();
@@ -649,7 +649,7 @@ test("confirming after an unchecked attempt clears the obsolete validation warni
   panel.remove();
 });
 
-test("seven guided steps follow server state, allow skipping and never enable anything", async () => {
+test("five task steps retain all server assessments, allow skipping and never enable anything", async () => {
   const { panel, root, transport, calls } = setup("nl");
   const data = featureData();
   data.review = { steps: [
@@ -657,7 +657,7 @@ test("seven guided steps follow server state, allow skipping and never enable an
     ["sounders", "not_supported"], ["notifications", "disabled"], ["scripts", "disabled"], ["check", "needs_attention"]
   ].map(([id, status]) => ({id, status, count: 0})), issues: [] };
   transport.callbacks.at(-1)(data);
-  assert.equal(root.querySelectorAll(".setup-steps li").length, 7);
+  assert.equal(root.querySelectorAll(".setup-steps li").length, 5);
   assert.ok(root.querySelector('[data-step="notifications"]').textContent.includes("Uit · optioneel"));
   assert.ok(root.querySelector('[data-step="sounders"]').textContent.includes("Niet ondersteund"));
   root.querySelector('[data-step="rooms"] button').click(); assert.equal(panel.page, "rooms");
@@ -1357,9 +1357,9 @@ test("closing a critical-save confirmation cannot re-enable a verified stale for
 test("task settings separate global phone choices from per-group outputs without commands",()=>{
   const v=setup('nl'),data=phoneData();data.groups=guidedGroupData().groups;data.groups[0].linking={enabled:true,bindings:[]};data.groups[0].actions={enabled:true,start:[],recovery:[]};
   v.transport.callbacks.at(-1)(data);v.panel.go('settings');
-  assert.equal(v.root.querySelectorAll('.settings-task').length,5);
+  assert.equal(v.root.querySelectorAll('.settings-task').length,4);
   assert.ok(v.root.querySelector('[data-setting=groups]').textContent.includes('1 met samen afgaan ingeschakeld'));
-  assert.ok(v.root.querySelector('[data-setting=actions]').textContent.includes('1 groepen met extra acties aan'));
+  assert.ok(v.root.querySelector('[data-setting=groups]').textContent.includes('1 groepen met extra acties aan'));
   assert.ok(v.root.querySelector('[data-setting=phones]').textContent.includes('Automatisch melden uit'));
   assert.equal(v.root.querySelectorAll('.settings-grid .primary').length,1);assert.deepEqual(v.calls,[]);v.panel.remove();
 });
@@ -1391,7 +1391,7 @@ test("all-detector alarm settings use only the read-only endpoint and refresh pr
   const v=setup('nl'),d=phoneData();v.transport.callbacks.at(-1)(d);let unavailable=false;
   v.panel._hass.callWS=async m=>{v.calls.push(m);return {readonly:true,revision:d.revision,rows:[{source:source.entity_id,status:unavailable?'UNREACHABLE':'NO_SMOKE_REPORTED',targets:[],groups:[],phones:[{target:'mobile_app_simulated_phone',profile:null,eligible:false,reason:'disabled'}]}]};};
   v.panel.openDialog({kind:'alarmsettings'});await tick();assert.deepEqual(v.calls.map(c=>c.type),['alarmmesh/alarm_settings']);
-  assert.equal(v.root.querySelectorAll('.alarm-setting-card').length,1);assert.match(v.root.querySelector('dialog').textContent,/alle geselecteerde melders/);
+  assert.equal(v.root.querySelectorAll('.alarm-setting-card').length,1);assert.match(v.root.querySelector('dialog').textContent,/alle geselecteerde rookmelders/);
   unavailable=true;v.transport.callbacks.at(-1)(d);await tick();assert.match(v.root.querySelector('dialog').textContent,/tijdelijk onbereikbaar/);
   unavailable=false;v.transport.callbacks.at(-1)(d);await tick();assert.ok(!v.root.querySelector('dialog').textContent.includes('tijdelijk onbereikbaar'));
   assert.ok(v.calls.every(c=>c.type==='alarmmesh/alarm_settings'));v.panel.remove();
@@ -1454,4 +1454,121 @@ test("lost confirmed-save response never leaves a fictional running request afte
  v.root.querySelector('form').dispatchEvent(new Event('submit',{cancelable:true}));v.root.querySelector('[name=confirm-request]').checked=true;v.root.querySelector('.confirm-execute').click();await tick();
  assert.notEqual(v.root.querySelector('.request-status').textContent,v.panel.t.delivery_sending);
  v.root.querySelector('[data-check-saved-phones]').click();await tick();assert.equal(v.root.querySelector('.request-status').textContent,'');assert.match(v.root.querySelector('.save-reconcile').textContent,/These choices are saved/);v.panel.remove();
+});
+
+
+test("detector cards show validated battery percentages including zero without inventing missing values", () => {
+  const v=setup('nl'),d=normal();
+  for(const [value,expected] of [[87,'87%'],[0,'0%'],[null,'Batterij onbekend'],[-1,'Batterij onbekend'],[120,'Batterij onbekend'],['50','Batterij onbekend']]) {
+    d.sources[0].capability={status:'detection_only',controls:[],details:{maintenance:{battery_percent:value,battery_low:null}}};
+    v.transport.callbacks.at(-1)(d);v.panel.go('devices');
+    assert.ok(v.root.querySelector('.source-battery')?.textContent.includes(expected),String(value));
+  }
+  d.sources[0].capability.details.maintenance={battery_percent:null,battery_low:true};v.transport.callbacks.at(-1)(d);
+  assert.ok(v.root.querySelector('.source-battery').textContent.includes('Batterij bijna leeg'));
+  assert.deepEqual(v.calls,[]);v.panel.remove();
+});
+
+test("route phone cards separate chosen, unavailable and unchosen phones without sending", async () => {
+ const v=setup('nl');v.panel._hass.callWS=async c=>{v.calls.push(c);return {readonly:true,revision:0,targets:[],groups:[],phones:[
+  {target:'mobile_app_a',selected:true,enabled:true,available:true,eligible:true,reason:'preview_eligible'},
+  {target:'mobile_app_b',selected:false,enabled:true,available:true,eligible:false,reason:'preview_recipient_disabled'},
+  {target:'mobile_app_c',selected:true,enabled:true,available:false,eligible:false,reason:'recipient_unavailable'}]};};
+ v.panel.openDialog({kind:'route',id:source.entity_id});await tick();
+ assert.equal(v.root.querySelectorAll('.phone-route-active > .phone-route-card').length,2);
+ const others=v.root.querySelector('.phone-route-others');assert.equal(others.hasAttribute("open"),false);assert.equal(others.querySelectorAll('.phone-route-card').length,1);
+ assert.ok(v.root.querySelector('.phone-route-active').textContent.includes('Niet beschikbaar'));
+ assert.ok(v.root.querySelector('.phone-route-active').textContent.includes('Ingesteld voor rookmeldingen'));
+ assert.deepEqual(v.calls,[{type:'alarmmesh/route',source:source.entity_id}]);v.panel.remove();
+});
+
+test("setup has one group entry and retains separate linked-sound and script assessments", () => {
+ const v=setup('nl'),d=featureData();d.review={steps:[{id:'groups',status:'configured',count:2},{id:'sounders',status:'needs_attention',count:1},{id:'scripts',status:'disabled',count:0}]};
+ v.transport.callbacks.at(-1)(d);
+ assert.equal(v.root.querySelectorAll('.setup-steps > li').length,5);
+ const group=v.root.querySelector('[data-step=groups]');assert.equal(group.querySelectorAll('button').length,1);
+ assert.ok(group.querySelector('[data-step=sounders]').textContent.includes('Aandacht nodig'));
+ assert.ok(group.querySelector('[data-step=scripts]').textContent.includes('Uit'));
+ assert.deepEqual(v.calls,[]);v.panel.remove();
+});
+
+test("practice disconnect drops its branches and resumes only on request; live smoke interrupts",async()=>{
+  const v=setup(), model=normal();
+  const second={...source,entity_id:"binary_sensor.hall",name:"Hall"};
+  model.sources.push(second);v.transport.callbacks.at(-1)(model);
+  v.panel._hass.callWS=async message=>{
+    v.calls.push(message);
+    return {readonly:true,revision:0,targets:[],phones:[],groups:[]};
+  };
+  v.panel.openDialog({kind:"route",id:source.entity_id});await tick();
+  const exercise=()=>v.root.querySelector(".exercise");
+  exercise().querySelector(".exercise-controls button").click();
+  exercise().querySelector("details:last-child button").click();await tick();
+  assert.deepEqual(v.calls.at(-1).other_sources,[source.entity_id]);
+  const calls=v.calls.length;
+  v.transport.event("disconnected");
+  assert.equal(exercise().querySelector(".exercise-branches"),null);
+  v.transport.event("ready");await tick();v.transport.callbacks.at(-1)(model);
+  assert.equal(v.calls.length,calls);
+  assert.match(exercise().textContent,/Paused/);
+  exercise().querySelector("button").click();await tick();
+  assert.ok(exercise().querySelector(".exercise-branches"));
+  model.result.smoke="SMOKE_REPORTED";model.sources[0].status="SMOKE_REPORTED";
+  v.transport.callbacks.at(-1)(model);
+  assert.equal(exercise(),null);assert.equal(v.panel.page,"incidents");
+  assert.ok(v.calls.every(c=>c.type==="alarmmesh/route"));v.panel.remove();
+});
+
+test("dashboard card clears private data on role loss and ignores a late push",async()=>{
+  await import("../../custom_components/alarmmesh/frontend/dashboard.js");
+  const v=setup(),card=document.createElement("alarmmesh-family-card");
+  document.body.append(card);
+  card.hass={...v.panel._hass,user:{id:"admin",is_admin:true}};
+  const push=v.transport.callbacks.at(-1);
+  push({...normal(),sources:[]});
+  assert.match(card.textContent,/No detectors selected/);
+  push(normal());assert.match(card.textContent,/no smoke reported/);
+  v.transport.event("disconnected");assert.match(card.textContent,/unknown/);
+  card.hass={...v.panel._hass,user:{id:"reader",is_admin:false}};
+  push(normal());assert.match(card.textContent,/Administrator access required/);
+  assert.equal(card.querySelector("a"),null);card.remove();v.panel.remove();
+});
+
+test("practice draws only eligible branches and keeps disabled destinations in their explanation", async () => {
+  const v = setup('nl');
+  const route = {readonly:true, revision:0, groups:[], targets:[], phones:[
+    {target:'phone_a', name:'Telefoon A', selected:true, eligible:false, reason:'disabled'},
+    {target:'phone_b', name:'Telefoon B', selected:true, eligible:false, reason:'disabled'}
+  ]};
+  v.panel._hass.callWS = async message => { v.calls.push(message); return route; };
+  async function preview() {
+    v.panel.openDialog({kind:'route', id:source.entity_id});
+    await tick();
+    const map = v.root.querySelector('.exercise');
+    map.querySelector('.exercise-controls button').click();
+    return map;
+  }
+  let map = await preview();
+  assert.ok(map.querySelector('.exercise-stop'));
+  assert.equal(map.querySelector('.exercise-stop section'), null);
+  assert.ok(map.querySelector('.exercise-example').textContent.includes('Voorbeeldwoning'));
+  assert.equal(map.querySelector('.exercise-example').hasAttribute('open'), false);
+  assert.ok(map.querySelector('.exercise-blocked').textContent.includes('Telefoon A'));
+  assert.equal(map.querySelector('.exercise-blocked').hasAttribute('open'), false);
+  assert.ok(map.querySelector('.exercise-controls').textContent.includes('Laat de oefenrook verdwijnen'));
+  assert.ok(!map.querySelector('.exercise-origin').textContent.includes('Geen ruimte'));
+  route.phones[0].eligible = true;
+  route.phones[0].reason = 'preview_eligible';
+  map = await preview();
+  assert.equal(map.querySelector('.exercise-stop'), null);
+  assert.equal(map.querySelector('.exercise-example'), null);
+  assert.equal(map.querySelectorAll('.exercise-branches section').length, 1);
+  assert.ok(map.querySelector('.exercise-branches').textContent.includes('Telefoon A'));
+  assert.ok(!map.querySelector('.exercise-branches').textContent.includes('Telefoon B'));
+  assert.ok(map.querySelector('.exercise-blocked').textContent.includes('Telefoon B'));
+  map.querySelector('.exercise-controls button').click(); await tick();
+  assert.ok(map.querySelector('h2').textContent.includes('afgerond'));
+  assert.equal(map.querySelector('.exercise-branches'), null);
+  assert.ok(v.calls.every(message => message.type === 'alarmmesh/route'));
+  v.panel.remove();
 });

@@ -38,6 +38,8 @@ navigation. All new automatic delivery starts off; no existing setting is enable
   Active smoke is prominent and names the reporting detector and assigned room.
 - **Detectors** lists only selected sources. Search is immediately available;
   additional filters are under **More filters**. Each row has **What happens during smoke?**.
+  Each detector row also shows its available battery percentage, including zero,
+  or an explicit unknown/low-battery indication. Values are not inferred from smoke status.
   Technical details are collapsed in the detector dialog; duplicate names in the
   same area include their source ID so they remain distinguishable. Open a row for the real HA state,
   source entity, assigned area, known device/model/manufacturer and groups. The
@@ -159,10 +161,10 @@ for model/provider conditions, reproducible evidence and the separate review URL
 ## Guided setup and group troubleshooting (local development)
 
 Open **Set up and check / Instellen en controleren** on Overview or Settings.
-The same guide links to seven existing settings: detectors, HA rooms, groups and
-incident origins, supported sounder targets, phone recipients, start/recovery
-scripts, and a final configuration review. Each step shows its server-derived
-state and count. Configured means saved/current metadata, not physically tested.
+The guide has five task entries: detectors, HA rooms, groups and actions, phone
+alerts, and problem review. Groups have one destination, with separate server-derived
+assessments for linked sounding and scripts inside that entry. No backend state
+is merged or enabled by this presentation. Configured means saved/current metadata, not physically tested.
 Optional-off and unsupported are distinct from attention needed. You can skip
 steps, navigate away and return; saved configuration determines progress. There
 is no second progress store or finish button that enables actions.
@@ -297,3 +299,27 @@ These are software controls, not physical-device validation.
 See the [morning review](morning-review.md) for the five-minute simulator tour,
 before/after evidence, actual browser coverage and automated validation. No physical
 smoke detection, phone delivery or sounder output was tested in this UI review.
+
+## Clearer sound roles and phone routes (local development)
+
+The group choice **Do not sound along / Niet laten meeklinken** leaves smoke
+reporting intact and does not disable the detector's own smoke alarm. The other
+choice explicitly allows supported remote sound when another detector reports
+smoke. Existing confirmation, capability checks and default-off behavior remain.
+Provider-specific stop limitations are available under Technical information.
+
+Both the single-detector route and My alarm settings use phone cards. Selected
+phones appear first, including unavailable selections and their reason. Unselected
+phones are collapsed under a counted list. Critical profiles and sound settings
+remain visible; readiness is not a claim of receipt or audible delivery.
+See the [local clarity review](clarity-review.md) for evidence and limits.
+
+## Family drill, incident links and dashboard card
+
+Open **Overview → Silent practice** or **Detectors → a detector → What happens if smoke is reported?**. The drill reads the configured routes. Press **Next step** to reveal the sounders, phones and actions together. Open a destination for its groups and limitations. On a live smoke report the drill closes and the incident screen takes priority.
+
+Smoke alerts carry the incident's relative HA URL in both mobile notification fields. Opening it requires the usual panel permissions. Incident observations follow the activity history limit of 30 days and 1,000 entries. A missing reference opens an explanation. [Companion notification links](https://companion.home-assistant.io/docs/notifications/notifications-basic/#opening-a-url)
+
+In a UI-managed dashboard, register `/alarmmesh-assets/dashboard.js` once as a **JavaScript module** under **Settings → Dashboards → Resources** (advanced mode). Then **Edit dashboard → Add card → AlarmMesh**. For a manual card, use `type: custom:alarmmesh-family-card`. In YAML-managed dashboards declare the same URL under `lovelace.resources` with `type: module`. The card uses the panel's administrator permissions. [Home Assistant custom dashboard cards](https://developers.home-assistant.io/docs/frontend/custom-ui/custom-card/)
+
+For maintenance, open **Detectors → a detector → Record maintenance**. Choose a date and the type of entry. After a lost reply, use **Check saved entry**. The journal retains the latest 500 entries per integration and binds each to the registered detector identity. The [five-minute family tour and local evidence](family-review.md) cover all four tasks.

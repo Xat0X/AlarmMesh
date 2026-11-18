@@ -55,6 +55,7 @@ class IncidentEffects:
             hass, 1, f"alarmmesh.receipts.{entry.entry_id}", atomic_writes=True
         )
         self.episodes = {}
+        self.record_activity = None
         self.lock = asyncio.Lock()
         self._task = None
         self.manual_tasks = set()
@@ -268,12 +269,29 @@ class IncidentEffects:
             }
             self.episodes[key] = old
         if old is not None and old["phase"] == "start":
+            if key == "notifications" and self.record_activity:
+                for source in sorted(active.difference(old["origins"])):
+                    self.record_activity(
+                        "alarm",
+                        "incident_origin",
+                        "SMOKE_REPORTED",
+                        source=source,
+                        correlation=old["id"],
+                        observed_at=now,
+                    )
             old["origins"] = sorted(set(old["origins"]) | active)
             old["relevant"] = sorted(set(old["relevant"]) | set(relevant))
             if len(old["relevant"]) > 256:
                 raise AutomationError("automation_source_limit")
             if not active and self._clear(old):
                 old["phase"], old["updated"] = "recovery", now
+                if key == "notifications" and self.record_activity:
+                    self.record_activity(
+                        "alarm",
+                        "incident_clear",
+                        "NO_SMOKE_REPORTED",
+                        correlation=old["id"],
+                    )
         return old
 
     async def _persist(self):
