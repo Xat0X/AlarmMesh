@@ -596,3 +596,34 @@ stored values, revisions and confirmations. Alarm routes still use the existing
 read-only endpoint. Recovery retains beta.9 lost-acknowledgement reconciliation;
 only its preparation text and ambiguous source labels change. No schema, provider
 contract, status calculation or executor changes. See [review](morning-review.md).
+
+
+## Per-phone smoke alert plans (local, after beta.11)
+
+`notification_profiles.py` validates optional version-1 recipient profiles and
+builds the shared message used by preview, explicit test and incident delivery.
+Existing rows without a profile retain their ordinary payload unchanged. No
+config-entry schema/version or status rule changes. Profile records live inside
+the existing atomic notifications store; invalid optional profiles block that
+recipient rather than becoming ordinary alerts or disabling other recipients.
+
+Platform metadata comes only from an unambiguous mobile_app registration matched
+to the service naming contract. Registration identity is hashed without storing
+webhooks or phone tokens. With no unique registration a user-selected platform
+uses an explicitly session-bound identity. Missing metadata does not erase
+choices; changed identity/platform blocks execution until review.
+
+The admin-only notification preview returns a confirmation bound to recipient,
+configuration revision, profile, stable message context and request ID. The
+volatile display time is excluded from the context hash so clock passage alone
+does not invalidate a preview. Dispatch rechecks the binding. Old ordinary API
+clients retain the legacy context confirmation; profiles require request binding.
+`prepare_settings` persists suppression for currently active origins before the
+settings write. Thus saving is not a notification trigger, while a new origin or
+new explicit-off/on lifetime can still produce its meaningful update.
+
+Critical fields apply only to smoke/test messages. Maintenance, reminders and
+recovery remain ordinary. No new retry, timer, device command or token storage.
+Manual latest-per-recipient receipts are bounded to 20 in runtime; existing
+bounded activity provides history. Nothing claims phone delivery or sound.
+See [phone contracts and limitations](phone-alerts.md).

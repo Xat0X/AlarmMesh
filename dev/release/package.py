@@ -39,6 +39,7 @@ REQUIRED_FILES = FOUNDATION_FILES | {
     "linking_runtime.py",
     "groups.py",
     "automation.py",
+    "notification_profiles.py",
     "effects.py",
     "self_test.py",
     "maintenance.py",
@@ -56,6 +57,7 @@ REQUIRED_FILES = FOUNDATION_FILES | {
     "frontend/drafts.js",
 }
 CATALOG_FILES = REQUIRED_FILES - {
+    "notification_profiles.py",
     "frontend/drafts.js",
     "matter.py",
     "recovery.py",

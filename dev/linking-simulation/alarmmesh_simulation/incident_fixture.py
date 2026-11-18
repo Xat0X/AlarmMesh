@@ -3,9 +3,11 @@
 import asyncio
 import json
 from pathlib import Path
+from unittest.mock import patch
 
 import voluptuous as vol
 
+from homeassistant.config_entries import SOURCE_IGNORE, ConfigEntry
 from homeassistant.const import EVENT_HOMEASSISTANT_STARTED
 from homeassistant.core import callback
 from homeassistant.exceptions import HomeAssistantError
@@ -19,6 +21,48 @@ from .catalog_fixture import async_setup_catalog
 async def async_setup_incidents(hass, entry):
     await async_setup_catalog(hass, entry)
     fixtures = hass.data["alarmmesh_simulation"]["fixtures"]
+    # Metadata-only registrations. No Companion provider or outbound transport.
+    for letter, platform in (("a", "iOS"), ("b", "Android")):
+        uid = f"alarmmesh_simulated_phone_{letter}"
+        owner = next(
+            (
+                e
+                for e in hass.config_entries.async_entries("mobile_app")
+                if e.unique_id == uid
+            ),
+            None,
+        )
+        data = {
+            "device_name": f"simulated_phone_{letter}",
+            "device_id": uid,
+            "os_name": platform,
+        }
+        if owner is None:
+            owner = ConfigEntry(
+                domain="mobile_app",
+                title=f"SIMULATED phone {letter}",
+                data=data,
+                options={},
+                version=1,
+                minor_version=1,
+                source=SOURCE_IGNORE,
+                unique_id=uid,
+                discovery_keys={},
+                subentries_data=[],
+            )
+            manager_type = type(hass.config_entries)
+            original = manager_type.async_setup
+
+            async def inert_setup(
+                manager, entry_id, *args, fixture=owner, delegate=original, **kwargs
+            ):
+                if entry_id == fixture.entry_id:
+                    return False
+                return await delegate(manager, entry_id, *args, **kwargs)
+
+            with patch.object(manager_type, "async_setup", inert_setup):
+                await hass.config_entries.async_add(owner)
+        assert owner.source == SOURCE_IGNORE and owner.data == data
     calls = []
     notification_mode = "normal"
     registry = er.async_get(hass)
@@ -143,7 +187,18 @@ async def async_setup_incidents(hass, entry):
         )
 
     async def notify(call):
-        calls.append({"kind": "notification", "target": call.service})
+        data = call.data.get("data", {})
+        calls.append(
+            {
+                "kind": "notification",
+                "target": call.service,
+                "alarm_fields": {
+                    k: data[k]
+                    for k in ("push", "channel", "priority", "ttl")
+                    if k in data
+                },
+            }
+        )
         update()
         if call.service.endswith("phone_b") and notification_mode == "timeout":
             await asyncio.sleep(15)

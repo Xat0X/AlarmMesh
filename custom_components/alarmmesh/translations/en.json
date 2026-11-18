@@ -3,24 +3,24 @@
   "config": {
     "step": {
       "user": {
-        "title": "Select AlarmMesh sources",
-        "description": "AlarmMesh shows smoke reports and source information. Linked sounding, mobile notifications and incident actions are optional and configured separately in the AlarmMesh panel; new automatic functions are off by default. Self-tests require supported devices and separate confirmation. No smoke reported is not a guarantee of safety.",
+        "title": "Choose detectors",
+        "description": "Follow smoke reports and detector status here. Optional linked sounding, phone alerts and extra actions are set separately in the AlarmMesh panel. New automatic actions are off by default. Self-tests need supported devices and separate confirmation. No smoke reported is not a guarantee of safety.",
         "data": {
-          "source_entity_ids": "Smoke detector sources"
+          "source_entity_ids": "Smoke detectors"
         },
         "data_description": {
-          "source_entity_ids": "Select one or more existing smoke detector entities. A temporarily unknown or unavailable detector can remain selected when its smoke detector metadata is available."
+          "source_entity_ids": "Choose at least one existing smoke detector in Home Assistant. An unreachable detector can remain selected if Home Assistant still identifies it as a smoke detector."
         }
       }
     },
     "error": {
       "no_sources": "Select at least one smoke detector.",
-      "invalid_sources": "Select a list of valid entity IDs.",
+      "invalid_sources": "Choose detectors from the list. Refresh the page if selection does not work.",
       "duplicate_sources": "Select each smoke detector only once.",
-      "unknown_entity": "A selected entity no longer exists. Select an existing smoke detector.",
-      "wrong_domain": "Only binary sensor entities can be selected.",
-      "wrong_device_class": "Each selected entity must have the smoke device class.",
-      "own_source": "Entities provided by AlarmMesh cannot be used as sources."
+      "unknown_entity": "A selected detector no longer exists. Check it in Home Assistant or choose another.",
+      "wrong_domain": "Choose a detector smoke status, not a button or switch.",
+      "wrong_device_class": "Home Assistant does not identify this choice as a smoke detector. Check the detector settings or choose another.",
+      "own_source": "Choose a detector smoke status, not an AlarmMesh overview."
     },
     "abort": {
       "already_configured": "AlarmMesh is already configured."
@@ -29,24 +29,24 @@
   "options": {
     "step": {
       "init": {
-        "title": "Change AlarmMesh sources",
-        "description": "AlarmMesh shows smoke reports and source information. Linked sounding, mobile notifications and incident actions are optional and configured separately in the AlarmMesh panel; new automatic functions are off by default. Self-tests require supported devices and separate confirmation. No smoke reported is not a guarantee of safety.",
+        "title": "Change selected detectors",
+        "description": "Follow smoke reports and detector status here. Optional linked sounding, phone alerts and extra actions are set separately in the AlarmMesh panel. New automatic actions are off by default. Self-tests need supported devices and separate confirmation. No smoke reported is not a guarantee of safety.",
         "data": {
-          "source_entity_ids": "Smoke detector sources"
+          "source_entity_ids": "Smoke detectors"
         },
         "data_description": {
-          "source_entity_ids": "Select one or more existing smoke detector entities. A temporarily unknown or unavailable detector can remain selected when its smoke detector metadata is available."
+          "source_entity_ids": "Choose at least one existing smoke detector in Home Assistant. An unreachable detector can remain selected if Home Assistant still identifies it as a smoke detector."
         }
       }
     },
     "error": {
       "no_sources": "Select at least one smoke detector.",
-      "invalid_sources": "Select a list of valid entity IDs.",
+      "invalid_sources": "Choose detectors from the list. Refresh the page if selection does not work.",
       "duplicate_sources": "Select each smoke detector only once.",
-      "unknown_entity": "A selected entity no longer exists. Select an existing smoke detector.",
-      "wrong_domain": "Only binary sensor entities can be selected.",
-      "wrong_device_class": "Each selected entity must have the smoke device class.",
-      "own_source": "Entities provided by AlarmMesh cannot be used as sources."
+      "unknown_entity": "A selected detector no longer exists. Check it in Home Assistant or choose another.",
+      "wrong_domain": "Choose a detector smoke status, not a button or switch.",
+      "wrong_device_class": "Home Assistant does not identify this choice as a smoke detector. Check the detector settings or choose another.",
+      "own_source": "Choose a detector smoke status, not an AlarmMesh overview."
     }
   },
   "entity": {

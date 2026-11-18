@@ -28,6 +28,12 @@ from .automation import (
     scripts,
     send_notification,
 )
+from .notification_profiles import (
+    IOS_SOUNDS,
+    ProfileError,
+    build_plan,
+    receiver_metadata,
+)
 from .status import SourceStatus
 
 REQUEST_TIMEOUT = 10
@@ -113,7 +119,28 @@ class IncidentEffects:
                 if (
                     not isinstance(receipt, dict)
                     or set(receipt)
-                    != {"kind", "target", "identity", "phase", "seen", "status"}
+                    not in (
+                        {"kind", "target", "identity", "phase", "seen", "status"},
+                        {
+                            "kind",
+                            "target",
+                            "identity",
+                            "phase",
+                            "seen",
+                            "status",
+                            "error",
+                        },
+                    )
+                    or receipt.get("error", "")
+                    not in {
+                        "",
+                        "settings_saved_during_smoke",
+                        "invalid_phone_profile",
+                        "invalid_phone_sound",
+                        "phone_identity_changed",
+                        "phone_platform_changed",
+                        "recipient_unavailable",
+                    }
                     or receipt["kind"] not in {"notification", "script"}
                     or receipt["phase"] not in {"start", "recovery"}
                     or receipt["status"]
@@ -189,6 +216,32 @@ class IncidentEffects:
                 self.hass, self._run(), "AlarmMesh incident delivery"
             )
             self._task = None if task.done() else task
+
+    async def prepare_settings(self, value):
+        """Saving is not an alarm trigger. Persist suppression for existing smoke."""
+        if value["enabled"] and self.linking.active:
+            episode = self._episode(
+                "notifications", self.entry.runtime_data.source_entity_ids
+            )
+            if episode and episode["phase"] == "start":
+                for recipient in value["recipients"]:
+                    if not recipient["enabled"]:
+                        continue
+                    target = recipient["service"]
+                    old = episode["receipts"].get(target)
+                    if old is None:
+                        if len(episode["receipts"]) >= 60:
+                            raise AutomationError("automation_source_limit")
+                        episode["receipts"][target] = {
+                            "kind": "notification",
+                            "target": target,
+                            "identity": "",
+                            "phase": "start",
+                            "seen": list(episode["origins"]),
+                            "status": "blocked",
+                            "error": "settings_saved_during_smoke",
+                        }
+                await self._persist()
 
     def _clear(self, episode):
         statuses = self.entry.runtime_data.source_statuses
@@ -363,7 +416,9 @@ class IncidentEffects:
                 async with deadline:
                     if receipt["kind"] == "notification":
                         await send_notification(
-                            self.hass, receipt["target"], self.message(episode)
+                            self.hass,
+                            receipt["target"],
+                            self.phone_plan(receipt["target"], episode)["message"],
                         )
                     else:
                         # One script per call preserves configured start order. This
@@ -381,6 +436,9 @@ class IncidentEffects:
                 receipt["status"] = (
                     "outcome_unknown" if deadline.expired() else "failed"
                 )
+            except AutomationError as err:
+                receipt["status"] = "blocked"
+                receipt["error"] = str(err)
             except Exception:
                 receipt["status"] = "failed"
             else:
@@ -403,6 +461,12 @@ class IncidentEffects:
                 continue
             key = recipient["service"]
             old = episode["receipts"].get(key)
+            if (
+                episode["phase"] == "recovery"
+                and old
+                and old.get("error") == "settings_saved_during_smoke"
+            ):
+                continue
             if old and old["phase"] == "start":
                 # Release suppression only on explicit off, never on unknown or
                 # an empty newly loaded active set. A fresh independent origin
@@ -497,22 +561,70 @@ class IncidentEffects:
         finally:
             self._task = None
 
-    def confirmation(self, target):
+    def phone_profile(self, target):
+        row = next(
+            (r for r in self.settings.value["recipients"] if r["service"] == target), {}
+        )
+        return row.get("profile")
+
+    def phone_plan(self, target, episode=None, *, test=False, include_time=True):
+        profile = self.phone_profile(target)
+        if profile is None and any(
+            r["service"] == target and "profile" in r
+            for r in self.settings.value["recipients"]
+        ):
+            raise AutomationError("invalid_phone_profile")
+        try:
+            message = build_plan(
+                self.hass,
+                target,
+                profile,
+                self.message(episode, test=test, include_time=include_time),
+                smoke=test or not episode or episode["phase"] == "start",
+            )
+        except ProfileError as err:
+            raise AutomationError(str(err)) from err
+        return {
+            "message": message,
+            "profile": deepcopy(profile),
+            "phone_confirmed": False,
+        }
+
+    def confirmation(self, target, request_id=None):
         """Bind a browser acknowledgement to current recipient and message context."""
         service = self.hass.services.async_services().get("notify", {}).get(target)
         if service is None or target not in {
             r["service"] for r in recipients(self.hass)
         }:
             return ""
-        message = self.message(test=True, include_time=False)
+        try:
+            message = self.phone_plan(target, test=True, include_time=False)
+        except AutomationError:
+            return ""
         # The time of dispatch changes naturally; substantive content must not.
         return hashlib.sha256(
-            json.dumps([target, id(service), self.settings.revision, message]).encode()
+            json.dumps(
+                [target, id(service), self.settings.revision, message, request_id]
+            ).encode()
         ).hexdigest()
 
     def snapshot(self):
         available = {r["service"] for r in recipients(self.hass)}
+        plans = {}
+        for target in available | {
+            r["service"] for r in self.settings.value["recipients"]
+        }:
+            try:
+                plans[target] = self.phone_plan(target, test=True)
+            except AutomationError as err:
+                plans[target] = {"error": str(err), "phone_confirmed": False}
         return {
+            "profile_support": True,
+            "phone_metadata": {
+                target: receiver_metadata(self.hass, target) for target in available
+            },
+            "phone_plans": plans,
+            "ios_sounds": IOS_SOUNDS,
             "settings": {
                 **deepcopy(self.settings.value),
                 "revision": self.settings.revision,
@@ -564,9 +676,18 @@ class IncidentEffects:
         if self.manual_tasks or request_id in self.manual_ids:
             raise AutomationError("test_busy")
         if kind == "notification":
+            if self.phone_profile(target) is not None and not identity:
+                raise AutomationError("notification_confirmation_stale")
             if target not in {r["service"] for r in recipients(self.hass)}:
                 raise AutomationError("recipient_unavailable")
-            if identity and identity != self.confirmation(target):
+            if (
+                identity
+                and identity != self.confirmation(target, request_id)
+                and (
+                    self.phone_profile(target) is not None
+                    or identity != self.confirmation(target)
+                )
+            ):
                 raise AutomationError("notification_confirmation_stale")
         elif kind == "script":
             current = script_target(self.hass, target)
@@ -584,7 +705,12 @@ class IncidentEffects:
             "request_id": request_id,
             "started": dt_util.utcnow().isoformat(),
         }
-        self.manual_results = [row]  # Only the last explicit test; no message contents.
+        if kind == "notification":
+            row["alarm_profile"] = deepcopy(self.phone_profile(target))
+        # One latest receipt per target, bounded and without message contents.
+        self.manual_results = [row] + [
+            r for r in self.manual_results if (r["kind"], r["target"]) != (kind, target)
+        ][:19]
 
         deadline = asyncio.timeout(REQUEST_TIMEOUT)
 
@@ -595,9 +721,18 @@ class IncidentEffects:
                 if kind == "notification":
                     if target not in {r["service"] for r in recipients(self.hass)}:
                         raise AutomationError("recipient_unavailable")
-                    if identity and identity != self.confirmation(target):
+                    if (
+                        identity
+                        and identity != self.confirmation(target, request_id)
+                        and (
+                            self.phone_profile(target) is not None
+                            or identity != self.confirmation(target)
+                        )
+                    ):
                         raise AutomationError("notification_confirmation_stale")
-                    await send_notification(self.hass, target, self.message(test=True))
+                    await send_notification(
+                        self.hass, target, self.phone_plan(target, test=True)["message"]
+                    )
                 else:
                     current = script_target(self.hass, target)
                     if current is None or current["identity"] != identity:

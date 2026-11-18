@@ -11,7 +11,7 @@ at `/alarmmesh`. The panel uses your existing HA session and profile language
 (Dutch/English), light/dark HA theme and local packaged assets. Other users keep
 their normal access to the two overview entities; the management panel is admin-only.
 
-Choose **Detectors > Choose sources** to open AlarmMesh's existing integration
+Choose **Detectors > Choose detectors** to open AlarmMesh's existing integration
 page, then **Configure**. This is the original entity selector and backend
 validation. Saving changed options reloads the integration. Cancelling or invalid
 input leaves the saved selection unchanged. No second source selection is stored.
@@ -25,14 +25,14 @@ Local development adds [separate maintenance messages, read-only group action
 examples and anonymized diagnosis](maintenance-tools.md) within the existing
 navigation. All new automatic delivery starts off; no existing setting is enabled.
 
-- **Overview** starts with one **Choose sources** action when no detector is selected.
+- **Overview** starts with one **Choose detectors** action when no detector is selected.
   Once configured, **Set up and check** is collapsed. The source, room and group
   counts are direct navigation buttons; missing sources are named in the status card.
   It shows the shared current smoke result, usable/selected source
   counts, assigned room count, group count, attention items and room cards.
   Active smoke is prominent and names the reporting detector and assigned room.
 - **Detectors** lists only selected sources. Search is immediately available;
-  additional filters are under **More filters**. Each row has **View alarm route**.
+  additional filters are under **More filters**. Each row has **What happens during smoke?**.
   Technical details are collapsed in the detector dialog; duplicate names in the
   same area include their source ID so they remain distinguishable. Open a row for the real HA state,
   source entity, assigned area, known device/model/manufacturer and groups. The
@@ -44,17 +44,28 @@ navigation. All new automatic delivery starts off; no existing setting is enable
 - **Groups** lets administrators create, rename, edit memberships and delete an
   organizational group. A detector can belong to several groups. Deleting asks
   for confirmation and does not delete any source. Empty groups are allowed.
-  A new group starts with its name and members. **Optional sounding and actions**
-  contains the existing origin, sounder and script controls.
+  A new group starts with its name and members. **Optional smoke actions**
+  summarizes enabled choices. Its separate sections let you choose which detectors
+  start actions, which sound together and which existing scripts run.
   **Sound together** is optional and off by default. Choose exact controls, review
   the source-to-target preview and acknowledge its limits before saving. The
   [linking guide](linked-sounding.md) lists profiles and stopping restrictions.
 
-**Settings** starts with phone notifications, their saved availability and a
-**Configure notifications** button. The form shows the message preview and delivery
-timing. Saving a recipient while incident notifications are disabled does not enable
-automatic delivery. Installation, catalog and diagnostic tools remain available under
-**Installation and technical help**.
+**Settings** presents five tasks: choose detectors, set up groups, choose phones,
+choose extra actions and review maintenance. Each shows its current setting.
+**Set up phone alerts** opens the phone form with separate iPhone/Android controls,
+permission help, save and test steps. Saving sends nothing. **Prepare test
+notification** previews the request; only separate confirmation sends it.
+Saving a recipient while automatic alerts are off does not enable delivery.
+Installation, catalog and diagnostic tools remain available under the help section.
+
+**Incidents** starts with the current smoke status, then previously observed
+incidents and requests. **Maintenance** and **Activity** summarize what is known;
+their detailed evidence limits remain under an expandable explanation. Battery
+information, a request receipt or a handled reminder never proves physical safety.
+For temporary loss of a detector, use **Check connection**. **Replace detector**
+is a separate, confirmed process; it never inherits permission to sound automatically.
+See the [five-minute walkthrough and review](plain-language-review.md).
 
 Names are trimmed, nonempty and at most 64 characters. A group can contain at
 most 256 distinct references; at most 100 groups are stored. If another browser

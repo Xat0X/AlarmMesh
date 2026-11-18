@@ -8,7 +8,7 @@
 
 Smoke reports and source availability from existing Home Assistant smoke detector
 entities, with a local panel for detectors, rooms and groups. This test release adds [optional linked sounding](docs/linked-sounding.md), off by default.
-Version 0.1.0-beta.11 also offers [Companion notifications, group
+Version 0.1.0-beta.12 also offers [Companion notifications, group
 script actions, incident details and reviewed built-in self-test requests](docs/incident-features.md).
 New automatic behavior defaults off; existing explicit choices are preserved.
 It includes [opt-in maintenance messages, non-executing action
@@ -20,7 +20,11 @@ The local [morning UI refinement](docs/morning-review.md) simplifies daily statu
 source routes, group setup and notification settings without changing execution rules.
 The local [notification correction and review](docs/notification-review.md) adds
 request diagnosis and safer confirmation/reconnect handling. Actual phone delivery
-and the originally reported live failure remain unverified.
+and the originally reported live failure remain unverified in that historical review.
+The current local work adds [per-phone critical smoke alerts and phone setup help](docs/phone-alerts.md).
+Ordinary delivery is now user-reported; audible behavior on a real phone remains
+unverified. [Current review evidence](docs/critical-notification-review.md) separates
+mock transport, browser observations and remaining phone acceptance.
 Earlier [finishing checks](docs/finish-review.md) remain dated historical evidence.
 
 > AlarmMesh is not a certified fire alarm system and must not replace certified standalone smoke detectors.
@@ -44,11 +48,11 @@ BSD-2 activation requires its broadcast setting to explicitly report off;
 AlarmMesh never changes that setting. The original branding, two overview
 entities, source-selection schema and smoke rules remain unchanged.
 
-## Test release: 0.1.0-beta.11
+## Test release: 0.1.0-beta.12
 
 For opt-in testing, enable **Pre-release** in the AlarmMesh Marketplace page and
-choose **0.1.0-beta.11**. Back up before updating and follow the restart prompt.
-Read the [release notes](docs/releases/0.1.0-beta.11.md) before installing.
+choose **0.1.0-beta.12**. Back up before updating and follow the restart prompt.
+Read the [release notes](docs/releases/0.1.0-beta.12.md) before installing.
 
 ## Current status: local panel and two read-only overviews
 
@@ -143,6 +147,7 @@ installer; use the isolated environment described below.
 
 ## Development and design
 
+- [Plain-language interface review and five-minute walkthrough](docs/plain-language-review.md)
 - [Current acceptance matrix: hosted CI, fresh UI and open checks](docs/acceptance-matrix.md)
 - [Local package, file-update and snapshot-recovery checks](docs/release-package.md)
 - [Disposable Marketplace and HA backup acceptance](docs/installer-acceptance.md)

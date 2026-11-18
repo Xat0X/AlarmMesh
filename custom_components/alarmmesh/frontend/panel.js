@@ -1,5 +1,5 @@
-import { TEXT } from "./translations.js?v=20261117-notify-1";
-import { Drafts } from "./drafts.js?v=20261116-matter-1";
+import { TEXT } from "./translations.js?v=20261118-independent-1";
+import { Drafts } from "./drafts.js?v=20261118-independent-1";
 
 // Safe DOM construction: names, labels and registry data are always text nodes.
 const el = (tag, text, cls) => {
@@ -76,7 +76,7 @@ export class AlarmMeshPanel extends HTMLElement {
         this.data = data.available ? data : null;
         this.transport = data.available ? "ready" : "notLoaded";
         if (!data.available) this.offlineDraft();
-        else if (this.shadowRoot.querySelector(".offline-draft")) { this.shadowRoot.querySelector(".offline-draft").remove(); for (const b of this.shadowRoot.querySelectorAll('dialog button[type="submit"],dialog .confirm-execute,dialog .confirm-linking')) if (!b.dataset.started && !b.dataset.confirmLocked) b.disabled = false; }
+        else if (this.shadowRoot.querySelector(".offline-draft")) { this.shadowRoot.querySelector(".offline-draft").remove(); for (const b of this.shadowRoot.querySelectorAll('dialog button[type="submit"],dialog .confirm-execute,dialog .confirm-linking')) if (!b.dataset.started && !b.dataset.confirmLocked && !b.dataset.reopenRequired) b.disabled = false; }
         if (data.available && this.detail?.pendingRecovery?.interrupted) this.detail.showMemberships();
         this.updateTestResult();
         if (!data.available || this.page !== "catalog" || !this.shadowRoot.querySelector(".catalog-filters")) this.render();
@@ -127,7 +127,7 @@ export class AlarmMeshPanel extends HTMLElement {
     const t = this.t;
     const sticky = this.shadowRoot.activeElement;
     const stickyKey = sticky?.dataset.sticky, selection = stickyKey ? [sticky.selectionStart, sticky.selectionEnd] : null;
-    const link = el("link"); link.rel = "stylesheet"; link.href = "/alarmmesh-assets/panel.css?v=20261117-notify-1";
+    const link = el("link"); link.rel = "stylesheet"; link.href = "/alarmmesh-assets/panel.css?v=20261118-independent-1";
     const shell = el("div", undefined, "shell");
     shell.classList.toggle("dark", Boolean(this._hass?.themes?.darkMode));
     const side = el("aside");
@@ -179,7 +179,7 @@ export class AlarmMeshPanel extends HTMLElement {
           const card = button("", () => this.openDialog({ kind: "group", id: group.id }), "card room-card");
           card.append(icon("select-group"), el("h3", group.name), this.badge(group.result), el("p", t[group.result.availability]), el("p", this.detectorCount(group.members.length)));
           if (group.unselected.length) card.append(el("p", `${group.unselected.length} · ${t.stale}`, "warning-text"));
-          card.append(el("p", `${t.linkTogether}: ${t[group.linking_status || "disabled"]}`));
+          card.append(el("p", `${t.linkTogether}: ${t[group.linking_status || "disabled"]}`),el("p",`${t.incidentActions}: ${t[group.actions?.enabled ? "enabled":"disabled"]}`));
           cards.append(card);
         }
         main.append(cards);
@@ -217,8 +217,9 @@ export class AlarmMeshPanel extends HTMLElement {
         issue.append(button(`${this.sourceName(source.entity_id)} · ${t[source.identity_changed ? "recovery_changed" : source.status] || t.UNKNOWN}`, () => this.openDialog({kind:"source", id:source.entity_id})));
         if (source.identity_changed || ["MISSING", "UNREACHABLE"].includes(source.status)) {
           if (source.status === "UNREACHABLE" && !source.identity_changed) issue.append(el("p", t.recovery_temporary));
-          const recover = button(t.recoverSource, () => this.openDialog({kind:"recovery", id:source.entity_id}), "button source-recovery");
-          recover.setAttribute("aria-label", `${t.recoverSource}: ${this.sourceName(source.entity_id)}`);
+          const temporary=source.status==='UNREACHABLE' && !source.identity_changed;
+          const recover = button(temporary?t.checkConnection:t.recoverSource, () => this.openDialog({kind:temporary?'source':'recovery', id:source.entity_id}), "button source-recovery");
+          recover.setAttribute("aria-label", `${temporary?t.checkConnection:t.recoverSource}: ${this.sourceName(source.entity_id)}`);
           issue.append(recover);
         }
         missing.append(issue);
@@ -305,7 +306,8 @@ export class AlarmMeshPanel extends HTMLElement {
       issue.append(button(replacement ? t.recoverSource : t.inspectDetector, () => this.openDialog({kind:replacement ? "recovery" : "source", id:source.entity_id}), "button primary"));
       parent.append(issue);
     }
-    parent.append(el("p", t.maintenanceNote, "section-note"));
+    parent.append(el("p",t.maintenanceSummary,"section-note"));
+    const limits=el('details',undefined,'maintenance-limits');limits.append(el('summary',t.aboutInformation),el('p',t.maintenanceNote));parent.append(limits);
     if (data.maintenance) {
       const section = el("details", undefined, "notice maintenance-delivery");
       section.append(el("summary", t.maintenanceNotifications));
@@ -628,12 +630,18 @@ export class AlarmMeshPanel extends HTMLElement {
     }
     const advanced = el("details", undefined, "advanced-options");
     advanced.open = Boolean(group?.linking?.enabled || group?.actions?.enabled || this.detail.section);
-    advanced.append(el("summary", t.optionalActions), originSection, linkingSection);
+    const advancedSummary=el("summary",t.optionalActions);advanced.append(advancedSummary);
+    const originsDetails=el('details',undefined,'group-option origins-option');originsDetails.append(el('summary',t.incidentSources),originSection);
+    const linkingDetails=el('details',undefined,'group-option linking-option');linkingDetails.open=Boolean(group?.linking?.enabled);linkingDetails.append(el('summary',t.linkTogether),linkingSection);
+    advanced.append(originsDetails,linkingDetails);
     form.append(advanced);
     const updateCounts = ()=> { memberCount.textContent=`${t.members}: ${[...form.querySelectorAll('[name="member"]')].filter(c=>c.checked).length}`; };
     form.addEventListener("change", updateCounts); updateCounts();
     memberSearch.addEventListener("input", ()=>{ for(const row of form.querySelectorAll('[data-member-search]')) row.hidden=!row.dataset.memberSearch.includes(memberSearch.value.toLocaleLowerCase()); });
-    const actionFields = this.actionFields(advanced, group?.actions);
+    const scriptsDetails=el('details',undefined,'group-option scripts-option');scriptsDetails.open=Boolean(group?.actions?.enabled);scriptsDetails.append(el('summary',t.incidentActions));advanced.append(scriptsDetails);
+    const actionFields = this.actionFields(scriptsDetails, group?.actions);
+    const updateActionSummary=()=>{advancedSummary.textContent=`${t.optionalActions} · ${t.linkTogether}: ${t[toggle.checked?'enabled':'disabled']} · ${t.incidentActions}: ${t[actionFields().enabled?'enabled':'disabled']}`;};
+    form.addEventListener('change',updateActionSummary);updateActionSummary();
     const actions = el("div", undefined, "actions"); const save = el("button", t.save, "button primary"); save.type = "submit";
     actions.append(button(t.cancel, () => this.closeDialog()), save); form.append(error, actions);
     form.addEventListener("submit", async event => {
@@ -768,47 +776,78 @@ export class AlarmMeshPanel extends HTMLElement {
     for (const b of dialog.querySelectorAll('button[type="submit"],.confirm-execute,.confirm-linking')) b.disabled = true;
   }
   renderSettings(parent) {
-    const t = this.t, automation = this.data.automation;
-    if (!automation) { this.renderSetupGuide(parent); return; }
-    const section = el("section", undefined, "notice");
-    section.append(el("h2", t.notifications), el("p", t[!automation.settings.recipients.some(r=>r.enabled) ? "notificationsNotConfigured" : !automation.settings.enabled ? "notificationsOff" : automation.notification_routes?.some(r=>r.eligible) ? "notificationsReady" : "delivery_blocked"]), el("p", t.notificationNote));
-    for (const recipient of automation.settings.recipients) section.append(el("p", `${automation.recipients.find(r => r.service === recipient.service)?.name || recipient.service.replace(/^mobile_app_/, "")}: ${t[recipient.enabled ? "enabled" : "disabled"]}${automation.missing_recipients.includes(recipient.service) ? ' · ' + t.recipient_unavailable : ''}`));
-    section.append(button(t.configureNotifications, () => this.openDialog({ kind: "settings" }), "button primary"));
-    for (const row of (automation.manual_results || []).filter(r=>r.kind==="notification").slice(-3)) this.notificationReceipt(section,row);
-    if (automation.error) section.append(el("p", t[automation.error] || t.error, "warning-text"));
-    const scripts = el("section", undefined, "notice");
-    scripts.append(el("h2", t.incidentActions), el("p", t.actionsLocation), button(t.groups, () => this.go("groups")));
-    parent.append(section, scripts);
-    if (this.data.maintenance) parent.append(button(t.configureMaintenance, () => this.openDialog({kind: "maintenance"})));
-    this.renderSetupGuide(parent);
-    const tools = el("details", undefined, "advanced-options");
-    tools.append(el("summary", t.installationAndHelp), button(t.choose, () => this.choose()), button(t.matterHelp, () => this.go("matterHelp")), button(t.catalog, () => this.go("catalog")), button(t.diagnostics, () => this.go("diagnostics")));
-    parent.append(button(t.maintenance, () => this.go("maintenance")), button(t.activity, () => this.go("activity")), button(t.viewIncidents, () => this.go("incidents")), tools);
+    const t=this.t,a=this.data.automation,d=this.data;
+    if(!a){this.renderSetupGuide(parent);return;}
+    parent.append(el('p',t.settingsIntro,'section-note'));
+    const grid=el('div',undefined,'settings-grid');
+    const card=(key,title,summary,label,action,primary=false)=>{
+      const box=el('section',undefined,'notice settings-task');box.dataset.setting=key;
+      box.append(el('h2',title),el('p',summary,'setting-value'),button(label,action,primary?'button primary':'button'));grid.append(box);return box;
+    };
+    card('detectors',t.settingsDetectors,`${this.detectorCount(d.sources.length)} · ${t[d.result.availability]}`,t.choose,()=>this.choose(),!d.sources.length);
+    const linked=d.groups.filter(g=>g.linking?.enabled).length;
+    card('groups',t.settingsGroups,`${d.groups.length} ${t.groups.toLowerCase()} · ${linked} ${t.groupsSoundOn}`,t.manageGroups,()=>this.go('groups'));
+    const selected=a.settings.recipients.filter(r=>r.enabled).length;
+    const phones=card('phones',t.settingsPhones,`${selected} ${t.phonesChosen} · ${t[a.settings.enabled?'automaticOn':'automaticOff']}`,t.configureNotifications,()=>this.openDialog({kind:'settings'}),Boolean(d.sources.length));
+    if(a.settings.recipients.length){
+      const details=el('details',undefined,'phone-settings-summary');details.append(el('summary',t.savedPhones));
+      for(const r of a.settings.recipients){const name=a.recipients.find(p=>p.service===r.service)?.name || r.service.replace(/^mobile_app_/,'');
+        details.append(el('h3',name),el('p',`${t[r.enabled?'recipientSelected':'recipientNotSelected']} · ${this.phoneSummary(r.profile)}`));
+        const error=a.phone_plans?.[r.service]?.error || (a.missing_recipients.includes(r.service)?'recipient_unavailable':null);
+        if(error)details.append(el('p',t[error] || t.invalid_phone_profile,'warning-text'));
+      }
+      details.append(el('p',t.phoneUnchecked));phones.append(details);
+    }
+    for(const row of (a.manual_results || []).filter(r=>r.kind==='notification').slice(0,3)){
+      const last=el('details',undefined,'phone-latest');last.append(el('summary',`${t.lastPhoneTest}: ${row.target.replace(/^mobile_app_/,'')}`));this.notificationReceipt(last,row);phones.append(last);
+    }
+    if(a.error)phones.append(el('p',t[a.error] || t.error,'warning-text'));
+    const actions=d.groups.filter(g=>g.actions?.enabled).length;
+    card('actions',t.settingsActions,`${actions} ${t.groupsActionsOn}. ${t.actionsLocation}`,t.manageActions,()=>this.go('groups'));
+    const maintenance=card('maintenance',t.settingsMaintenance,t.maintenanceSetupShort,t.maintenance,()=>this.go('maintenance'));
+    if(d.maintenance)maintenance.append(el('p',`${t.maintenanceNotifications}: ${t[d.maintenance.settings.enabled?'enabled':'disabled']}`));
+    parent.append(grid);
+    const help=el('details',undefined,'advanced-options settings-help');help.append(el('summary',t.installationAndHelp));this.renderSetupGuide(help);
+    help.append(button(t.matterHelp,()=>this.go('matterHelp')),button(t.catalog,()=>this.go('catalog')),button(t.diagnostics,()=>this.go('diagnostics')));parent.append(help);
   }
   notificationForm(dialog) {
     const t = this.t, a = this.data.automation;
     if (!a) return;
     const cfg = this.detail.restoredDraft?.value || a.settings, revision = this.detail.restoredDraft?.revision ?? a.settings.revision, form = el("form");
-    dialog.append(el("h2", t.notifications), el("p", t.notificationNote));
+    dialog.append(el("h2", a.profile_support ? t.phoneWizard : t.notifications), el("p", a.profile_support ? t.phoneWizardIntro : t.notificationNote));
+    if(a.profile_support){const steps=el('ol',undefined,'phone-steps');for(const text of [t.phoneStepChoose,t.phoneStepSound,t.phoneStepSave])steps.append(el('li',text));dialog.append(steps);}
     const toggle = this.checkField(form, t.enableNotifications, cfg.enabled, "notifications-enabled");
     const recovery = this.checkField(form, t.recoveryNotification, cfg.recovery, "notifications-recovery");
     const stored = new Map(cfg.recipients.map(r => [r.service, r]));
     const choices = [...a.recipients, ...cfg.recipients.filter(r => !a.recipients.some(n => n.service === r.service)).map(r => ({ ...r, name: r.service, missing: true }))];
-    const recipients = [], removed = new Set();
+    const recipients = [], removed = new Set(), profiles = new Map();
     if (!choices.length) form.append(el("p", t.noRecipients, "notice"), el("p", t.phoneSetupHelp));
     for (const recipient of choices) {
       const row = el("section", undefined, "recipient-row");
       const input = this.checkField(row, `${recipient.name}${recipient.missing ? ' · ' + t.recipient_unavailable : ''}`, stored.get(recipient.service)?.enabled || false, "recipient");
       input.value = recipient.service; recipients.push(input);
       row.append(el("small", t[recipient.missing ? "phoneMissingHelp" : "phoneAvailable"]));
-      if (!recipient.missing) row.append(button(t.testNotification, () => this.confirmRequest(form, { actionKind: "notification", target: recipient.service, name: recipient.name }), "button"));
-      if (stored.has(recipient.service)) row.append(button(t.forgetRecipient, () => { removed.add(recipient.service); row.remove(); }, "button destructive"));
+      const last=(a.manual_results || []).find(r=>r.kind==='notification' && r.target===recipient.service);
+      if(last)row.append(el('p',`${t.lastPhoneTest}: ${this.formatTime(last.started)} · ${t['delivery_'+last.status] || t.guide_unknown}`));
+      if (a.profile_support) {
+        profiles.set(recipient.service,this.phoneFields(row,recipient,stored.get(recipient.service)?.profile,input));
+        const problem=a.phone_plans?.[recipient.service]?.error;
+        if(problem) row.append(el("p",t[problem] || t.invalid_phone_profile,"warning-text"));
+      }
+      const testHelp=el("p","","phone-test-help");testHelp.setAttribute("role","status");
+      if (!recipient.missing) row.append(button(t.testNotification, () => {
+        const saved=this.data?.automation?.settings.recipients.find(r=>r.service===recipient.service)?.profile;
+        if(a.profile_support && JSON.stringify(profiles.get(recipient.service)?.())!==JSON.stringify(saved)) {testHelp.textContent=t.saveBeforeTest;return;}
+        this.confirmRequest(form, { actionKind: "notification", target: recipient.service, name: recipient.name });
+      }, "button"),testHelp);
+      if (stored.has(recipient.service)) {const more=el('details',undefined,'phone-more');more.append(el('summary',t.morePhoneOptions),button(t.forgetRecipient, () => { removed.add(recipient.service); row.remove(); }, "button destructive"));row.append(more);}
       form.append(row);
     }
-    const preview = el("details"); preview.open = true; preview.append(el("summary", t.messagePreview), el("strong", a.preview.title), el("p", a.preview.message, "message-preview")); form.append(el("p", t.notificationTiming, "section-note"), preview);
+    if(a.profile_support)form.append(toggle.parentElement,recovery.parentElement);
+    const preview = el("details"); preview.open = !a.profile_support; preview.append(el("summary", t.messagePreview), el("strong", a.preview.title), el("p", a.preview.message, "message-preview")); form.append(el("p", t.notificationTiming, "section-note"), preview);
     const error = el("p", "", "form-error"); error.setAttribute("role", "alert");
     const save = el("button", t.saveSettings, "button primary"); save.type = "submit";
-    const read = () => ({enabled:toggle.checked,recovery:recovery.checked,recipients:recipients.filter(r=>!removed.has(r.value) && (r.checked || stored.has(r.value))).map(r=>({service:r.value,enabled:r.checked}))});
+    const read = () => ({enabled:toggle.checked,recovery:recovery.checked,recipients:recipients.filter(r=>!removed.has(r.value) && (r.checked || stored.has(r.value))).map(r=>{const profile=profiles.get(r.value)?.();return {service:r.value,enabled:r.checked,...(profile ? {profile}: {})};})});
     const detail = this.detail;
     let refreshSerial = 0;
     form.append(button(t.refreshRecipients, async () => {
@@ -826,18 +865,73 @@ export class AlarmMeshPanel extends HTMLElement {
       event.preventDefault();
       if (form.querySelector(".request-confirmation")) { error.textContent = t.finishConfirmation; return; }
       if (!this.data) { error.textContent = t.offline; return; }
-      const value = { enabled: toggle.checked, recovery: recovery.checked, recipients: recipients.filter(r => !removed.has(r.value) && (r.checked || stored.has(r.value))).map(r => ({ service: r.value, enabled: r.checked })) };
+      const value = read();
       if (value.enabled && !value.recipients.some(r => r.enabled)) { error.textContent = t.invalid_notifications; return; }
       const send = async confirmed => {
         save.disabled = true;
         try { await this._hass.callWS({ type: "alarmmesh/settings", revision, notifications: value, confirmed }); this.clearDraft(); this.closeDialog(); }
-        catch (e) { error.textContent = t[e.code] || t.error; save.disabled = Boolean(save.dataset.confirmLocked); }
+        catch (e) {
+          error.textContent = t[e.code] || t.saveResultUnknown; save.disabled = Boolean(save.dataset.confirmLocked);
+          if(a.profile_support && !t[e.code]) {
+            form.querySelector('.save-reconcile')?.remove();
+            const status=el('section',undefined,'notice save-reconcile'),message=el('p',t.saveResultUnknown);
+            const check=button(t.checkSavedPhones,async()=>{
+              check.disabled=true;
+              try {
+                const current=await this._hass.callWS({type:'alarmmesh/current'});
+                if(!status.isConnected)return;
+                const saved=current.automation.settings;
+                const canonical=v=>Array.isArray(v)?v.map(canonical):v && typeof v==='object'?Object.fromEntries(Object.keys(v).sort().map(k=>[k,canonical(v[k])])):v;
+                const same=JSON.stringify(canonical({enabled:saved.enabled,recovery:saved.recovery,recipients:saved.recipients}))===JSON.stringify(canonical(read()));
+                message.textContent=t[same?'phonesSavedVerified':'phonesSavedDifferent'];
+                error.textContent='';save.disabled=true;save.dataset.reopenRequired='true';
+              } catch {message.textContent=t.saveResultUnknown;}
+              finally {check.disabled=false;}
+            });check.dataset.checkSavedPhones='';status.append(message,check);form.append(status);
+            const edited=()=>{if(status.isConnected)message.textContent=t.phonesSaveEdited;};
+            form.addEventListener('input',edited);form.addEventListener('change',edited);
+          }
+        }
       };
-      if (!value.enabled) { await send(false); return; }
-      this.confirmRequest(form, { name: t.confirmAutomation, confirmationOnly: true, note: `${t.notificationNote}\n${value.recipients.filter(r => r.enabled).map(r => r.service).join(', ')}`, execute: () => send(true) });
+      if (!value.enabled && !value.recipients.some(r=>r.profile?.critical)) { await send(false); return; }
+      this.confirmRequest(form, { name: a.profile_support ? t.reviewPhones : t.confirmAutomation, confirmationOnly: true, note: `${a.profile_support ? t.saveIsQuiet : t.notificationNote}\n${value.recipients.filter(r => r.enabled).map(r => `${r.service.replace(/^mobile_app_/,"")}: ${this.phoneSummary(r.profile)}`).join('\n')}`, execute: () => send(true) });
     });
     this.trackDraft(form,revision,read);
     dialog.append(form);
+  }
+  phoneSummary(profile) {
+    const t=this.t;if(!profile)return t.phoneOrdinary;
+    const sound=t[this.data?.automation?.ios_sounds?.[profile.sound]] || profile.sound || t.sound_default;
+    return `${t['phone_'+profile.platform] || t.guide_unknown} · ${t[profile.critical ? 'phoneCritical':'phoneOrdinary']}${profile.platform==='ios' ? ` · ${sound}${profile.critical ? ` · ${profile.volume*100}%` : ''}`:''}`;
+  }
+  phoneFields(parent,recipient,saved,chosen) {
+    const t=this.t,meta=this.data.automation.phone_metadata?.[recipient.service];
+    let changed=false,identity=saved?.identity || meta?.identity || '',origin=saved?.origin || meta?.origin || 'user';
+    const box=el("details",undefined,"phone-profile");box.open=chosen.checked;
+    const summary=el("summary",t.phoneOptions);box.append(summary);
+    const field=(label,name,choices,value)=>{const l=el("label",label),s=el("select");s.name=name;
+      for(const [id,text] of choices){const o=el("option",text);o.value=id;o.selected=id===value;s.append(o);}l.append(s);box.append(l);return s;};
+    const platform=field(t.phonePlatform,"phone-platform",[["unknown",t.phone_unknown],["ios",t.phone_ios],["android",t.phone_android]],saved?.platform || meta?.platform || "unknown");
+    box.append(el('small',t[origin==='metadata' ? 'platformFromHA':'platformFromUser']));
+    const critical=this.checkField(box,t.phoneCritical,"critical" in (saved || {}) ? saved.critical : false,"phone-critical");
+    const ios=el("section",undefined,"phone-ios"),help=el("details",undefined,"phone-help");
+    const soundLabel=el("label",t.phoneSound),sound=el("select");sound.name="phone-sound";
+    for(const [id,key] of Object.entries(this.data.automation.ios_sounds || {default:'sound_default'})){const o=el("option",t[key] || id);o.value=id;o.selected=saved?.sound_source!=='imported' && id===(saved?.sound || 'default');sound.append(o);}
+    const custom=el("option",t.sound_imported);custom.value="imported";custom.selected=saved?.sound_source==='imported';sound.append(custom);soundLabel.append(sound);
+    const nameLabel=el("label",t.importedFilename),name=el("input");name.name="phone-sound-file";name.maxLength=100;name.value=saved?.sound_source==='imported' ? saved.sound : '';nameLabel.append(name);
+    const volumeLabel=el("label",t.phoneVolume),volume=el("input");volume.type="number";volume.name="phone-volume";volume.min="0";volume.max="100";volume.step="1";volume.value=String((saved?.volume ?? 1)*100);volumeLabel.append(volume);
+    ios.append(soundLabel,nameLabel,volumeLabel,el("small",t.soundAvailability));box.append(ios,help,el("p",t.phoneUnchecked,"phone-evidence"));
+    const read=()=>{if(!changed && !saved)return undefined;const p={version:1,platform:platform.value,origin,identity,critical:critical.checked};if(p.platform==='ios')Object.assign(p,{sound:sound.value==='imported' ? name.value : sound.value,sound_source:sound.value==='imported' ? 'imported':'bundled',volume:Number.parseFloat(volume.value)/100});return p;};
+    const draw=()=>{ios.hidden=platform.value!=='ios';nameLabel.hidden=sound.value!=='imported';volumeLabel.hidden=!critical.checked;critical.disabled=platform.value==='unknown';
+      help.replaceChildren(el("summary",t.whyNoSound),el("p",t['phoneHelp_'+platform.value]));
+      if(meta?.identity_scope==='session')help.append(el("p",t.phoneSessionIdentity));
+      if(sound.value==='imported' && platform.value==='ios')help.append(el("p",t.importSoundHelp));
+      help.append(el("p",t.phoneNoProof));summary.textContent=this.phoneSummary(read() || {platform:platform.value,critical:false});};
+    box.addEventListener('input',()=>{changed=true;draw();});box.addEventListener('change',()=>{changed=true;draw();});
+    platform.addEventListener('change',()=>{changed=true;origin='user';identity=meta?.identity || identity;critical.checked=false;draw();});
+    chosen.addEventListener('change',()=>{box.open=chosen.checked;});
+    if(saved && meta && saved.identity!==meta.identity)box.append(button(t.reviewPhoneIdentity,()=>{changed=true;identity=meta.identity;origin='user';critical.checked=false;draw();}));
+    draw();parent.append(box);return read;
   }
   maintenanceForm(dialog) {
     const t = this.t, m = this.data.maintenance, a = this.data.automation;
@@ -857,7 +951,7 @@ export class AlarmMeshPanel extends HTMLElement {
       const row = el("div", undefined, "recipient-row");
       const input = this.checkField(row, `${recipient.name}${recipient.missing ? ' · ' + t.recipient_unavailable : ''}`, stored.get(recipient.service)?.enabled, "maintenance-recipient");
       input.value = recipient.service; inputs.push(input);
-      if (stored.has(recipient.service)) row.append(button(t.forgetRecipient, () => { removed.add(recipient.service); row.remove(); }, "button destructive"));
+      if (stored.has(recipient.service)) {const more=el('details',undefined,'phone-more');more.append(el('summary',t.morePhoneOptions),button(t.forgetRecipient, () => { removed.add(recipient.service); row.remove(); }, "button destructive"));row.append(more);}
       form.append(row);
     }
     const error = el("p", "", "form-error"); error.setAttribute("role", "alert");
@@ -941,7 +1035,7 @@ export class AlarmMeshPanel extends HTMLElement {
         for (const recipient of result.phones) {
           const name = this.data.automation?.recipients.find(r => r.service === recipient.target)?.name || recipient.target.replace(/^mobile_app_/, "");
           output.append(el("p", `${name} · ${t[recipient.reason] || t.guide_unknown}`));
-          output.append(el("small", `${t.phoneSelected}: ${t[recipient.selected ? 'enabled':'disabled']} · ${t.enableNotifications}: ${t[recipient.enabled ? 'enabled':'disabled']} · ${t.phoneAvailable}: ${t[recipient.available ? 'enabled':'disabled']}`));
+          output.append(el("small", `${t.phoneSelected}: ${t[recipient.selected ? 'enabled':'disabled']} · ${t[recipient.enabled ? 'automaticOn':'automaticOff']} · ${t[recipient.available ? 'phoneAvailable':'recipient_unavailable']}`));
         }
         if (!result.phones.length) output.append(el("p", t.noRecipients));
         if (result.notification_preview) { const preview=el("details"); preview.append(el("summary",t.messagePreview),el("strong",result.notification_preview.title),el("p",result.notification_preview.message,"message-preview"),el("small",t.phoneDeliveryUnconfirmed));output.append(preview); }
@@ -1050,28 +1144,41 @@ export class AlarmMeshPanel extends HTMLElement {
     const controls = [...parent.querySelectorAll("input,select,button")].map(node => [node, node.disabled]);
     for (const [node] of controls) { node.dataset.confirmLocked = "true"; node.disabled = true; }
     return () => {
-      for (const [node, disabled] of controls) { delete node.dataset.confirmLocked; node.disabled = disabled; }
+      for (const [node, disabled] of controls) { delete node.dataset.confirmLocked; node.disabled = disabled || Boolean(node.dataset.reopenRequired); }
       if (!this.data) this.offlineDraft();
     };
   }
   confirmRequest(parent, detail) {
     const t = this.t;
+    if(detail.actionKind==='notification' && this.data?.automation?.profile_support && !detail.phonePlan) {
+      const previous=parent.querySelector('.request-confirmation');previous?.restore?.();previous?.remove();
+      const restore=this.lockControls(parent),pending=el('section',undefined,'notice request-confirmation');pending.restore=restore;
+      const status=el('p',t.loading);pending.append(status,button(t.cancel,()=>{pending.remove();restore();}));parent.append(pending);
+      const generation=this.generation;
+      if(typeof globalThis.crypto?.getRandomValues!=='function'){status.textContent=t.request_random_unavailable;return;}
+      const request=Array.from(globalThis.crypto.getRandomValues(new Uint8Array(16)),b=>b.toString(16).padStart(2,'0')).join('');
+      this._hass.callWS({type:'alarmmesh/notification_preview',target:detail.target,request_id:request}).then(plan=>{
+        if(!pending.isConnected || generation!==this.generation || !this.data)return;
+        if(plan.context!==this.data.automation.confirmations[detail.target]) {status.textContent=t.notification_confirmation_stale;return;}
+        pending.remove();restore();this.confirmRequest(parent,{...detail,phonePlan:plan});
+      }).catch(e=>{if(pending.isConnected)status.textContent=t[e.code] || t.offline;});return;
+    }
     const previous = parent.querySelector(".request-confirmation"); previous?.restore?.(); previous?.remove();
     const restore = this.lockControls(parent);
     const box = el("section", undefined, "notice request-confirmation");
     box.restore = restore;
     if (detail.actionKind === "notification") {
       box.dataset.notificationTarget = detail.target;
-      box.dataset.notificationToken = this.data?.automation?.confirmations?.[detail.target] || "";
-      detail.identity = box.dataset.notificationToken;
+      box.dataset.notificationToken = detail.phonePlan?.context || this.data?.automation?.confirmations?.[detail.target] || "";
+      detail.identity = detail.phonePlan?.confirmation || box.dataset.notificationToken;
     }
     box.append(el("h3", detail.name || t.explicitTest), el("p", detail.note || (detail.actionKind === "selftest" ? t.selfTestWarning : detail.actionKind === "script" ? t.scriptConsequences : t.notifyTestWarning)));
     const ack = this.checkField(box, t.confirmExactTarget, false, "confirm-request");
     const error = el("p", "", "form-error"); error.setAttribute("role", "alert");
     const status = el("p", "", "request-status"); status.setAttribute("role", "status");
-    const execute = button(t.confirmRequest, async () => {
+    const execute = button(detail.confirmationOnly ? t.confirmRequest : detail.actionKind==='notification' ? t.sendPhoneTest : detail.actionKind==='selftest' ? t.startSelfTest : t.runScriptTest, async () => {
       if (execute.disabled || execute.dataset.started) return;
-      if (detail.actionKind === "notification" && (!detail.identity || detail.identity !== this.data?.automation?.confirmations?.[detail.target])) {
+      if (detail.actionKind === "notification" && (!detail.identity || box.dataset.notificationToken !== this.data?.automation?.confirmations?.[detail.target])) {
         ack.checked = false; status.textContent = t.notification_confirmation_stale; return;
       }
       if (!ack.checked) { error.textContent = t.test_confirmation_required; ack.focus(); return; }
@@ -1084,7 +1191,7 @@ export class AlarmMeshPanel extends HTMLElement {
       try {
         if (typeof globalThis.crypto?.getRandomValues !== "function") throw Object.assign(new Error("Secure random values unavailable"), { code: "request_random_unavailable" });
         // getRandomValues also works on local HTTP; randomUUID requires a secure context.
-        const request = Array.from(globalThis.crypto.getRandomValues(new Uint8Array(16)), byte => byte.toString(16).padStart(2, "0")).join("");
+        const request = detail.phonePlan?.request_id || Array.from(globalThis.crypto.getRandomValues(new Uint8Array(16)), byte => byte.toString(16).padStart(2, "0")).join("");
         if (detail.actionKind === "selftest") box.dataset.selftestRequest = request;
         if (detail.actionKind === "notification") box.dataset.deliveryRequest = request;
         const result = await this._hass.callWS({ type: "alarmmesh/test", kind: detail.actionKind, target: detail.target, identity: detail.identity || "", confirmed: true, request_id: request });
@@ -1097,9 +1204,10 @@ export class AlarmMeshPanel extends HTMLElement {
     }, "button destructive confirm-execute");
     box.append(status, error, button(t.cancel, () => { box.remove(); restore(); if (parent.tagName === "DIALOG" && this.detail?.kind === "test") this.closeDialog(); }), execute); parent.append(box); ack.focus();
     if (detail.actionKind === "notification" && this.data?.automation?.test_preview) {
-      const preview = this.data.automation.test_preview;
+      const preview = detail.phonePlan?.message || this.data.automation.test_preview;
       box.insertBefore(el("p", `${preview.title}\n${preview.message}`, "message-preview"), ack.parentElement);
-      box.append(el("small", t.phoneDeliveryUnconfirmed), button(t.refreshConfirmation, () => this.confirmRequest(parent, detail)));
+      if(detail.phonePlan)box.insertBefore(el('p',`${this.phoneSummary(detail.phonePlan.profile)}. ${detail.phonePlan.profile?.critical ? t.criticalTestWarning : t.phoneUnchecked}`,'notice'),ack.parentElement);
+      box.append(el("small", t.phoneDeliveryUnconfirmed), button(t.refreshConfirmation, () => this.confirmRequest(parent, {...detail,phonePlan:null})));
     }
   }
   updateTestResult() {
@@ -1160,7 +1268,8 @@ export class AlarmMeshPanel extends HTMLElement {
   renderIncidents(parent) {
     parent.append(button(this.t.activity,()=>this.go("activity")));
     const t = this.t, data = this.data;
-    parent.append(el("p", t.incidentNote, "notice"));
+    const current=el('section',undefined,'notice incident-now');current.append(el('h2',t.currentSituation),this.badge(data.result),el('p',t[data.result.availability]));parent.append(current);
+    const explanation=el('details',undefined,'incident-explanation');explanation.append(el('summary',t.howToReadIncidents),el('p',t.incidentNote));parent.append(explanation);
     this.sourceList(parent, data.sources.filter(s => s.status === "SMOKE_REPORTED"));
     const active = data.incident?.active_sources || [];
     const pending = active.filter(id => data.sources.find(s => s.entity_id === id)?.status !== "SMOKE_REPORTED");
@@ -1178,7 +1287,7 @@ export class AlarmMeshPanel extends HTMLElement {
     for (const episode of episodes) {
       const card = el("section", undefined, "notice incident-episode"); card.dataset.incident = episode.id;
       const group = data.groups.find(g => g.id === episode.group_id);
-      card.append(el("h2", group?.name || t.notifications));
+      card.append(el("h2", group?.name || t.notifications),el("p",t[episode.phase==='recovery'?'incidentClosed':'incidentStillOpen'],"episode-phase"));
       const flow = el("ol", undefined, "incident-flow");
       flow.append(el("li", `${t.incidentStarted}: ${this.formatTime(episode.started)}`));
       flow.append(el("li", `${t.recordedOrigins}: ${episode.origins.map(id => this.sourceName(id)).join(", ")}`));
@@ -1213,6 +1322,7 @@ export class AlarmMeshPanel extends HTMLElement {
     const t=this.t,card=el("section",undefined,"notice");
     card.append(el("strong",`${t.explicitTest} · ${row.target.replace(/^mobile_app_/,"")}`),el("p",t['delivery_'+row.status] || t.guide_unknown),el("small",this.formatTime(row.started)));
     if(row.kind==="notification") {
+      if(row.alarm_profile)card.append(el('p',this.phoneSummary(row.alarm_profile)));
       card.append(el("p",t.phoneDeliveryUnconfirmed));
       if(["failed","blocked","outcome_unknown"].includes(row.status)) card.append(el("p",t[row.error] || t.deliveryAdvice),button(t.configureNotifications,()=>this.openDialog({kind:"settings"})));
     }
@@ -1294,7 +1404,7 @@ export class AlarmMeshPanel extends HTMLElement {
   }
   renderActivity(parent) {
     const t=this.t, history=this.data.activity, f=this.activityFilters;
-    parent.append(el("p",t.activityLimit,"section-note"));
+    parent.append(el("p",t.activitySummary,"section-note"));const limits=el('details',undefined,'activity-limits');limits.append(el('summary',t.aboutInformation),el('p',t.activityLimit));parent.append(limits);
     if(!history) {parent.append(el("p",t.guide_unknown));return;}
     if(history.incomplete) parent.append(el("p",t.activityIncomplete,"notice warning-text"));
     if(!history.events.length) {parent.append(el("p",t.activityEmpty,"notice"));return;}

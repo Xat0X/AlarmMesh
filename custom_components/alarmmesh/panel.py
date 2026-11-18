@@ -261,7 +261,7 @@ class PanelController:
             "alarmmesh-panel",
             sidebar_title="AlarmMesh",
             sidebar_icon="mdi:smoke-detector",
-            module_url=f"{ASSET_URL}/panel.js?v=20261117-notify-review-2",
+            module_url=f"{ASSET_URL}/panel.js?v=20261118-independent-1",
             require_admin=True,
         )
         self.hub.controller = self
@@ -545,6 +545,7 @@ async def async_prepare(hass: HomeAssistant) -> PanelHub:
         websocket_api.async_register_command(hass, ws_group)
         websocket_api.async_register_command(hass, ws_catalog)
         websocket_api.async_register_command(hass, ws_settings)
+        websocket_api.async_register_command(hass, ws_phone_preview)
         websocket_api.async_register_command(hass, ws_test)
         websocket_api.async_register_command(hass, ws_maintenance)
         websocket_api.async_register_command(hass, ws_preview)
@@ -637,7 +638,10 @@ async def ws_settings(hass, connection, msg):
         return
     try:
         await controller.effects.settings.save(
-            msg["notifications"], msg["revision"], msg["confirmed"]
+            msg["notifications"],
+            msg["revision"],
+            msg["confirmed"],
+            before_save=controller.effects.prepare_settings,
         )
     except (AutomationError, OSError) as err:
         code = (
@@ -650,6 +654,41 @@ async def ws_settings(hass, connection, msg):
     )
     controller.effects.changed()
     controller.hub.publish()
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "alarmmesh/notification_preview",
+        vol.Required("target"): vol.All(str, vol.Length(max=255)),
+        vol.Required("request_id"): vol.Match(r"^[a-f0-9]{32}$"),
+    }
+)
+@websocket_api.require_admin
+@callback
+def ws_phone_preview(hass, connection, msg):
+    controller = hass.data[DATA_HUB].controller
+    if controller is None:
+        connection.send_error(msg["id"], "not_loaded", "not_loaded")
+        return
+    try:
+        effects = controller.effects
+        confirmation = effects.confirmation(msg["target"], msg["request_id"])
+        if not confirmation:
+            effects.phone_plan(msg["target"], test=True)
+            raise AutomationError("recipient_unavailable")
+        plan = effects.phone_plan(msg["target"], test=True)
+    except AutomationError as err:
+        connection.send_error(msg["id"], str(err), str(err))
+        return
+    connection.send_result(
+        msg["id"],
+        {
+            **plan,
+            "confirmation": confirmation,
+            "context": effects.confirmation(msg["target"]),
+            "request_id": msg["request_id"],
+        },
+    )
 
 
 @websocket_api.websocket_command(
@@ -687,7 +726,12 @@ async def ws_test(hass, connection, msg):
         else:
             if msg["kind"] == "notification" and (
                 not msg["identity"]
-                or msg["identity"] != controller.effects.confirmation(msg["target"])
+                or msg["identity"]
+                != controller.effects.confirmation(msg["target"], msg["request_id"])
+                and (
+                    controller.effects.phone_profile(msg["target"]) is not None
+                    or msg["identity"] != controller.effects.confirmation(msg["target"])
+                )
             ):
                 raise AutomationError("notification_confirmation_stale")
             result = await controller.effects.manual(

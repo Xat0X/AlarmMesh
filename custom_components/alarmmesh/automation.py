@@ -10,6 +10,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.storage import Store
 
+from .notification_profiles import ProfileError, check_profile, validate_profile
+
 MAX_RECIPIENTS = 20
 MAX_SCRIPTS = 20
 DEFAULT_NOTIFICATIONS = {"enabled": False, "recovery": False, "recipients": []}
@@ -90,6 +92,11 @@ def notification_route(
             else "preview_eligible"
         )
     )
+    if chosen and "profile" in chosen:
+        try:
+            check_profile(hass, target, chosen["profile"])
+        except ProfileError as err:
+            reason = str(err)
     return {
         "target": target,
         "selected": selected,
@@ -162,7 +169,7 @@ def validate_actions(value: object) -> None:
             seen.add(row["entity_id"])
 
 
-def validate_notifications(value: object) -> None:
+def validate_notifications(value: object, *, profiles=True) -> None:
     if (
         not isinstance(value, dict)
         or set(value) != {"enabled", "recovery", "recipients"}
@@ -176,7 +183,8 @@ def validate_notifications(value: object) -> None:
     for row in value["recipients"]:
         if (
             not isinstance(row, dict)
-            or set(row) != {"service", "enabled"}
+            or set(row)
+            not in ({"service", "enabled"}, {"service", "enabled", "profile"})
             or not isinstance(row["service"], str)
             or not re.fullmatch(r"mobile_app_[a-z0-9_]+", row["service"])
             or row["service"] in seen
@@ -184,6 +192,11 @@ def validate_notifications(value: object) -> None:
         ):
             raise AutomationError("invalid_notifications")
         seen.add(row["service"])
+        if profiles and "profile" in row:
+            try:
+                validate_profile(row["profile"])
+            except ProfileError as err:
+                raise AutomationError(str(err)) from err
 
 
 class NotificationStore:
@@ -208,10 +221,12 @@ class NotificationStore:
                 or data["revision"] < 0
             ):
                 raise AutomationError("invalid_storage")
-            validate_notifications(data["value"])
+            # Legacy rows remain unchanged. A damaged optional profile fails its
+            # own execution plan, without disabling independently valid recipients.
+            validate_notifications(data["value"], profiles=False)
             self.value, self.revision = deepcopy(data["value"]), data["revision"]
 
-    async def save(self, value, revision, confirmed):
+    async def save(self, value, revision, confirmed, *, before_save=None):
         async with self.lock:
             if self.closed:
                 raise AutomationError("not_loaded")
@@ -222,12 +237,34 @@ class NotificationStore:
             old = {r["service"] for r in self.value["recipients"]}
             if any(r["service"] not in available | old for r in value["recipients"]):
                 raise AutomationError("recipient_unavailable")
+            previous = {r["service"]: r for r in self.value["recipients"]}
+            for row in value["recipients"]:
+                if "profile" not in row:
+                    if "profile" in previous.get(row["service"], {}):
+                        raise AutomationError("phone_profile_review_required")
+                    continue
+                # Preserve unavailable saved choices; never reinterpret them.
+                if (
+                    row["service"] not in available
+                    and row["profile"]
+                    == previous.get(row["service"], {}).get("profile")
+                    and (not row["enabled"] or previous[row["service"]]["enabled"])
+                ):
+                    continue
+                try:
+                    check_profile(self.hass, row["service"], row["profile"])
+                except ProfileError as err:
+                    raise AutomationError(str(err)) from err
+                if row["profile"]["critical"] and confirmed is not True:
+                    raise AutomationError("automation_confirmation_required")
             if value["enabled"] and (
                 confirmed is not True
                 or not any(r["enabled"] for r in value["recipients"])
             ):
                 raise AutomationError("automation_confirmation_required")
             new = {"revision": self.revision + 1, "value": deepcopy(value)}
+            if before_save is not None:
+                await before_save(value)
             await self.store.async_save(new)
             self.value, self.revision = new["value"], new["revision"]
 

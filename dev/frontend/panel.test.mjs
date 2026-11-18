@@ -269,7 +269,7 @@ test("catalog is searched locally with provider-specific assessments and safe te
   const search = root.querySelector('[type="search"]'); search.value = "variant"; search.dispatchEvent(new Event("input"));
   assert.equal(root.querySelectorAll(".catalog-card").length, 1);
   assert.equal(root.querySelectorAll(".catalog-card img").length, 0);
-  const provider = root.querySelector('select[aria-label="Provider"]'); provider.querySelector('option[value="zha"]').selected = true; provider.dispatchEvent(new Event("change"));
+  const provider = root.querySelector('select[aria-label="Connected through"]'); provider.querySelector('option[value="zha"]').selected = true; provider.dispatchEvent(new Event("change"));
   assert.ok(root.querySelector(".catalog-card").textContent.includes("Not yet confirmed"));
   assert.deepEqual(calls, []); panel.remove();
 });
@@ -362,7 +362,7 @@ test("changed mapping identity is never described as current", () => {
   data.groups[0].linking_status = "review_needed";
   data.groups[0].linking.bindings[0].identity = "b".repeat(64);
   transport.callbacks.at(-1)(data); panel.openDialog({ kind: "group", id: "guide-group" });
-  assert.ok(root.querySelector('[data-check="binding"]').textContent.includes("identity or capability changed"));
+  assert.ok(root.querySelector('[data-check="binding"]').textContent.includes("detector's control changed"));
   assert.equal(root.querySelector('[data-check="current"]'), null);
   root.querySelector('[data-check="binding"] button').click();
   assert.ok(root.querySelector("#group-name")); assert.deepEqual(calls, []); panel.remove();
@@ -428,7 +428,7 @@ test("empty notification selection and cancelling an explicit test make no reque
   const form = root.querySelector("dialog form"); form.querySelector('[name="notifications-enabled"]').checked = true;
   form.dispatchEvent(new Event("submit", { cancelable: true })); await tick();
   assert.ok(form.textContent.includes("at least one")); assert.deepEqual(calls, []);
-  [...form.querySelectorAll("button")].find(b => b.textContent === "Send test notification").click();
+  [...form.querySelectorAll("button")].find(b => b.textContent === "Prepare test notification").click();
   assert.ok(form.querySelector(".request-confirmation").textContent.includes("SIMULATED phone"));
   [...form.querySelectorAll(".request-confirmation button")].find(b => b.textContent === "Cancel").click();
   assert.equal(form.querySelector(".request-confirmation"), null); assert.deepEqual(calls, []); panel.remove();
@@ -458,7 +458,7 @@ test("group origin subset and ordered script actions share the existing explicit
   const select = form.querySelector('[data-phase="start"] select'); select.querySelector('option[value="script.simulated_start"]').selected = true; select.dispatchEvent(new Event("change"));
   form.dispatchEvent(new Event("submit", { cancelable: true })); await tick();
   assert.deepEqual(calls, []); assert.ok(form.querySelector(".link-confirmation").textContent.includes("SIMULATED action"));
-  assert.ok(form.querySelector(".link-confirmation").textContent.includes("own physical or external consequences"));
+  assert.ok(form.querySelector(".link-confirmation").textContent.includes("Review it first. AlarmMesh does not confirm"));
   form.querySelector(".confirm-ack").checked = true; form.querySelector(".confirm-linking").click(); await tick();
   assert.deepEqual(calls[0].origins, [source.entity_id]);
   assert.deepEqual(calls[0].actions, { enabled: true, start: [{ entity_id: "script.simulated_start", identity: "c".repeat(64) }], recovery: [] });
@@ -482,9 +482,9 @@ test("self-test is offered only with its own reviewed control and exact target c
   const { panel, root, transport, calls } = setup(); const data = featureData(); transport.callbacks.at(-1)(data);
   panel.openDialog({ kind: "source", id: data.sources[1].entity_id });
   assert.ok(root.querySelector("dialog").textContent.includes("not a self-test"));
-  assert.ok(![...root.querySelectorAll("dialog button")].some(b => b.textContent === "Start built-in self-test"));
+  assert.ok(![...root.querySelectorAll("dialog button")].some(b => b.textContent === "Request self-test"));
   panel.openDialog({ kind: "source", id: data.sources[0].entity_id });
-  [...root.querySelectorAll("dialog button")].find(b => b.textContent === "Start built-in self-test").click();
+  [...root.querySelectorAll("dialog button")].find(b => b.textContent === "Request self-test").click();
   assert.deepEqual(calls, []); assert.ok(root.querySelector("dialog").textContent.includes("Sound may occur"));
   assert.ok(root.querySelector("dialog").textContent.includes(data.sources[0].name));
   root.querySelector('[name="confirm-request"]').checked = true; root.querySelector(".confirm-execute").click(); await tick();
@@ -499,7 +499,7 @@ test("incident details distinguish current smoke, delivery failures and explicit
   transport.callbacks.at(-1)(data); await panel.go("incidents");
   const text = root.querySelector("main").textContent;
   assert.ok(text.includes("Rook gemeld")); assert.ok(text.includes("Aanvraag mislukt")); assert.ok(text.includes("geen geslaagde test"));
-  assert.ok(text.includes("Actuele rookmeldingen staan los")); panel.remove();
+  assert.ok(text.includes("Bovenaan staat de huidige rookstatus")); panel.remove();
 });
 
 test("stored changed sounder identity is retained until explicitly reselected", async () => {
@@ -689,7 +689,7 @@ test("missing recipient stays visible until explicit removal, cancelling preserv
   data.automation.missing_recipients=["mobile_app_simulated_gone"];
   transport.callbacks.at(-1)(data); panel.openDialog({kind:"settings"});
   const missing=[...root.querySelectorAll(".recipient-row")].find(r=>r.textContent.includes("simulated_gone"));
-  assert.ok(missing.textContent.includes("unavailable")); assert.equal(missing.querySelectorAll("button").length,1);
+  assert.ok(missing.textContent.includes("Phone not found")); assert.equal(missing.querySelectorAll("button").length,1);
   missing.querySelector("button").click(); panel.closeDialog(); assert.deepEqual(calls,[]);
   panel.openDialog({kind:"settings"}); assert.ok(root.querySelector('input[value="mobile_app_simulated_gone"]'));
   [...root.querySelectorAll(".recipient-row")].find(r=>r.textContent.includes("simulated_gone")).querySelector("button").click();
@@ -705,11 +705,11 @@ test("incident summary records only known times and separates pending clearance 
   data.selftest={source:data.sources[1].entity_id,status:"outcome_unknown"};
   transport.callbacks.at(-1)(data); await panel.go("incidents");
   const flow=root.querySelector(".incident-flow"); assert.ok(flow.textContent.includes("explicit no-smoke"));
-  assert.ok(!flow.textContent.includes("recovery recorded"));
+  assert.ok(!flow.textContent.includes("No smoke reported at"));
   assert.ok(root.querySelector(".incident-episode").textContent.includes("physical result unconfirmed"));
   assert.ok(root.querySelector(".selftest-result").textContent.includes("not a pass"));
   const recovered=structuredClone(data); recovered.automation.episodes[0].phase="recovery"; recovered.automation.episodes[0].updated="2026-11-15T08:05:00Z";
-  transport.callbacks.at(-1)(recovered); assert.ok(root.querySelector(".incident-flow").textContent.includes("recovery recorded"));
+  transport.callbacks.at(-1)(recovered); assert.ok(root.querySelector(".incident-flow").textContent.includes("No smoke reported at"));
   panel.remove();
 });
 
@@ -909,7 +909,7 @@ test("reminder draft, exact confirmation, cancellation and offline guard",async(
  let form=root.querySelector('dialog form');form.querySelector('[name="reminder-date"]').value='2027-04-01';form.querySelector('[name="reminder-enabled"]').checked=true;form.querySelector('[name="reminder-recipient"] option[value="mobile_app_mock"]').selected=true;
  transport.event('disconnected');assert.equal(form.querySelector('[name="reminder-date"]').value,'2027-04-01');assert.equal(form.querySelector('[type="submit"]').disabled,true);assert.deepEqual(calls,[]);
  transport.event('ready');await tick();transport.callbacks.at(-1)(data);assert.equal(root.querySelector('dialog form'),form);
- form.dispatchEvent(new Event('submit',{cancelable:true}));assert.deepEqual(calls,[]);assert.ok(form.querySelector('.request-confirmation').textContent.includes('No automatic self-test'));
+ form.dispatchEvent(new Event('submit',{cancelable:true}));assert.deepEqual(calls,[]);assert.ok(form.querySelector('.request-confirmation').textContent.includes('No self-test or sound is started'));
  form.querySelector('[name="confirm-request"]').checked=true;form.querySelector('.confirm-execute').click();await tick();assert.equal(calls[0].type,'alarmmesh/reminder');assert.equal(calls[0].value.enabled,true);assert.equal(calls[0].value.date,'2027-04-01');assert.equal(calls[0].confirmed,true);
  panel.openDialog({kind:'reminder',id:source.entity_id});[...root.querySelectorAll('dialog button')].find(b=>b.textContent==='Cancel').click();assert.equal(calls.length,1);panel.remove();
 });
@@ -1212,7 +1212,7 @@ test("lost notification reply reconciles only its matching receipt without repla
   v.transport.callbacks.at(-1)(data);
   v.panel._hass.callWS = async c => {v.calls.push(c);throw {code:"connection_lost"};};
   v.panel.openDialog({kind:"settings"});
-  [...v.root.querySelectorAll('button')].find(b=>b.textContent==='Send test notification').click();
+  [...v.root.querySelectorAll('button')].find(b=>b.textContent==='Prepare test notification').click();
   v.root.querySelector('[name="confirm-request"]').checked = true;
   v.root.querySelector('.confirm-execute').click();await tick();
   assert.ok(v.root.querySelector('.request-status').textContent.includes(v.panel.t.delivery_outcome_unknown));
@@ -1240,7 +1240,7 @@ test("phone refresh retains unsaved choices and original revision without sendin
 });
 
 for (const state of ["MISSING", "UNREACHABLE", "changed"]) {
-  test(`overview offers direct source recovery for ${state} without dispatch`, async () => {
+  test(`overview distinguishes connection help from replacement for ${state} without dispatch`, async () => {
     const v = setup("nl"), data = normal();
     data.sources[0].status = state === "changed" ? "NO_SMOKE_REPORTED" : state;
     data.sources[0].identity_changed = state === "changed";
@@ -1251,8 +1251,12 @@ for (const state of ["MISSING", "UNREACHABLE", "changed"]) {
     if (state === "UNREACHABLE") assert.ok(v.root.querySelector(".hero-missing").textContent.includes(v.panel.t.recovery_temporary));
     v.panel._hass.callWS = async c => { v.calls.push(c); return {selected:true,groups:[],candidates:[]}; };
     action.click(); await tick();
-    assert.equal(v.panel.detail.kind, "recovery");
-    assert.deepEqual(v.calls, [{type:"alarmmesh/recovery",source:source.entity_id}]);
+    assert.equal(v.panel.detail.kind, state === "UNREACHABLE" ? "source" : "recovery");
+    assert.deepEqual(v.calls, state === "UNREACHABLE" ? [] : [{type:"alarmmesh/recovery",source:source.entity_id}]);
+    if(state === "UNREACHABLE") {
+      assert.ok(action.textContent.includes(v.panel.t.checkConnection));
+      assert.ok(v.root.querySelector('.detector-technical').textContent.includes(v.panel.t.recoverSource));
+    }
     v.panel.remove();
   });
 }
@@ -1273,5 +1277,111 @@ for (const scenario of ['edit', 'reopen', 'confirmation', 'reconnect']) {
     if(scenario!=='edit')assert.equal(v.root.querySelector('dialog form'),form);
     if(scenario==='confirmation')assert.ok(v.root.querySelector('.request-confirmation'));
     v.panel.remove();
+  });
+}
+
+
+function phoneData() {
+  const data=featureData(),a=data.automation,target=a.recipients[0].service;
+  a.profile_support=true;a.ios_sounds={default:'sound_default'};
+  a.phone_metadata={[target]:{platform:'ios',origin:'metadata',identity:'b'.repeat(64),identity_scope:'registration'}};
+  a.phone_plans={};a.test_preview={title:'Test',message:'No physical result'};
+  return data;
+}
+test("phone wizard keeps legacy ordinary choice until explicit edit and preserves profile on pushes", async()=>{
+  const v=setup('en'),data=phoneData();v.transport.callbacks.at(-1)(data);v.panel.openDialog({kind:'settings'});
+  const root=v.root,critical=root.querySelector('[name=phone-critical]'),form=root.querySelector('form');
+  assert.equal(critical.checked,false);assert.match(root.querySelector('dialog').textContent,/Saving sends nothing/);
+  root.querySelector('[name=recipient]').checked=true;
+  critical.checked=true;critical.dispatchEvent(new Event('change',{bubbles:true}));
+  v.transport.callbacks.at(-1)(data);assert.equal(root.querySelector('[name=phone-critical]'),critical);assert.equal(critical.checked,true);
+  form.dispatchEvent(new Event('submit',{cancelable:true}));await tick();assert.equal(v.calls.length,0);
+  assert.match(root.querySelector('.request-confirmation').textContent,/Critical smoke alert/);
+  root.querySelector('[name=confirm-request]').checked=true;root.querySelector('.confirm-execute').click();await tick();
+  assert.equal(v.calls.length,1);assert.equal(v.calls[0].type,'alarmmesh/settings');
+  assert.equal(v.calls[0].notifications.enabled,false);assert.equal(v.calls[0].notifications.recipients[0].profile.critical,true);
+  v.panel.remove();
+});
+test("critical preview binds server request id and sends only after explicit acknowledgement",async()=>{
+  const v=setup(),data=phoneData(),target=data.automation.recipients[0].service;
+  v.transport.callbacks.at(-1)(data);const calls=[];v.panel._hass.callWS=async m=>{calls.push(m);return m.type==='alarmmesh/notification_preview'?{context:'a'.repeat(64),confirmation:'c'.repeat(64),request_id:m.request_id,profile:{platform:'android',critical:true},message:{title:'Test',message:'Simulation only'}}:{status:'accepted'};};
+  v.panel.openDialog({kind:'test',actionKind:'notification',target,name:'Mock phone'});await tick();
+  assert.equal(calls.length,1);assert.equal(calls[0].type,'alarmmesh/notification_preview');
+  assert.match(v.root.querySelector('.request-confirmation').textContent,/may make sound even in silent mode/);
+  v.root.querySelector('[name=confirm-request]').checked=true;v.root.querySelector('.confirm-execute').click();await tick();
+  assert.equal(calls.length,2);assert.equal(calls[1].identity,'c'.repeat(64));assert.equal(calls[1].request_id,calls[0].request_id);
+  v.root.querySelector('.confirm-execute').click();await tick();assert.equal(calls.length,2);v.panel.remove();
+});
+
+
+test("lost settings acknowledgement offers read-only verification without resubmitting or clearing form",async()=>{
+  const v=setup(),data=phoneData();v.transport.callbacks.at(-1)(data);let saved,calls=[];
+  v.panel._hass.callWS=async m=>{calls.push(m.type);if(m.type==='alarmmesh/settings'){saved=m.notifications;throw {code:'connection_lost'};}return {...data,automation:{...data.automation,settings:{...saved,revision:1}}};};
+  v.panel.openDialog({kind:'settings'});const form=v.root.querySelector('form');
+  v.root.querySelector('[name=recipient]').checked=true;form.dispatchEvent(new Event('submit',{cancelable:true}));await tick();
+  const check=v.root.querySelector('[data-check-saved-phones]');assert.ok(check);
+  assert.equal(v.root.querySelector('form'),form);check.click();await tick();
+  assert.deepEqual(calls,['alarmmesh/settings','alarmmesh/current']);
+  assert.match(v.root.querySelector('.save-reconcile').textContent,/These choices are saved/);
+  assert.equal(v.root.querySelector('.form-error').textContent,'');
+  assert.equal(v.root.querySelector('button[type=submit]').disabled,true);
+  assert.equal(v.root.querySelector('form'),form);assert.equal(v.root.querySelector('[name=recipient]').checked,true);v.panel.remove();
+});
+
+
+test("verified save stays read-only after reconnect until the form is reopened",async()=>{
+  const v=setup(),data=phoneData();v.transport.callbacks.at(-1)(data);let saved;
+  v.panel._hass.callWS=async m=>{if(m.type==='alarmmesh/settings'){saved=m.notifications;throw {code:'connection_lost'};}return {...data,automation:{...data.automation,settings:{...saved,revision:1}}};};
+  v.panel.openDialog({kind:'settings'});v.root.querySelector('[name=recipient]').checked=true;
+  v.root.querySelector('form').dispatchEvent(new Event('submit',{cancelable:true}));await tick();
+  v.root.querySelector('[data-check-saved-phones]').click();await tick();
+  assert.equal(v.root.querySelector('button[type=submit]').disabled,true);
+  v.transport.event('disconnected');v.transport.event('ready');await tick();v.transport.callbacks.at(-1)(data);
+  assert.equal(v.root.querySelector('button[type=submit]').disabled,true);
+  assert.equal(v.root.querySelector('[name=recipient]').checked,true);v.panel.remove();
+});
+
+
+test("closing a critical-save confirmation cannot re-enable a verified stale form",async()=>{
+  const v=setup(),data=phoneData();v.transport.callbacks.at(-1)(data);let saved;
+  v.panel._hass.callWS=async m=>{if(m.type==='alarmmesh/settings'){saved=m.notifications;throw {code:'connection_lost'};}return {...data,automation:{...data.automation,settings:{...saved,revision:1}}};};
+  v.panel.openDialog({kind:'settings'});v.root.querySelector('[name=recipient]').checked=true;
+  const critical=v.root.querySelector('[name=phone-critical]');critical.checked=true;critical.dispatchEvent(new Event('change',{bubbles:true}));
+  const form=v.root.querySelector('form');form.dispatchEvent(new Event('submit',{cancelable:true}));
+  v.root.querySelector('[name=confirm-request]').checked=true;v.root.querySelector('.confirm-execute').click();await tick();
+  v.root.querySelector('[data-check-saved-phones]').click();await tick();
+  const cancel=[...v.root.querySelectorAll('.request-confirmation button')].find(b=>b.textContent===v.panel.t.cancel);cancel.click();
+  assert.equal(form.querySelector('button[type=submit]').disabled,true);assert.equal(critical.checked,true);v.panel.remove();
+});
+
+test("task settings separate global phone choices from per-group outputs without commands",()=>{
+  const v=setup('nl'),data=phoneData();data.groups=guidedGroupData().groups;data.groups[0].linking={enabled:true,bindings:[]};data.groups[0].actions={enabled:true,start:[],recovery:[]};
+  v.transport.callbacks.at(-1)(data);v.panel.go('settings');
+  assert.equal(v.root.querySelectorAll('.settings-task').length,5);
+  assert.ok(v.root.querySelector('[data-setting=groups]').textContent.includes('1 met samen afgaan ingeschakeld'));
+  assert.ok(v.root.querySelector('[data-setting=actions]').textContent.includes('1 groepen met extra acties aan'));
+  assert.ok(v.root.querySelector('[data-setting=phones]').textContent.includes('Automatisch melden uit'));
+  assert.equal(v.root.querySelectorAll('.settings-grid .primary').length,1);assert.deepEqual(v.calls,[]);v.panel.remove();
+});
+
+for (const when of ['before-check', 'pending-check', 'after-check']) {
+  test(`save readback never claims newer form edits are saved: ${when}`, async()=>{
+    const v=setup(),data=phoneData();v.transport.callbacks.at(-1)(data);let saved,resolve;
+    v.panel._hass.callWS=async m=>{
+      v.calls.push(m.type);
+      if(m.type==='alarmmesh/settings'){saved=structuredClone(m.notifications);throw {code:'connection_lost'};}
+      if(when==='pending-check')return new Promise(r=>{resolve=r;});
+      return {...data,automation:{...data.automation,settings:{...saved,revision:1}}};
+    };
+    v.panel.openDialog({kind:'settings'});v.root.querySelector('[name=recipient]').checked=true;
+    v.root.querySelector('form').dispatchEvent(new Event('submit',{cancelable:true}));await tick();
+    const edit=()=>{const input=v.root.querySelector('[name=notifications-recovery]');input.checked=true;input.dispatchEvent(new Event('input',{bubbles:true}));};
+    if(when==='before-check')edit();
+    v.root.querySelector('[data-check-saved-phones]').click();await tick();
+    if(when==='pending-check'){edit();resolve({...data,automation:{...data.automation,settings:{...saved,revision:1}}});await tick();}
+    if(when==='after-check')edit();
+    assert.ok(!v.root.querySelector('.save-reconcile').textContent.includes(v.panel.t.phonesSavedVerified));
+    assert.equal(v.root.querySelector('[name=notifications-recovery]').checked,true);
+    assert.deepEqual(v.calls,['alarmmesh/settings','alarmmesh/current']);v.panel.remove();
   });
 }

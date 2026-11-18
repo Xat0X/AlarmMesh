@@ -8,7 +8,8 @@ const list=(v,max,check)=>Array.isArray(v) && v.length<=max && v.every(check);
 const identity=v=>typeof v==="string" && /^[a-f0-9]{64}$/.test(v);
 const targetValid=(kind,target)=>text(target) && (kind==="edit" ? target==="new" || /^[a-f0-9]{32}$/.test(target) : kind==="reminder" ? /^binary_sensor\.[a-z0-9_]+$/.test(target) : target==="new");
 const validRecord=r=>keys(r,["kind","target","revision","signature","value","time"]) && targetValid(r.kind,r.target) && Number.isSafeInteger(r.revision) && r.revision>=0 && typeof r.signature==="string" && r.signature.length<=100000 && Number.isFinite(r.time) && r.time<=Date.now() && Date.now()-r.time<TTL && validDraft(r.kind,r.value);
-const phones=v=>list(v,20,r=>keys(r,["service","enabled"]) && /^mobile_app_[a-z0-9_]+$/.test(r.service) && bool(r.enabled));
+const phoneProfile=p=>keys(p,["version","platform","origin","identity","critical","sound","sound_source","volume"]) && p.version===1 && ["unknown","ios","android"].includes(p.platform) && ["user","metadata"].includes(p.origin) && identity(p.identity) && bool(p.critical) && (p.platform!=="ios" || text(p.sound,100) && ["bundled","imported"].includes(p.sound_source) && Number.isFinite(p.volume) && p.volume>=0 && p.volume<=1);
+const phones=v=>list(v,20,r=>keys(r,["service","enabled","profile"]) && /^mobile_app_[a-z0-9_]+$/.test(r.service) && bool(r.enabled) && (!('profile' in r) || phoneProfile(r.profile)));
 const scripts=v=>list(v,20,r=>keys(r,["entity_id","identity"]) && /^script\.[a-z0-9_]+$/.test(r.entity_id) && identity(r.identity));
 export function validDraft(kind,v) {
  if(kind==="settings" || kind==="maintenance") return keys(v,kind==="settings" ? ["enabled","recovery","recipients"] : ["enabled","recovery","recipients","battery","fault","unavailable","delay"]) && bool(v.enabled) && bool(v.recovery) && phones(v.recipients) && (kind!=="maintenance" || [v.battery,v.fault,v.unavailable].every(bool) && [5,15,30,60].includes(v.delay));

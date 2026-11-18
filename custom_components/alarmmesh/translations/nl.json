@@ -3,24 +3,24 @@
   "config": {
     "step": {
       "user": {
-        "title": "AlarmMesh-bronnen selecteren",
-        "description": "AlarmMesh toont rookmeldingen en broninformatie. Samen afgaan, gsm-meldingen en incidentacties zijn optioneel en worden afzonderlijk ingesteld in het AlarmMesh-paneel; nieuwe automatische functies staan standaard uit. Zelftests zijn alleen beschikbaar voor aantoonbaar ondersteunde apparaten en vereisen afzonderlijke bevestiging. Geen rook gemeld is geen veiligheidsgarantie.",
+        "title": "Melders kiezen",
+        "description": "Volg hier rookmeldingen en de status van melders. Samen afgaan, telefoonmeldingen en extra acties zijn optioneel en stel je apart in via het AlarmMesh-paneel. Nieuwe automatische acties staan standaard uit. Zelftests vereisen ondersteunde apparaten en afzonderlijke bevestiging. Geen rook gemeld is geen veiligheidsgarantie.",
         "data": {
-          "source_entity_ids": "Rookmelderbronnen"
+          "source_entity_ids": "Rookmelders"
         },
         "data_description": {
-          "source_entity_ids": "Selecteer één of meer bestaande rookmelderentiteiten. Een tijdelijk onbekende of onbeschikbare rookmelder mag geselecteerd blijven als de rookmeldermetadata beschikbaar is."
+          "source_entity_ids": "Kies minstens een bestaande rookmelder uit Home Assistant. Een tijdelijk onbereikbare melder mag blijven staan als Home Assistant hem nog als rookmelder herkent."
         }
       }
     },
     "error": {
-      "no_sources": "Selecteer minstens één rookmelder.",
-      "invalid_sources": "Selecteer een lijst met geldige entiteits-ID's.",
-      "duplicate_sources": "Selecteer elke rookmelder slechts één keer.",
-      "unknown_entity": "Een geselecteerde entiteit bestaat niet meer. Selecteer een bestaande rookmelder.",
-      "wrong_domain": "Alleen binary_sensor-entiteiten kunnen worden geselecteerd.",
-      "wrong_device_class": "Elke geselecteerde entiteit moet de apparaatklasse smoke hebben.",
-      "own_source": "Entiteiten die AlarmMesh zelf levert, kunnen niet als bron worden gebruikt."
+      "no_sources": "Selecteer minstens \u00c3\u00a9\u00c3\u00a9n rookmelder.",
+      "invalid_sources": "Kies rookmelders uit de lijst. Vernieuw het scherm als de keuze niet werkt.",
+      "duplicate_sources": "Selecteer elke rookmelder slechts \u00c3\u00a9\u00c3\u00a9n keer.",
+      "unknown_entity": "Een gekozen melder bestaat niet meer. Controleer hem in Home Assistant of kies een andere.",
+      "wrong_domain": "Kies de rookstatus van een melder, geen knop of schakelaar.",
+      "wrong_device_class": "Home Assistant herkent deze keuze niet als rookmelder. Controleer de melderinstellingen of kies een andere.",
+      "own_source": "Kies een echte rookmelderstatus, niet een overzicht van AlarmMesh."
     },
     "abort": {
       "already_configured": "AlarmMesh is al geconfigureerd."
@@ -29,24 +29,24 @@
   "options": {
     "step": {
       "init": {
-        "title": "AlarmMesh-bronnen aanpassen",
-        "description": "AlarmMesh toont rookmeldingen en broninformatie. Samen afgaan, gsm-meldingen en incidentacties zijn optioneel en worden afzonderlijk ingesteld in het AlarmMesh-paneel; nieuwe automatische functies staan standaard uit. Zelftests zijn alleen beschikbaar voor aantoonbaar ondersteunde apparaten en vereisen afzonderlijke bevestiging. Geen rook gemeld is geen veiligheidsgarantie.",
+        "title": "Gekozen melders aanpassen",
+        "description": "Volg hier rookmeldingen en de status van melders. Samen afgaan, telefoonmeldingen en extra acties zijn optioneel en stel je apart in via het AlarmMesh-paneel. Nieuwe automatische acties staan standaard uit. Zelftests vereisen ondersteunde apparaten en afzonderlijke bevestiging. Geen rook gemeld is geen veiligheidsgarantie.",
         "data": {
-          "source_entity_ids": "Rookmelderbronnen"
+          "source_entity_ids": "Rookmelders"
         },
         "data_description": {
-          "source_entity_ids": "Selecteer één of meer bestaande rookmelderentiteiten. Een tijdelijk onbekende of onbeschikbare rookmelder mag geselecteerd blijven als de rookmeldermetadata beschikbaar is."
+          "source_entity_ids": "Kies minstens een bestaande rookmelder uit Home Assistant. Een tijdelijk onbereikbare melder mag blijven staan als Home Assistant hem nog als rookmelder herkent."
         }
       }
     },
     "error": {
-      "no_sources": "Selecteer minstens één rookmelder.",
-      "invalid_sources": "Selecteer een lijst met geldige entiteits-ID's.",
-      "duplicate_sources": "Selecteer elke rookmelder slechts één keer.",
-      "unknown_entity": "Een geselecteerde entiteit bestaat niet meer. Selecteer een bestaande rookmelder.",
-      "wrong_domain": "Alleen binary_sensor-entiteiten kunnen worden geselecteerd.",
-      "wrong_device_class": "Elke geselecteerde entiteit moet de apparaatklasse smoke hebben.",
-      "own_source": "Entiteiten die AlarmMesh zelf levert, kunnen niet als bron worden gebruikt."
+      "no_sources": "Selecteer minstens \u00c3\u00a9\u00c3\u00a9n rookmelder.",
+      "invalid_sources": "Kies rookmelders uit de lijst. Vernieuw het scherm als de keuze niet werkt.",
+      "duplicate_sources": "Selecteer elke rookmelder slechts \u00c3\u00a9\u00c3\u00a9n keer.",
+      "unknown_entity": "Een gekozen melder bestaat niet meer. Controleer hem in Home Assistant of kies een andere.",
+      "wrong_domain": "Kies de rookstatus van een melder, geen knop of schakelaar.",
+      "wrong_device_class": "Home Assistant herkent deze keuze niet als rookmelder. Controleer de melderinstellingen of kies een andere.",
+      "own_source": "Kies een echte rookmelderstatus, niet een overzicht van AlarmMesh."
     }
   },
   "entity": {

@@ -103,3 +103,36 @@ dialog .recovery-smoke { border: 2px solid var(--alarm); }
 
 .recovery-steps { padding-left: 24px; line-height: 1.5; }
 .recovery-steps li { padding: 4px 0 4px 4px; }
+
+.phone-profile { margin-top: 12px; }
+.phone-profile label:not(.check) { display: block; margin: 12px 0; }
+.phone-profile select, .phone-profile input[type=number], .phone-profile input:not([type]) { display:block; width:100%; min-height:44px; box-sizing:border-box; margin-top:6px; color:var(--primary-text-color); background:var(--card-background-color); border:1px solid var(--divider-color); border-radius:8px; padding:8px; }
+.phone-profile [hidden] { display:none !important; }
+.phone-help { margin-top:12px; }
+.phone-help p, .phone-evidence { line-height:1.5; overflow-wrap:anywhere; }
+.phone-profile summary { min-height:44px; cursor:pointer; }
+
+.phone-profile select { font:inherit; }
+.phone-profile summary:focus-visible, .phone-profile select:focus-visible { outline:3px solid #008e9c; outline-offset:3px; }
+
+/* Task-oriented settings and progressive disclosure, using the existing palette. */
+.settings-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; margin:20px 0; }
+.settings-grid .settings-task { margin:0; padding:22px; min-width:0; }
+.setting-value { color:var(--muted); margin:10px 0 16px; }
+.settings-task h2 { font-size:18px; }
+.settings-task details { margin-top:16px; }
+.settings-task .phone-latest .notice { margin:10px 0; }
+.group-option { margin:12px 0; padding:12px; border:1px solid var(--divider-color,#8b9cab); border-radius:10px; }
+.group-option > summary { min-height:44px; font-weight:600; cursor:pointer; }
+.group-option section { border:0; padding:8px 0; }
+.phone-steps { padding-left:24px; margin:12px 0 22px; line-height:1.5; }
+.phone-steps li { padding:4px 0; }
+.phone-more { margin:8px 0; font-size:14px; }
+.phone-more > summary { min-height:44px; display:flex; align-items:center; cursor:pointer; }
+.phone-more > summary::before { content:'\25B8'; margin-right:8px; }
+.phone-more[open] > summary::before { content:'\25BE'; }
+.incident-now .badge { margin:8px 0; }
+.incident-explanation,.activity-limits,.maintenance-limits { margin:12px 0 22px; }
+.episode-phase { font-weight:600; margin-bottom:12px; }
+summary:focus-visible,select:focus-visible,a:focus-visible { outline:3px solid #008e9c; outline-offset:3px; }
+@media(max-width:700px){.settings-grid{grid-template-columns:1fr}.settings-grid .settings-task{padding:20px}}

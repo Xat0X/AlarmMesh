@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.1.0-beta.12 — 2026-11-18
+
+- Correct saved-choice verification after a lost response: compare the current
+  form and invalidate the success message when it is edited. Three regressions
+  and browser reconnect scenarios cover the correction.
+
+- Organize settings around detector, group, phone, extra-action and maintenance
+  tasks; simplify Dutch and English labels, optional group controls and incident
+  explanations. Keep current smoke separate from historical requests.
+- Keep a readback-verified phone form read-only after reconnect or cancelling a
+  confirmation. Both regressions were reproduced before correction.
+- Review the interface in all eight language/theme/phone-tablet combinations;
+  see the [plain-language review](docs/plain-language-review.md) for local evidence.
+- Add explicit per-phone iOS/Android smoke alert profiles, reviewed sound choices,
+  phone permission help and one shared preview/test/incident plan.
+- Bind new-profile test confirmation to the request ID, registration, settings and
+  message context. Keep legacy ordinary choices and noncritical recovery,
+  maintenance and reminders unchanged.
+- Prevent saving during existing smoke from triggering notification output.
+- Simplify phone setup: recipient first, relevant sound controls, optional help,
+  separate save/test, actual request status and no physical-success claim.
+- Add simulated service-layer regressions and inspect all eight language/theme/
+  phone-tablet combinations. See [local review](docs/critical-notification-review.md).
+
 ## 0.1.0-beta.11 — 2026-11-17
 
 - Preserve newer phone settings and active confirmations when recipient refresh replies arrive late, after reopening or reconnecting.

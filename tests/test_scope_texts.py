@@ -22,10 +22,10 @@ def test_scope_text_keeps_optional_effects_and_confirmation_visible(
     expected = (
         [
             "smoke reports",
-            "source information",
+            "detector status",
             "optional",
-            "mobile notifications",
-            "incident actions",
+            "phone alerts",
+            "extra actions",
             "panel",
             "off by default",
             "supported devices",
@@ -35,10 +35,10 @@ def test_scope_text_keeps_optional_effects_and_confirmation_visible(
         if language == "en"
         else [
             "rookmeldingen",
-            "broninformatie",
+            "status van melders",
             "optioneel",
-            "gsm-meldingen",
-            "incidentacties",
+            "telefoonmeldingen",
+            "extra acties",
             "paneel",
             "standaard uit",
             "ondersteunde apparaten",
