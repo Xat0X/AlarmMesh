@@ -1,6 +1,6 @@
-import { exercise, incidentDetail, careView } from "./family.js?v=family-beta15";
-import { TEXT } from "./translations.js?v=family-beta15";
-import { Drafts } from "./drafts.js?v=family-beta15";
+import { exercise, incidentDetail, careView } from "./family.js?v=family-beta16";
+import { TEXT } from "./translations.js?v=family-beta16";
+import { Drafts } from "./drafts.js?v=family-beta16";
 
 // Safe DOM construction: names, labels and registry data are always text nodes.
 const el = (tag, text, cls) => {
@@ -134,7 +134,7 @@ export class AlarmMeshPanel extends HTMLElement {
     const t = this.t;
     const sticky = this.shadowRoot.activeElement;
     const stickyKey = sticky?.dataset.sticky, selection = stickyKey ? [sticky.selectionStart, sticky.selectionEnd] : null;
-    const link = el("link"); link.rel = "stylesheet"; link.href = "/alarmmesh-assets/panel.css?v=family-beta15";
+    const link = el("link"); link.rel = "stylesheet"; link.href = "/alarmmesh-assets/panel.css?v=family-beta16";
     const shell = el("div", undefined, "shell");
     shell.classList.toggle("dark", Boolean(this._hass?.themes?.darkMode));
     const side = el("aside");
@@ -638,25 +638,64 @@ export class AlarmMeshPanel extends HTMLElement {
     for (const source of bindingSources) {
       const cap = source.capability;
       const row = el("div", undefined, "binding-row");
-      const targetLabel = el("label", `${this.sourceName(source.entity_id)}`);
-      const select = el("select"); select.id = `binding-${source.entity_id}`; select.name = "link-target"; targetLabel.htmlFor = select.id;
-      const empty = el("option", t.smokeOnlyRole); empty.value = ""; select.append(empty);
       const controls = cap?.controls || [];
       const oldBinding = group?.linking?.bindings.find(b => b.source === source.entity_id);
-      empty.selected = !oldBinding;
-      const currentBinding = controls.find(c => c.target === oldBinding?.target && c.identity === oldBinding?.identity);
-      for (const control of controls) {
-        const option = el("option", `${t.soundAlong}${controls.length > 1 ? ` · ${t[control.profile] || t.activation_only}` : ""}`); option.value = control.target; option.disabled = cap.status !== "linkable"; option.selected = currentBinding?.target === control.target; select.append(option);
+      const currentBinding = controls.find(c => c.target === oldBinding?.target && c.identity === oldBinding?.identity && c.profile === oldBinding?.profile);
+      const stale = oldBinding && !currentBinding;
+      const canChoose = cap?.status === "linkable";
+      const fieldId = `binding-${source.entity_id}`;
+      const savedFields = c => ({ source: c.source, target: c.target, profile: c.profile, identity: c.identity });
+      const name = this.sourceName(source.entity_id);
+      let readBinding;
+      if (controls.length <= 1) {
+        const label = el("label", undefined, "check sound-choice");
+        const check = el("input");
+        check.type = "checkbox"; check.id = fieldId; check.name = "link-target";
+        check.checked = Boolean(currentBinding);
+        check.disabled = !controls.length || (!canChoose && !currentBinding);
+        if (!canChoose && currentBinding) check.addEventListener("change", () => { check.disabled = !check.checked; });
+        label.append(check, el("span", name));
+        row.append(label);
+        let kept = stale ? oldBinding : null;
+        if (stale) {
+          const warning = el("div", undefined, "stale-binding");
+          const discard = () => { kept = null; warning.hidden = true; };
+          warning.append(el("p", t.storedControlChanged), button(t.removeOldSounder, discard));
+          row.append(warning);
+          check.addEventListener("change", () => { if (check.checked) discard(); });
+        }
+        readBinding = () => check.checked && controls[0] ? savedFields(controls[0]) : kept;
+      } else {
+        // Replacing a stored identity (even at the same entity ID) requires
+        // a distinct choice. Preserve the old binding until explicitly changed.
+        const label = el("label", name);
+        const select = el("select"); select.name = "link-target"; select.id = fieldId; label.htmlFor = fieldId;
+        const empty = el("option", t.smokeOnlyRole); empty.value = ""; empty.selected = !oldBinding; select.append(empty);
+        for (const control of controls) {
+          const option = el("option", controls.length === 1 ? t.soundAlong : `${t.soundAlong} · ${control.target}`);
+          option.value = control.target; option.disabled = !canChoose; option.selected = currentBinding === control; select.append(option);
+        }
+        if (stale) {
+          const stored = el("option", t.storedControlChanged);
+          stored.value = "stored"; stored.selected = true; select.append(stored);
+        }
+        row.append(label, select);
+        readBinding = () => {
+          if (select.value === "stored") return oldBinding;
+          const choice = controls.find(c => c.target === select.value);
+          return choice ? savedFields(choice) : null;
+        };
       }
-      if (oldBinding && !controls.some(c => c.target === oldBinding.target && c.identity === oldBinding.identity)) {
-        const stale = el("option", t.storedControlChanged); stale.value = `stored:${oldBinding.target}`; stale.selected = true; select.append(stale);
-      }
-      row.append(targetLabel, select, el("p", t.soundRoleHelp, "binding-help"), el("small", cap ? `${this.providerLabel(cap)} / ${this.capabilityLabel(cap)}` : t.no_verified_profile));
+      const note = el("p", !canChoose ? (t[cap?.reason] || t.no_verified_profile)
+        : controls.every(c => c.safe_stop) ? t.soundAutoStop : t.soundManualStop, "binding-help");
+      note.id = `${fieldId}-help`;
+      row.querySelector('[name="link-target"]').setAttribute("aria-describedby", note.id);
+      row.append(note);
       if (cap) { const requirements = el("details"); requirements.append(el("summary", t.technicalDetails), el("p", t[cap.reason] || t.no_verified_profile), el("p", `${source.model || t.unknown} · ${source.entity_id}`)); for (const control of controls) requirements.append(el("p", control.target)); row.append(requirements); }
       else row.append(el("small", t.storedSourceMissing, "warning-text"));
       row.hidden = !selected.has(source.entity_id);
       for (const check of form.querySelectorAll('input[name="member"]')) if (check.value === source.entity_id) check.addEventListener("change", () => { row.hidden = !check.checked; });
-      linkingSection.append(row); bindings.push({ source, select, controls, oldBinding });
+      linkingSection.append(row); bindings.push({ source, readBinding });
     }
     const originSection = el("section", undefined, "linking-section");
     originSection.append(el("h3", t.incidentSources), el("p", t.incidentSourceNote));
@@ -681,7 +720,13 @@ export class AlarmMeshPanel extends HTMLElement {
     const actionFields = this.actionFields(scriptsDetails, group?.actions);
     const updateActionSummary=()=>{advancedSummary.textContent=`${t.optionalActions} · ${t.linkTogether}: ${t[toggle.checked?'enabled':'disabled']} · ${t.incidentActions}: ${t[actionFields().enabled?'enabled':'disabled']}`;};
     form.addEventListener('change',updateActionSummary);updateActionSummary();
-    const readGroup=()=>({name:name.value,members:[...form.querySelectorAll('[name="member"]')].filter(c=>c.checked).map(c=>c.value),origins:originRows.filter(c=>c.checked && [...form.querySelectorAll('[name="member"]')].some(m=>m.value===c.value && m.checked)).map(c=>c.value),linking:{enabled:toggle.checked,bindings:bindings.filter(b=>[...form.querySelectorAll('[name="member"]')].some(m=>m.checked && m.value===b.source.entity_id) && b.select.value).map(b=>{const c=b.controls.find(c=>c.target===b.select.value);return c ? {source:c.source,target:c.target,profile:c.profile,identity:c.identity} : b.oldBinding;}).filter(Boolean)},actions:actionFields(),unselected:group?.unselected || []});
+    const selectedMembers = () => [...form.querySelectorAll('[name="member"]')].filter(c => c.checked).map(c => c.value);
+    const selectedBindings = members => bindings.filter(b => members.includes(b.source.entity_id)).map(b => b.readBinding()).filter(Boolean);
+    const readGroup = () => {
+      const members = selectedMembers();
+      return { name: name.value, members, origins: originRows.filter(c => c.checked && members.includes(c.value)).map(c => c.value),
+        linking: { enabled: toggle.checked, bindings: selectedBindings(members) }, actions: actionFields(), unselected: group?.unselected || [] };
+    };
     const changes=el("div");form.append(changes);const drawChanges=()=>{changes.replaceChildren();this.changeSummary(changes,"group",original || {},readGroup());};form.addEventListener("change",drawChanges);form.addEventListener("input",drawChanges);form.addEventListener("click",()=>queueMicrotask(drawChanges));drawChanges();
     const actions = el("div", undefined, "actions"); const save = el("button", t.save, "button primary"); save.type = "submit";
     actions.append(button(t.cancel, () => this.closeDialog()), save); form.append(error, actions);
@@ -691,12 +736,8 @@ export class AlarmMeshPanel extends HTMLElement {
       if (form.querySelector(".request-confirmation,.link-confirmation")) { error.textContent = t.finishConfirmation; return; }
       if (!name.value.trim() || name.value.trim().length > 64) { error.textContent = t.invalid_name; name.setAttribute("aria-invalid", "true"); name.focus(); return; }
       name.removeAttribute("aria-invalid");
-      const members = [...form.querySelectorAll('input[name="member"]')].filter(c => c.checked).map(c => c.value);
-      const mapped = bindings.filter(b => members.includes(b.source.entity_id) && b.select.value).map(b => {
-        if (b.select.value.startsWith("stored:")) return b.oldBinding;
-        const control = b.controls.find(c => c.target === b.select.value);
-        return control ? { source: control.source, target: control.target, profile: control.profile, identity: control.identity } : b.oldBinding;
-      });
+      const members = selectedMembers();
+      const mapped = selectedBindings(members);
       const payload = { operation: original ? "update" : "create", ...(original ? { group_id: original.id } : {}), revision, name: name.value.trim(), members };
       const origins = originRows.filter(c => c.checked && members.includes(c.value)).map(c => c.value);
       if (group?.origins || origins.length !== members.length) payload.origins = origins;
@@ -717,7 +758,7 @@ export class AlarmMeshPanel extends HTMLElement {
         for (const destination of toggle.checked ? mapped : []) {
           const targetName = this.data.sources.find(s => s.entity_id === destination.source)?.name || destination.source;
           for (const source of this.data.sources.filter(s => origins.includes(s.entity_id) && s.entity_id !== destination.source)) confirmation.append(el("p", `${source.name} → ${targetName} (${destination.target})`));
-          const control = bindings.flatMap(b => b.controls).find(c => c.target === destination.target);
+          const control = this.data.sources.find(s => s.entity_id === destination.source)?.capability?.controls.find(c => c.target === destination.target && c.identity === destination.identity);
           confirmation.append(el("p", control?.safe_stop ? t.automation_stop_separate : t.no_safe_stop, "warning-text"));
         }
         if (actionValue.enabled) {

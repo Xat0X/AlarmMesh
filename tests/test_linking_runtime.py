@@ -116,6 +116,9 @@ def devices(hass):
         return {
             "source": source,
             "target": target,
+            "feedback": entity("binary_sensor", "buzzer_manual_alarm", "off", {})
+            if model == "JY-GZ-01AQ" and origin == "mqtt"
+            else None,
             "device": device.id,
             "setting": setting,
             "test": test,
@@ -230,6 +233,43 @@ async def test_settings_options_services_disabled_entities_and_ambiguity(hass, d
     hass.states.async_set(d["target"], "mute", {"options": ["mute", "alarm"]})
     hass.services.async_remove("select", "select_option")
     assert cap.describe(d["source"])["reason"] == "service_missing"
+
+
+async def test_write_only_aqara_uses_independent_device_feedback(hass, devices):
+    add, calls, _ = devices
+    origin = add("origin")
+    attic = add("attic", "JY-GZ-01AQ", vendor="Aqara")
+    other = add("other", "JY-GZ-01AQ", vendor="Aqara")
+    cap = Capabilities(hass)
+    target = attic["target"]
+    hass.states.async_set(target, "unknown", dict(hass.states.get(target).attributes))
+    members = [origin["source"], attic["source"]]
+    entry = await setup(hass, members)
+    await configure(hass, entry, members, [attic])
+    saved = binding(hass, attic)
+    hass.states.async_set(attic["feedback"], "on")
+    assert not cap.is_idle(cap.resolve(saved))
+    hass.states.async_set(origin["source"], "on", {"device_class": "smoke"})
+    await flush(hass, entry)
+    assert not calls
+    hass.states.async_set(attic["feedback"], "off")
+    await flush(hass, entry)
+    assert not calls  # A manually stopped target stays quiet in this incident.
+    hass.states.async_set(origin["source"], "off", {"device_class": "smoke"})
+    await flush(hass, entry)
+    hass.states.async_set(origin["source"], "on", {"device_class": "smoke"})
+    await flush(hass, entry)
+    hass.states.async_set(origin["source"], "off", {"device_class": "smoke"})
+    await flush(hass, entry)
+    assert calls == [
+        ("select", "select_option", {"entity_id": target, "option": "alarm"})
+    ]
+    for value in ("unknown", "unavailable"):
+        hass.states.async_set(attic["feedback"], value)
+        assert cap.resolve(saved) is None
+        assert cap.describe(attic["source"])["reason"] == "aqara_feedback_needed"
+    hass.states.async_remove(attic["feedback"])
+    assert hass.states.is_state(other["feedback"], "off") and cap.resolve(saved) is None
 
 
 async def test_foreign_device_and_replaced_registry_identity_never_bind(hass, devices):
@@ -423,6 +463,45 @@ async def test_reload_does_not_adopt_or_stop_previous_or_manual_activation(
     hass.states.async_set(a["source"], "off", {"device_class": "smoke"})
     await flush(hass, entry)
     assert len(calls) == 1
+
+
+async def test_quiet_target_during_persistent_smoke_before_and_after_reload(
+    hass, devices
+):
+    add, calls, _ = devices
+    origin, other = add("origin"), add("other")
+    members = [origin["source"], other["source"]]
+    entry = await setup(hass, members)
+    await configure(hass, entry, members, [other])
+    hass.states.async_set(origin["source"], "on", {"device_class": "smoke"})
+    await flush(hass, entry)
+    attrs = dict(hass.states.get(other["target"]).attributes)
+    hass.states.async_set(other["target"], "stop", attrs)
+    hass.states.async_set(
+        origin["source"], "on", {"device_class": "smoke", "sequence": 2}
+    )
+    await flush(hass, entry)
+    assert [c[2]["option"] for c in calls] == ["smoke_siren"]
+    assert await hass.config_entries.async_reload(entry.entry_id)
+    await flush(hass, entry)
+    assert [c[2]["option"] for c in calls] == ["smoke_siren", "smoke_siren"]
+
+
+async def test_rapid_external_stop_and_restart_cannot_be_stopped_as_ours(hass, devices):
+    add, calls, _ = devices
+    origin, other = add("origin"), add("other")
+    members = [origin["source"], other["source"]]
+    entry = await setup(hass, members)
+    await configure(hass, entry, members, [other])
+    hass.states.async_set(origin["source"], "on", {"device_class": "smoke"})
+    await flush(hass, entry)
+    attrs = dict(hass.states.get(other["target"]).attributes)
+    hass.states.async_set(other["target"], "stop", attrs)
+    hass.states.async_set(other["target"], "smoke_siren", attrs)
+    hass.states.async_set(origin["source"], "off", {"device_class": "smoke"})
+    await flush(hass, entry)
+    assert [c[2]["option"] for c in calls] == ["smoke_siren"]
+    assert not entry.runtime_data.panel.linking.owned
 
 
 async def test_pause_cancels_inflight_and_does_not_send_pending_targets(hass, devices):
@@ -686,6 +765,50 @@ async def test_existing_manual_co_sounder_is_never_adopted_or_stopped(hass, devi
     hass.states.async_set(b["source"], "off", {"device_class": "smoke"})
     await flush(hass, entry)
     assert calls == []
+
+
+@pytest.mark.parametrize("attributable", [True, False])
+async def test_delayed_heiman_start_confirmation_and_physical_hush(
+    hass, devices, attributable
+):
+    add, calls, _ = devices
+    origin, other = add("origin"), add("other")
+    members = [origin["source"], other["source"]]
+    entry = await setup(hass, members)
+    await configure(hass, entry, members, [other])
+    attrs = dict(hass.states.get(other["target"]).attributes)
+    contexts = []
+
+    async def delayed(call):
+        option = call.data["option"]
+        calls.append(option)
+        if option == "smoke_siren":
+            contexts.append(call.context)
+        else:
+            hass.states.async_set(other["target"], option, attrs)
+
+    hass.services.async_register("select", "select_option", delayed)
+    hass.states.async_set(origin["source"], "on", {"device_class": "smoke"})
+    await flush(hass, entry)
+    # Another HA observation arrives before the detector acknowledges the start.
+    hass.states.async_set(origin["test"], "off", {"sequence": 1})
+    await flush(hass, entry)
+    hass.states.async_set(
+        other["target"],
+        "smoke_siren",
+        attrs,
+        context=contexts[0] if attributable else None,
+    )
+    await flush(hass, entry)
+    # A physical button can silence a device while its smoke entity stays on.
+    hass.states.async_set(
+        origin["source"], "on", {"device_class": "smoke", "muted": True}
+    )
+    await flush(hass, entry)
+    assert calls == ["smoke_siren"]
+    hass.states.async_set(origin["source"], "off", {"device_class": "smoke"})
+    await flush(hass, entry)
+    assert calls == (["smoke_siren", "stop"] if attributable else ["smoke_siren"])
 
 
 async def test_manual_tone_replaces_our_ownership_before_clear(hass, devices):

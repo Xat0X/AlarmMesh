@@ -111,6 +111,11 @@ async def async_setup_entry(hass, entry):
             "test": test,
             "target": target,
             "setting": setting,
+            "feedback": register(
+                name, provider, device, "binary_sensor", "buzzer_manual_alarm"
+            )
+            if name == "b"
+            else None,
         }
         if target:
             outputs[target] = (
@@ -141,6 +146,11 @@ async def async_setup_entry(hass, entry):
             hass.states.async_set(
                 item["test"], "on" if is_on(f"{name}_test") else "off"
             )
+            if item["feedback"]:
+                hass.states.async_set(
+                    item["feedback"],
+                    "on" if outputs[item["target"]] == "alarm" else "off",
+                )
             if item["setting"]:
                 hass.states.async_set(
                     item["setting"],

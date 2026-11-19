@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.0-beta.16 — 2026-11-19
+
+- Recognize the separate manual-alarm feedback for the Aqara JY-GZ-01AQ (JY-GZ-03AQ) on Zigbee2MQTT. Previously saved Aqara sounder assignments need renewed confirmation. Linked sounding is activation-only on this model.
+- Track delayed feedback for an AlarmMesh-started Heiman HS1SA-E-PLUS sounder so the integration can request a stop after all contributing detectors and the target report clear.
+- Select linked sounders with one checkbox per detector. The group editor explains unavailable controls and which models support an automatic stop.
+
 ## 0.1.0-beta.15 — 2026-11-19
 
 - Show current smoke above the history when an earlier notification opens a past incident. Retain its first recorded source after recovery.

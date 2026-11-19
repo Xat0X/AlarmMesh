@@ -229,6 +229,18 @@ class SelfTests:
             {k: c[k] for k in ("target", "identity", "idle_states")}
             for c in self.cap.describe(source)["controls"]
         ]
+        if origin == "zigbee2mqtt" and profile.key == "selftest":
+            feedback = self.cap.aqara_feedback(source)
+            if feedback or self.cap.mqtt_property(source, "buzzer"):
+                if not feedback:
+                    return None
+                sounders = [
+                    {
+                        "target": feedback.entity_id,
+                        "identity": feedback.id,
+                        "idle_states": ("off",),
+                    }
+                ]
         identity = hashlib.sha256(
             json.dumps(
                 [

@@ -3,8 +3,9 @@
 import asyncio
 from contextlib import suppress
 from copy import deepcopy
+from dataclasses import dataclass
 
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import Context, HomeAssistant, State, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.event import async_track_state_change_event
 
@@ -12,6 +13,15 @@ from . import matter
 from .capabilities import Capabilities, Control
 from .linking import Activation, plan_activations, update_incidents
 from .status import SourceStatus
+
+
+@dataclass(frozen=True)
+class PendingStart:
+    control: Control
+    before: State
+    context_id: str
+    expiry: asyncio.TimerHandle
+    record: dict
 
 
 class LinkingRuntime:
@@ -26,6 +36,7 @@ class LinkingRuntime:
         self.attempted: dict[str, set[str]] = {}
         self.owned: dict[str, Control] = {}
         self.records: dict[str, dict] = {}
+        self._pending_starts: dict[str, PendingStart] = {}
         self._task: asyncio.Task | None = None
         self._paused = True
         self._closed = False
@@ -62,7 +73,28 @@ class LinkingRuntime:
         self.changed()
 
     @callback
-    def _related_changed(self, *_args):
+    def _related_changed(self, event):
+        target = event.data["entity_id"]
+        state = event.data["new_state"]
+        owned = self.owned.get(target)
+        if owned and owned.safe_stop and (not state or state.state != owned.option):
+            # A manual stop followed by a rapid new sound can fit in one HA
+            # loop iteration. The later sound no longer belongs to AlarmMesh.
+            self.owned.pop(target)
+            if self.records[target]["status"] != "stopping":
+                self.records[target]["status"] = "not_stopped"
+        if pending := self._pending_starts.get(target):
+            self._forget_pending(target)
+            if (
+                self.records.get(target) is pending.record
+                and event.data["old_state"] is pending.before
+                and state
+                and state.state == pending.control.option
+                and pending.context_id in {state.context.id, state.context.parent_id}
+                and self.capabilities.resolve(pending.control.binding()) is not None
+            ):
+                self.owned[target] = pending.control
+                pending.record["status"] = "sent"
         self.changed()
         if not self._closed and not self._paused:
             self.publish()
@@ -115,9 +147,22 @@ class LinkingRuntime:
         self.attempted = {
             target: origins for target, origins in self.attempted.items() if origins
         }
+        if self._pending_starts:
+            selected = set(self.runtime.source_entity_ids)
+            bindings = [
+                binding
+                for group in self.groups.groups
+                if group["linking"]["enabled"] and set(group["members"]) <= selected
+                for binding in group["linking"]["bindings"]
+            ]
+            for target, pending in tuple(self._pending_starts.items()):
+                if pending.control.binding() not in bindings:
+                    self._forget_pending(target)
         if self.active and not was_active:
             self.records = {
-                key: value for key, value in self.records.items() if key in self.owned
+                key: value
+                for key, value in self.records.items()
+                if key in self.owned or key in self._pending_starts
             }
         self._dirty = True
         if self._task is None or self._task.done():
@@ -178,6 +223,19 @@ class LinkingRuntime:
             [g for g in self.groups.groups if set(g["members"]) <= selected],
         )
 
+    @callback
+    def _forget_pending(self, target):
+        pending = self._pending_starts.pop(target, None)
+        if pending:
+            pending.expiry.cancel()
+            if self.records.get(target) is pending.record:
+                pending.record["status"] = "not_stopped"
+
+    @callback
+    def _expire_pending(self, target):
+        self._forget_pending(target)
+        self._publish()
+
     async def _activate(self, activation, slots):
         async with slots:
             target = activation.binding["target"]
@@ -190,6 +248,7 @@ class LinkingRuntime:
                 "status": "blocked",
                 "profile": activation.binding["profile"],
             }
+            self._forget_pending(target)
             self.records[target] = record
             if (control := self._current(activation)) is None:
                 return
@@ -206,12 +265,18 @@ class LinkingRuntime:
                 data["duration"] = control.duration
             if control.tone is not None:
                 data["tone"] = control.tone
+            context = Context()
+            before = self.hass.states.get(target)
             record["status"] = "sending"
             self._publish()
             try:
                 async with asyncio.timeout(10):
                     await self.hass.services.async_call(
-                        control.domain, control.service, data, blocking=True
+                        control.domain,
+                        control.service,
+                        data,
+                        blocking=True,
+                        context=context,
                     )
             except asyncio.CancelledError:
                 record["status"] = "outcome_unknown"
@@ -221,6 +286,26 @@ class LinkingRuntime:
             except Exception:  # A broken provider must not prevent other targets.
                 record["status"] = "failed"
             else:
+                if control.safe_stop:
+                    state = self.hass.states.get(target)
+                    if state is before:
+                        # An accepted call can finish before the state arrives.
+                        # Observe for two seconds without holding a dispatch slot.
+                        expiry = self.hass.loop.call_later(
+                            2, self._expire_pending, target
+                        )
+                        self._pending_starts[target] = PendingStart(
+                            control,
+                            before,
+                            context.id,
+                            expiry,
+                            record,
+                        )
+                        record["status"] = "sent"
+                        return
+                    if not state or state.state != control.option:
+                        record["status"] = "not_stopped"
+                        return
                 self.owned[target] = control
                 record["status"] = "sent" if control.safe_stop else "sent_no_auto_stop"
 
@@ -255,6 +340,9 @@ class LinkingRuntime:
             is not SourceStatus.NO_SMOKE_REPORTED
         ):
             self.records[target]["status"] = "not_stopped"
+            return
+        # A new origin may have joined while another target's request was in flight.
+        if any(action.binding == control.binding() for action in self._plan()):
             return
         # A source becoming unknown never clears its latched incident.
         if any(origin in self.active for origin in self.records[target]["origins"]):
@@ -326,6 +414,8 @@ class LinkingRuntime:
 
     async def pause(self):
         self._paused = True
+        for target in tuple(self._pending_starts):
+            self._forget_pending(target)
         if self._task:
             task = self._task
             task.cancel()

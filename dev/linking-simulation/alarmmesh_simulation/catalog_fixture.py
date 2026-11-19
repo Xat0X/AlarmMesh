@@ -183,6 +183,9 @@ async def async_setup_catalog(hass, entry):
             "source": source,
             "target": target,
             "setting": setting,
+            "feedback": register("binary_sensor", "buzzer_manual_alarm")
+            if key == "buzzer"
+            else None,
             "battery": battery,
             "fault": fault,
             "test": test,
@@ -232,6 +235,11 @@ async def async_setup_catalog(hass, entry):
                 {"device_class": "problem"},
             )
             hass.states.async_set(item["test"], "on" if enabled("test") else "off")
+            if item["feedback"]:
+                hass.states.async_set(
+                    item["feedback"],
+                    "on" if outputs[item["target"]] == "alarm" else "off",
+                )
             if item["setting"]:
                 hass.states.async_set(
                     item["setting"], "on" if enabled(f"{name}_permission") else "off"

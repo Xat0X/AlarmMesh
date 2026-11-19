@@ -176,8 +176,12 @@ test("linked sounding is off by default and requires an exact preview plus ackno
   assert.equal(Boolean(form.querySelector('[name="link-enabled"]').checked), false);
   for (const input of form.querySelectorAll('[name="member"]')) input.checked = true;
   form.querySelector('[name="link-enabled"]').checked = true;
-  const select = [...form.querySelectorAll("select")][1];
-  select.querySelector('option[value="siren.simulation_b"]').selected = true;
+  const options = form.querySelectorAll('input[name="link-target"]');
+  assert.equal(options[0].disabled, true);
+  assert.ok(options[0].closest(".binding-row").querySelector(".binding-help").textContent.includes("missing or disabled"));
+  assert.equal(options[1].type, "checkbox");
+  assert.equal(options[1].checked, false);
+  options[1].checked = true;
   form.dispatchEvent(new Event("submit", { cancelable: true })); await tick();
   assert.deepEqual(calls, []);
   assert.ok(root.querySelector(".link-confirmation").textContent.includes("Detector A → Detector B"));
@@ -189,6 +193,26 @@ test("linked sounding is off by default and requires an exact preview plus ackno
   assert.equal(calls.length, 1);
   assert.equal(calls[0].confirmed, true);
   assert.deepEqual(calls[0].linking, { enabled: true, bindings: [{ source: "binary_sensor.simulation_b", target: "siren.simulation_b", profile: "smszb_zha", identity: "a".repeat(64) }] });
+  panel.remove();
+});
+
+test("a changed device at the same target needs explicit replacement", async () => {
+  const { panel, root, transport, calls } = setup();
+  const data = linkedData(), control = data.sources[1].capability.controls[0];
+  const old = { source: control.source, target: control.target, profile: control.profile, identity: "b".repeat(64) };
+  const group = { id: "g", name: "Floor", members: data.sources.map(s => s.entity_id), unselected: [], linking: { enabled: false, bindings: [old] } };
+  data.groups = [group]; transport.callbacks.at(-1)(data); panel.openDialog({ kind: "edit", group });
+  const form = root.querySelector("form"), field = form.querySelectorAll('input[name="link-target"]')[1];
+  assert.ok(!field.checked && !field.disabled);
+  assert.ok(form.querySelector(".stale-binding button"));
+  form.querySelector('[name="link-enabled"]').checked = true;
+  form.dispatchEvent(new Event("submit", { cancelable: true })); await tick();
+  assert.equal(root.querySelector(".link-confirmation"), null);
+  assert.deepEqual(calls, []);
+  field.checked = true; field.dispatchEvent(new Event("change"));
+  form.dispatchEvent(new Event("submit", { cancelable: true })); await tick();
+  form.querySelector(".confirm-ack").checked = true; form.querySelector(".confirm-linking").click(); await tick();
+  assert.equal(calls[0].linking.bindings[0].identity, control.identity);
   panel.remove();
 });
 
@@ -239,12 +263,12 @@ test("target assignments only show current group members, retaining unsaved choi
   const members = [...root.querySelectorAll('[name="member"]')];
   members[1].checked = true; members[1].dispatchEvent(new Event("change"));
   assert.equal(rows.filter(row => !row.hidden).length, 1);
-  const target = rows[1].querySelector("select"); target.querySelector('option[value="siren.simulation_b"]').selected = true;
+  const target = rows[1].querySelector('input[name="link-target"]'); target.checked = true;
   members[1].checked = false; members[1].dispatchEvent(new Event("change"));
   members[1].checked = true; members[1].dispatchEvent(new Event("change"));
-  assert.equal(target.value, "siren.simulation_b");
+  assert.equal(target.checked, true);
   transport.callbacks.at(-1)(linkedData());
-  assert.equal(root.querySelectorAll(".binding-row")[1].querySelector("select").value, "siren.simulation_b");
+  assert.equal(root.querySelectorAll(".binding-row")[1].querySelector('input[name="link-target"]').checked, true);
   assert.deepEqual(calls, []); panel.remove();
 });
 
@@ -539,7 +563,7 @@ test("group confirmation locks script editing and cannot dispatch while disconne
   const form = root.querySelector("dialog form"); form.querySelector("#group-name").value = "Preview";
   for (const member of form.querySelectorAll('[name="member"]')) member.checked = true;
   form.querySelector('[name="link-enabled"]').checked = true;
-  const target = form.querySelectorAll('[name="link-target"]')[1]; target.options[1].selected = true;
+  const target = form.querySelectorAll('[name="link-target"]')[1]; target.checked = true;
   form.dispatchEvent(new Event("submit", { cancelable: true })); await tick();
   const add = [...form.querySelectorAll(".action-config button")].find(b => b.textContent === "Add script");
   assert.equal(add.disabled, true);

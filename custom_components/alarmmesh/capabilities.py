@@ -306,6 +306,12 @@ class Capabilities:
             "maintenance": maintenance,
         }
 
+    def aqara_feedback(self, source):
+        matches = self.mqtt_property(source, "buzzer_manual_alarm")
+        if len(matches) == 1 and matches[0].domain == "binary_sensor":
+            return matches[0]
+        return None
+
     def describe(self, source: str) -> dict:
         entity, device, origin, raw_model, raw_vendor, catalog = self.metadata(source)
         result = {
@@ -411,7 +417,14 @@ class Capabilities:
             return result
         target = candidates[0]
         state = self.hass.states.get(target.entity_id)
-        if not state or state.state in {"unknown", "unavailable"}:
+        # Z2M exposes Aqara's buzzer as a write-only select. Read its actual
+        # manual-alarm flag through the same device and discovery identity.
+        feedback = self.aqara_feedback(source) if name == "aqara_mqtt" else None
+        if (
+            not state
+            or state.state == "unavailable"
+            or (state.state == "unknown" and name != "aqara_mqtt")
+        ):
             result.update(status="not_confirmed", reason="control_unavailable")
             return result
         if (
@@ -460,8 +473,17 @@ class Capabilities:
         if not self.hass.services.has_service(action["domain"], action["service"]):
             result.update(status="not_confirmed", reason="service_missing")
             return result
+        if name == "aqara_mqtt":
+            observed = self.hass.states.get(feedback.entity_id) if feedback else None
+            if not observed or observed.state not in {"on", "off"}:
+                if result["status"] == "detection_only":
+                    result.update(
+                        status="not_confirmed", reason="aqara_feedback_needed"
+                    )
+                return result
+
         model, vendor = raw_model.casefold(), raw_vendor.casefold()
-        # Keep the four published beta.2 identities byte-for-byte stable.
+        # Normalize published legacy model names before binding the registry identities.
         if profile.legacy_identity:
             model = next(
                 (
@@ -496,6 +518,12 @@ class Capabilities:
                     else [],
                 ]
             )
+        if feedback:
+            # Existing Aqara assignments require review before this readback
+            # can authorize a command with an unknown select value.
+            fingerprint.extend(
+                [feedback.id, feedback.unique_id, feedback.config_entry_id]
+            )
         identity = hashlib.sha256(json.dumps(fingerprint).encode()).hexdigest()
         control = Control(source, target.entity_id, name, identity, **action)
         result["controls"] = [asdict(control)]
@@ -521,4 +549,12 @@ class Capabilities:
     def is_idle(self, control: Control) -> bool:
         """Shared read-only idle test; never adopt manual/external sounding."""
         state = self.hass.states.get(control.target)
+        if control.profile == "aqara_mqtt":
+            feedback = self.aqara_feedback(control.source)
+            return bool(
+                state
+                and state.state in {"unknown", "alarm", "mute"}
+                and feedback
+                and self.hass.states.is_state(feedback.entity_id, "off")
+            )
         return state is not None and state.state in control.idle_states

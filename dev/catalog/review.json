@@ -49,7 +49,8 @@
               "self_test": "implemented_read_only",
               "requirements": [
                 "Eligible selected binary_sensor smoke entity on the same registry device/config entry; exact matching control, features/options and explicit admin confirmation.",
-                "Linkage alarm must already be enabled; firmware 21/0021/0.0.0_0021 is blocked. AlarmMesh never changes that setting or mutes local smoke."
+                "Linkage alarm must already be enabled; firmware 21/0021/0.0.0_0021 is blocked. AlarmMesh never changes that setting or mutes local smoke.",
+                "The write-only buzzer select needs the same device's readable buzzer_manual_alarm sensor. Only off permits a start. Review saved assignments after upgrading to this feedback contract."
               ],
               "gaps": [],
               "sources": [
@@ -147,7 +148,8 @@
           "self_test": "implemented_read_only",
           "requirements": [
             "Eligible selected binary_sensor smoke entity on the same registry device/config entry; exact matching control, features/options and explicit admin confirmation.",
-            "Linkage alarm must already be enabled; firmware 21/0021/0.0.0_0021 is blocked. AlarmMesh never changes that setting or mutes local smoke."
+            "Linkage alarm must already be enabled; firmware 21/0021/0.0.0_0021 is blocked. AlarmMesh never changes that setting or mutes local smoke.",
+            "The write-only buzzer select needs the same device's readable buzzer_manual_alarm sensor. Only off permits a start. Review saved assignments after upgrading to this feedback contract."
           ],
           "gaps": [],
           "sources": [

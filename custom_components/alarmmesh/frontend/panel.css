@@ -274,3 +274,5 @@ dialog:has(.exercise) > button:first-child { position: relative; z-index: 1; }
 .exercise .exercise-example > p { margin: 4px 0 12px; }
 .exercise .exercise-demo-origin { display: block; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); padding: 10px 12px; }
 .exercise-example .exercise-branches section p { margin: 4px 0 0; }
+
+.binding-row .sound-choice{display:flex;align-items:center;gap:12px;min-height:44px}.binding-row .binding-help{margin:4px 0 8px}

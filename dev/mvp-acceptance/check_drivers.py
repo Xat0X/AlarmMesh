@@ -326,7 +326,11 @@ async def main(requested):
                         "unique_id": unique,
                         "device": device,
                         "name": prop,
-                        **({"state_topic": topic} if domain != "button" else {}),
+                        **(
+                            {"state_topic": topic}
+                            if domain != "button" and prop != "buzzer"
+                            else {}
+                        ),
                         "availability_topic": topic + "/availability",
                         **payload,
                     },
@@ -361,6 +365,16 @@ async def main(requested):
                     "payload_off": False,
                 },
             )
+            if key == "buzzer":
+                await discover(
+                    "binary_sensor",
+                    "buzzer_manual_alarm",
+                    {
+                        "value_template": "{{ value_json.buzzer_manual_alarm }}",
+                        "payload_on": True,
+                        "payload_off": False,
+                    },
+                )
             if index == 1:
                 await discover(
                     "button",
@@ -371,7 +385,11 @@ async def main(requested):
             if domain == "select":
                 payload.update(
                     options=options,
-                    value_template="{{ value_json." + key + " }}",
+                    **(
+                        {"value_template": "{{ value_json." + key + " }}"}
+                        if key != "buzzer"
+                        else {}
+                    ),
                     command_template="{{ value }}",
                 )
             elif domain == "switch":
@@ -414,7 +432,7 @@ async def main(requested):
                 "smoke": False,
                 "battery": 72,
                 "test": False,
-                key: idle,
+                **({"buzzer_manual_alarm": False} if key == "buzzer" else {key: idle}),
                 "siren_state": "OFF",
                 **(
                     {
@@ -441,7 +459,12 @@ async def main(requested):
                     and target
                     and hass.states.is_state(source, "off")
                     and hass.states.get(target)
-                    and hass.states.get(target).state not in {"unknown", "unavailable"}
+                    and (
+                        hass.states.is_state(target, "unknown")
+                        if key == "buzzer"
+                        else hass.states.get(target).state
+                        not in {"unknown", "unavailable"}
+                    )
                 ):
                     break
             else:
@@ -497,6 +520,19 @@ async def main(requested):
                 await asyncio.sleep(0.05)
             raise AssertionError("Synthetic MQTT state did not arrive")
 
+        states[1]["buzzer_manual_alarm"] = True
+        await publish("alarmmesh_simulation/synthetic1", states[1])
+        await wait_state(
+            lambda: panel.selftests._conflicts(panel.selftests.resolve(sources[1]))
+        )
+        require(
+            messages.empty(), "Checking an already sounding detector sent a command"
+        )
+        states[1]["buzzer_manual_alarm"] = False
+        await publish("alarmmesh_simulation/synthetic1", states[1])
+        await wait_state(
+            lambda: not panel.selftests._conflicts(panel.selftests.resolve(sources[1]))
+        )
         control = panel.selftests.resolve(sources[1])
         require(control is not None, "Actual discovered self-test button missing")
         await panel.selftests.start(

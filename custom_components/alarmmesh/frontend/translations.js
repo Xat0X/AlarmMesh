@@ -1065,3 +1065,16 @@ Object.assign(TEXT.nl,{smokeOnlyRole:"Niet laten meeklinken",detection_only:"Roo
 Object.assign(TEXT.en,{smokeOnlyRole:"Do not sound along",detection_only:"Smoke reporting available",linkable:"Linked sounding supported",activation_only:"Linked sounding without automatic stop",not_confirmed:"Linked sounding not confirmed"});
 Object.assign(TEXT.nl,{silentDrill:"Stille oefening",chooseDrillSource:"Welke melder meldt rook in de oefening?",activity_incident_origin:"Rook waargenomen",activity_incident_clear:"Incident vrijgegeven"});
 Object.assign(TEXT.en,{silentDrill:"Silent practice",chooseDrillSource:"Which detector reports smoke in this practice?",activity_incident_origin:"Smoke observed",activity_incident_clear:"Incident cleared"});
+
+Object.assign(TEXT.nl, {
+  removeOldSounder: "Oude keuze verwijderen",
+  aqara_feedback_needed: "Home Assistant heeft geen actuele stand voor het externe alarm van deze Aqara. Bekijk de sensor ‘Buzzer manual alarm’ bij dit apparaat.",
+  soundAutoStop: "AlarmMesh kan het meeklinken stoppen zodra alle betrokken melders geen rook meer melden.",
+  soundManualStop: "Deze melder kan meeklinken. AlarmMesh kan het geluid bij dit model niet automatisch stoppen."
+});
+Object.assign(TEXT.en, {
+  removeOldSounder: "Remove old selection",
+  aqara_feedback_needed: "Home Assistant has no current reading for this Aqara’s remote alarm. Look for the ‘Buzzer manual alarm’ sensor on this device.",
+  soundAutoStop: "AlarmMesh can stop the sound it started once all involved detectors report no smoke.",
+  soundManualStop: "This detector can sound along. AlarmMesh cannot automatically stop the sound on this model."
+});
