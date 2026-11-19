@@ -167,6 +167,44 @@ function linkedData() {
   return data;
 }
 
+test("attic sounder unlocks in the open group form and a changed gate invalidates consent", async () => {
+  const { panel, root, transport, calls } = setup("nl");
+  const data = linkedData();
+  const attic = data.sources[1];
+  const control = attic.capability.controls[0];
+  const update = (status, reason) => {
+    attic.capability = { status, reason, controls: [control] };
+    transport.callbacks.at(-1)(data);
+  };
+  update("setting_needed", "aqara_linkage_missing");
+  panel.openDialog({ kind: "edit", group: null });
+  const form = root.querySelector("form");
+  const box = () => form.querySelectorAll('[name="link-target"]')[1];
+  const help = () => box().closest(".binding-row").querySelector(".binding-help").textContent;
+  form.querySelector("#group-name").value = "Mijn zolder";
+  for (const member of form.querySelectorAll('[name="member"]')) member.checked = true;
+  form.querySelector('[name="link-enabled"]').checked = true;
+  assert.ok(box().disabled && help().includes("apparaatpagina"));
+  update("setting_needed", "aqara_linkage_required");
+  assert.ok(box().disabled && help().includes("uit staat"));
+  update("linkable", "no_safe_stop");
+  assert.equal(box().disabled, false);
+  assert.equal(box().checked, false);
+  box().checked = true;
+  form.dispatchEvent(new Event("submit", { cancelable: true }));
+  await tick();
+  form.querySelector(".confirm-ack").checked = true;
+  update("setting_needed", "aqara_linkage_unavailable");
+  update("linkable", "no_safe_stop");
+  assert.equal(form.querySelector(".confirm-ack").checked, false);
+  form.querySelector(".confirm-ack").checked = true;
+  form.querySelector(".confirm-linking").click();
+  await tick();
+  assert.deepEqual(calls, []);
+  assert.equal(form.querySelector("#group-name").value, "Mijn zolder");
+  panel.remove();
+});
+
 test("linked sounding is off by default and requires an exact preview plus acknowledgement", async () => {
   const { panel, root, calls, transport } = setup();
   transport.callbacks.at(-1)(linkedData());

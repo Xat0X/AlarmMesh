@@ -99,11 +99,17 @@ class Capabilities:
         ):
             return ()
         unique_id = f"{ids[0]}_{property_name}_{base}"
+        # Writable binary exposes use a switch_ discovery object ID. The shorter
+        # form is also used by existing installations and other entity types.
+        switch_id = f"{ids[0]}_switch_{property_name}_{base}"
         return tuple(
             e
             for e in self.related(source)
             if e.platform == "mqtt"
-            and e.unique_id == unique_id
+            and (
+                e.unique_id == unique_id
+                or (e.domain == "switch" and e.unique_id == switch_id)
+            )
             and not e.disabled_by
             and e.config_entry_id == entity.config_entry_id
         )
@@ -388,14 +394,20 @@ class Capabilities:
                 or settings[0].domain != domain
                 or setting.state != required_state
             ):
-                result.update(
-                    status="setting_needed",
-                    reason="bosch_broadcast_must_be_off"
-                    if key == "broadcast_alarms"
-                    else "aqara_linkage_required"
-                    if key == "linkage_alarm"
-                    else "remote_permission_required",
-                )
+                if key == "linkage_alarm":
+                    if len(settings) > 1:
+                        reason = "aqara_linkage_ambiguous"
+                    elif not settings or settings[0].domain != domain:
+                        reason = "aqara_linkage_missing"
+                    elif not setting or setting.state not in {"on", "off"}:
+                        reason = "aqara_linkage_unavailable"
+                    else:
+                        reason = "aqara_linkage_required"
+                elif key == "broadcast_alarms":
+                    reason = "bosch_broadcast_must_be_off"
+                else:
+                    reason = "remote_permission_required"
+                result.update(status="setting_needed", reason=reason)
         if (device.sw_version or "").strip() in profile.blocked_firmware:
             result.update(status="not_confirmed", reason="aqara_firmware_21")
         candidates = (

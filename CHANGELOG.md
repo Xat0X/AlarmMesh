@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.0-beta.17 — 2026-11-19
+
+- Recognize Zigbee2MQTT discovery switch identifiers for Aqara, Bosch and ShinaSystem. Explain a missing, unreadable or duplicate Aqara linkage switch separately from an off switch. An open group editor now updates the affected checkbox while preserving other edits.
+
 ## 0.1.0-beta.16 — 2026-11-19
 
 - Recognize the separate manual-alarm feedback for the Aqara JY-GZ-01AQ (JY-GZ-03AQ) on Zigbee2MQTT. Previously saved Aqara sounder assignments need renewed confirmation. Linked sounding is activation-only on this model.

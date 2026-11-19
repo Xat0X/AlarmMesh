@@ -598,6 +598,19 @@ def test_z2m_white_label_evidence_cannot_authorize_a_zha_alias():
         validate_catalog(data)
 
 
+async def test_bosch_test_mode_with_discovery_switch_id_blocks_test_origin(
+    hass, catalog_devices
+):
+    add, calls = catalog_devices
+    device = bsd_target(add)
+    cap = Capabilities(hass)
+    switch = device["register"]("switch", "switch_test_mode", "on", {})
+    assert cap.test_blocked(device["source"])
+    hass.states.async_set(switch, "off")
+    assert not cap.test_blocked(device["source"])
+    assert not calls
+
+
 def bsd_target(add, *, prerequisite=True):
     return add(
         "BSD-2",

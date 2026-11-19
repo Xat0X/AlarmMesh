@@ -1,5 +1,5 @@
 import { exercise, incidentDetail, careView } from "./family.js?v=family-beta16";
-import { TEXT } from "./translations.js?v=family-beta16";
+import { TEXT } from "./translations.js?v=sounder-discovery-1";
 import { Drafts } from "./drafts.js?v=family-beta16";
 
 // Safe DOM construction: names, labels and registry data are always text nodes.
@@ -85,6 +85,7 @@ export class AlarmMeshPanel extends HTMLElement {
         if (data.available && this.detail?.pendingRecovery?.interrupted) this.detail.showMemberships();
         this.updateTestResult();
         if(data.available && this.detail?.kind==="route" && this.detail.resumed)this.detail.resumed();
+        if (data.available && this.detail?.kind === "edit") this.detail.refreshSounders?.();
         if (data.available && this.detail?.kind === "alarmsettings") this.detail.refresh?.();
         if (!data.available || this.page !== "catalog" || !this.shadowRoot.querySelector(".catalog-filters")) this.render();
         if (this.detail && !["edit", "delete", "settings", "maintenance", "test", "reminder", "copy", "route", "recovery", "alarmsettings", "phoneObservation", "care"].includes(this.detail.kind)) this.renderDialog();
@@ -635,68 +636,41 @@ export class AlarmMeshPanel extends HTMLElement {
     toggleLabel.append(toggle, el("span", t.enableLink)); linkingSection.append(toggleLabel);
     const bindings = [];
     const bindingSources = [...this.data.sources, ...(group?.linking?.bindings || []).filter(b => !this.data.sources.some(s => s.entity_id === b.source)).map(b => ({ entity_id: b.source, name: b.source }))];
+    const availability = source => JSON.stringify([source.capability?.status, source.capability?.reason, source.capability?.controls]);
     for (const source of bindingSources) {
-      const cap = source.capability;
       const row = el("div", undefined, "binding-row");
-      const controls = cap?.controls || [];
       const oldBinding = group?.linking?.bindings.find(b => b.source === source.entity_id);
-      const currentBinding = controls.find(c => c.target === oldBinding?.target && c.identity === oldBinding?.identity && c.profile === oldBinding?.profile);
-      const stale = oldBinding && !currentBinding;
-      const canChoose = cap?.status === "linkable";
-      const fieldId = `binding-${source.entity_id}`;
-      const savedFields = c => ({ source: c.source, target: c.target, profile: c.profile, identity: c.identity });
-      const name = this.sourceName(source.entity_id);
-      let readBinding;
-      if (controls.length <= 1) {
-        const label = el("label", undefined, "check sound-choice");
-        const check = el("input");
-        check.type = "checkbox"; check.id = fieldId; check.name = "link-target";
-        check.checked = Boolean(currentBinding);
-        check.disabled = !controls.length || (!canChoose && !currentBinding);
-        if (!canChoose && currentBinding) check.addEventListener("change", () => { check.disabled = !check.checked; });
-        label.append(check, el("span", name));
-        row.append(label);
-        let kept = stale ? oldBinding : null;
-        if (stale) {
-          const warning = el("div", undefined, "stale-binding");
-          const discard = () => { kept = null; warning.hidden = true; };
-          warning.append(el("p", t.storedControlChanged), button(t.removeOldSounder, discard));
-          row.append(warning);
-          check.addEventListener("change", () => { if (check.checked) discard(); });
-        }
-        readBinding = () => check.checked && controls[0] ? savedFields(controls[0]) : kept;
-      } else {
-        // Replacing a stored identity (even at the same entity ID) requires
-        // a distinct choice. Preserve the old binding until explicitly changed.
-        const label = el("label", name);
-        const select = el("select"); select.name = "link-target"; select.id = fieldId; label.htmlFor = fieldId;
-        const empty = el("option", t.smokeOnlyRole); empty.value = ""; empty.selected = !oldBinding; select.append(empty);
-        for (const control of controls) {
-          const option = el("option", controls.length === 1 ? t.soundAlong : `${t.soundAlong} · ${control.target}`);
-          option.value = control.target; option.disabled = !canChoose; option.selected = currentBinding === control; select.append(option);
-        }
-        if (stale) {
-          const stored = el("option", t.storedControlChanged);
-          stored.value = "stored"; stored.selected = true; select.append(stored);
-        }
-        row.append(label, select);
-        readBinding = () => {
-          if (select.value === "stored") return oldBinding;
-          const choice = controls.find(c => c.target === select.value);
-          return choice ? savedFields(choice) : null;
-        };
-      }
-      const note = el("p", !canChoose ? (t[cap?.reason] || t.no_verified_profile)
-        : controls.every(c => c.safe_stop) ? t.soundAutoStop : t.soundManualStop, "binding-help");
-      note.id = `${fieldId}-help`;
-      row.querySelector('[name="link-target"]').setAttribute("aria-describedby", note.id);
-      row.append(note);
-      if (cap) { const requirements = el("details"); requirements.append(el("summary", t.technicalDetails), el("p", t[cap.reason] || t.no_verified_profile), el("p", `${source.model || t.unknown} · ${source.entity_id}`)); for (const control of controls) requirements.append(el("p", control.target)); row.append(requirements); }
-      else row.append(el("small", t.storedSourceMissing, "warning-text"));
+      const field = { source, row, availability: availability(source), readBinding: this.renderSounderChoice(row, source, oldBinding) };
       row.hidden = !selected.has(source.entity_id);
       for (const check of form.querySelectorAll('input[name="member"]')) if (check.value === source.entity_id) check.addEventListener("change", () => { row.hidden = !check.checked; });
-      linkingSection.append(row); bindings.push({ source, readBinding });
+      linkingSection.append(row); bindings.push(field);
     }
+    this.detail.refreshSounders = () => {
+      const confirmation = form.querySelector(".link-confirmation");
+      for (const field of bindings) {
+        const id = field.source.entity_id;
+        const latest = this.data.sources.find(source => source.entity_id === id) || { entity_id: id };
+        const signature = availability(latest);
+        if (signature === field.availability) continue;
+        const choice = field.readBinding();
+        if (confirmation) {
+          if (toggle.checked && choice && selectedMembers().includes(id)) {
+            confirmation.dataset.stale = "true";
+            confirmation.querySelector(".confirm-ack").checked = false;
+            error.textContent = t.control_changed;
+          }
+          continue;
+        }
+        const fieldFocused = this.shadowRoot.activeElement === field.row.querySelector('[name="link-target"]');
+        const detailsOpen = field.row.querySelector("details")?.open;
+        field.row.replaceChildren();
+        field.readBinding = this.renderSounderChoice(field.row, latest, choice);
+        field.availability = signature;
+        const details = field.row.querySelector("details");
+        if (details && detailsOpen) details.open = true;
+        if (fieldFocused) field.row.querySelector('[name="link-target"]')?.focus();
+      }
+    };
     const originSection = el("section", undefined, "linking-section");
     originSection.append(el("h3", t.incidentSources), el("p", t.incidentSourceNote));
     const originRows = [];
@@ -769,6 +743,7 @@ export class AlarmMeshPanel extends HTMLElement {
         const ackLabel = el("label", undefined, "check");
         const ack = el("input"); ack.type = "checkbox"; ack.className = "confirm-ack"; ackLabel.append(ack, el("span", t.acceptLink));
         const confirm = button(t.confirmEnable, async () => {
+          if (confirmation.dataset.stale) { ack.checked = false; error.textContent = t.control_changed; return; }
           if(this.data?.revision!==revision){ack.checked=false;error.textContent=t.conflict;return;}
           if (!ack.checked) { error.textContent = t.linking_confirmation_required; ack.focus(); return; }
           if (!this.data) { error.textContent = t.offline; return; }
@@ -776,7 +751,7 @@ export class AlarmMeshPanel extends HTMLElement {
           await this.mutate({ ...payload, confirmed: true }, error);
           confirm.disabled = false;
         }, "button primary confirm-linking");
-        confirmation.append(ackLabel, error, button(t.back, () => { confirmation.remove(); form.insertBefore(error, actions); error.textContent = ""; restore(); }), confirm);
+        confirmation.append(ackLabel, error, button(t.back, () => { confirmation.remove(); form.insertBefore(error, actions); error.textContent = ""; restore(); this.detail.refreshSounders(); }), confirm);
         form.append(confirmation); ack.focus(); return;
       }
       save.disabled = true;
@@ -785,6 +760,64 @@ export class AlarmMeshPanel extends HTMLElement {
     });
     this.trackDraft(form,revision,readGroup);
     dialog.append(form);
+  }
+  renderSounderChoice(row, source, oldBinding) {
+    const t = this.t, cap = source.capability;
+    const controls = cap?.controls || [];
+    const currentBinding = controls.find(c => c.target === oldBinding?.target && c.identity === oldBinding?.identity && c.profile === oldBinding?.profile);
+    const stale = oldBinding && !currentBinding;
+    const canChoose = cap?.status === "linkable";
+    const fieldId = `binding-${source.entity_id}`;
+    const savedFields = c => ({ source: c.source, target: c.target, profile: c.profile, identity: c.identity });
+    const name = this.sourceName(source.entity_id);
+    let readBinding;
+    if (controls.length <= 1) {
+      const label = el("label", undefined, "check sound-choice");
+      const check = el("input");
+      check.type = "checkbox"; check.id = fieldId; check.name = "link-target";
+      check.checked = Boolean(currentBinding);
+      check.disabled = !controls.length || (!canChoose && !currentBinding);
+      if (!canChoose && currentBinding) check.addEventListener("change", () => { check.disabled = !check.checked; });
+      label.append(check, el("span", name));
+      row.append(label);
+      let kept = stale ? oldBinding : null;
+      if (stale) {
+        const warning = el("div", undefined, "stale-binding");
+        const discard = () => { kept = null; warning.hidden = true; };
+        warning.append(el("p", t.storedControlChanged), button(t.removeOldSounder, discard));
+        row.append(warning);
+        check.addEventListener("change", () => { if (check.checked) discard(); });
+      }
+      readBinding = () => check.checked && controls[0] ? savedFields(controls[0]) : kept;
+    } else {
+      // Replacing a stored identity (even at the same entity ID) requires
+      // a distinct choice. Preserve the old binding until explicitly changed.
+      const label = el("label", name);
+      const select = el("select"); select.name = "link-target"; select.id = fieldId; label.htmlFor = fieldId;
+      const empty = el("option", t.smokeOnlyRole); empty.value = ""; empty.selected = !oldBinding; select.append(empty);
+      for (const control of controls) {
+        const option = el("option", controls.length === 1 ? t.soundAlong : `${t.soundAlong} · ${control.target}`);
+        option.value = control.target; option.disabled = !canChoose; option.selected = currentBinding === control; select.append(option);
+      }
+      if (stale) {
+        const stored = el("option", t.storedControlChanged);
+        stored.value = "stored"; stored.selected = true; select.append(stored);
+      }
+      row.append(label, select);
+      readBinding = () => {
+        if (select.value === "stored") return oldBinding;
+        const choice = controls.find(c => c.target === select.value);
+        return choice ? savedFields(choice) : null;
+      };
+    }
+    const note = el("p", !canChoose ? (t[cap?.reason] || t.no_verified_profile)
+      : controls.every(c => c.safe_stop) ? t.soundAutoStop : t.soundManualStop, "binding-help");
+    note.id = `${fieldId}-help`;
+    row.querySelector('[name="link-target"]').setAttribute("aria-describedby", note.id);
+    row.append(note);
+    if (cap) { const requirements = el("details"); requirements.append(el("summary", t.technicalDetails), el("p", t[cap.reason] || t.no_verified_profile), el("p", `${source.model || t.unknown} · ${source.entity_id}`)); for (const control of controls) requirements.append(el("p", control.target)); row.append(requirements); }
+    else row.append(el("small", t.storedSourceMissing, "warning-text"));
+    return readBinding;
   }
   detectorDetails(parent, source) {
     const t = this.t, details = source.capability.details || {};

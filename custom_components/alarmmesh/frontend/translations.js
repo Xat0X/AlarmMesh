@@ -7,7 +7,7 @@ export const TEXT = {
     detection_only: "Smoke detection only", linkable: "Linkable", setting_needed: "Setting needed", not_confirmed: "Not yet confirmed",
     zigbee2mqtt: "Zigbee2MQTT / MQTT", mqtt: "MQTT", zha: "ZHA", unknown_origin: "Origin unknown",
     no_verified_profile: "This device can report smoke, but has no supported external sounder control for this model/provider.", source_identity_changed: "The source is no longer identified as a smoke detector.",
-    aqara_linkage_required: "Enable linkage_alarm yourself on this Aqara device first. AlarmMesh never changes that setting.", aqara_firmware_21: "Aqara firmware 21 has a documented alarm regression. This profile is blocked.",
+    aqara_linkage_required: "Home Assistant reports that Linkage alarm is off on this detector. Check the switch on its device page.", aqara_firmware_21: "Aqara firmware 21 has a documented alarm regression. This profile is blocked.",
     zha_route_unconfirmed: "Smoke reports work; an equivalent ZHA external sounder route is not confirmed for this model.",
     control_missing: "The required control is missing or disabled in this HA installation.", ambiguous_control: "More than one possible control exists. No automatic choice is made.",
     control_unavailable: "The sounder control is currently unavailable.", invalid_control_options: "The control does not offer the required documented options.",
@@ -63,7 +63,7 @@ export const TEXT = {
     detection_only: "Alleen rookdetectie", linkable: "Koppelbaar", setting_needed: "Instelling nodig", not_confirmed: "Nog niet bevestigd",
     zigbee2mqtt: "Zigbee2MQTT / MQTT", mqtt: "MQTT", zha: "ZHA", unknown_origin: "Herkomst onbekend",
     no_verified_profile: "Deze melder kan rook melden, maar heeft geen ondersteunde externe zoemerbediening voor dit model/deze provider.", source_identity_changed: "De bron wordt niet meer als rookmelder herkend.",
-    aqara_linkage_required: "Schakel linkage_alarm eerst zelf in op deze Aqara. AlarmMesh wijzigt die instelling nooit.", aqara_firmware_21: "Aqara-firmware 21 heeft een gedocumenteerd alarmprobleem. Dit profiel is geblokkeerd.",
+    aqara_linkage_required: "Home Assistant meldt dat Linkage alarm op deze melder uit staat. Controleer de schakelaar op de apparaatpagina.", aqara_firmware_21: "Aqara-firmware 21 heeft een gedocumenteerd alarmprobleem. Dit profiel is geblokkeerd.",
     zha_route_unconfirmed: "Rookmeldingen werken; een gelijkwaardige externe ZHA-zoemerroute is voor dit model nog niet bevestigd.",
     control_missing: "De vereiste bediening ontbreekt of is uitgeschakeld in deze HA-installatie.", ambiguous_control: "Er zijn meerdere mogelijke bedieningen. Er wordt niet automatisch gekozen.",
     control_unavailable: "De zoemerbediening is momenteel onbeschikbaar.", invalid_control_options: "De bediening biedt niet de vereiste gedocumenteerde opties.",
@@ -1068,12 +1068,18 @@ Object.assign(TEXT.en,{silentDrill:"Silent practice",chooseDrillSource:"Which de
 
 Object.assign(TEXT.nl, {
   removeOldSounder: "Oude keuze verwijderen",
+  aqara_linkage_missing: "Home Assistant ziet geen ingeschakelde Linkage alarm-entiteit bij deze melder. Kijk op de apparaatpagina ook bij de uitgeschakelde entiteiten.",
+  aqara_linkage_unavailable: "Home Assistant kan de stand van Linkage alarm op deze melder nu niet lezen. Controleer de actuele stand op de apparaatpagina.",
+  aqara_linkage_ambiguous: "Home Assistant ziet meerdere koppelschakelaars bij deze melder. Controleer welke entiteit bij de huidige Zigbee2MQTT-koppeling hoort.",
   aqara_feedback_needed: "Home Assistant heeft geen actuele stand voor het externe alarm van deze Aqara. Bekijk de sensor ‘Buzzer manual alarm’ bij dit apparaat.",
   soundAutoStop: "AlarmMesh kan het meeklinken stoppen zodra alle betrokken melders geen rook meer melden.",
   soundManualStop: "Deze melder kan meeklinken. AlarmMesh kan het geluid bij dit model niet automatisch stoppen."
 });
 Object.assign(TEXT.en, {
   removeOldSounder: "Remove old selection",
+  aqara_linkage_missing: "Home Assistant cannot find an enabled Linkage alarm entity for this detector. Check disabled entities on its device page too.",
+  aqara_linkage_unavailable: "Home Assistant cannot read this detector’s Linkage alarm setting right now. Check its current state on the device page.",
+  aqara_linkage_ambiguous: "Home Assistant sees multiple linkage switches for this detector. Check which entity belongs to the current Zigbee2MQTT connection.",
   aqara_feedback_needed: "Home Assistant has no current reading for this Aqara’s remote alarm. Look for the ‘Buzzer manual alarm’ sensor on this device.",
   soundAutoStop: "AlarmMesh can stop the sound it started once all involved detectors report no smoke.",
   soundManualStop: "This detector can sound along. AlarmMesh cannot automatically stop the sound on this model."

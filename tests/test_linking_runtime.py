@@ -235,12 +235,58 @@ async def test_settings_options_services_disabled_entities_and_ambiguity(hass, d
     assert cap.describe(d["source"])["reason"] == "service_missing"
 
 
+async def test_aqara_discovery_switch_is_device_bound_and_reports_blocker(
+    hass, devices
+):
+    add, calls, _ = devices
+    attic = add("attic", "JY-GZ-01AQ", vendor="Aqara")
+    other = add("other", "JY-GZ-01AQ", vendor="Aqara")
+    cap = Capabilities(hass)
+    registry = er.async_get(hass)
+    legacy = registry.async_get(attic["setting"])
+    owner = hass.config_entries.async_get_entry(legacy.config_entry_id)
+    uid = "sim_attic_switch_linkage_alarm_zigbee2mqtt"
+    current = registry.async_get_or_create(
+        "switch",
+        "mqtt",
+        uid,
+        config_entry=owner,
+        device_id=attic["device"],
+        suggested_object_id="renamed_attic_setting",
+    )
+    source = attic["source"]
+    hass.states.async_set(current.entity_id, "on")
+    assert cap.describe(source)["reason"] == "aqara_linkage_ambiguous"
+    assert cap.resolve(binding(hass, attic)) is None
+    registry.async_remove(legacy.entity_id)
+    assert cap.describe(source)["status"] == "linkable"
+    saved = binding(hass, attic)
+    for value, reason in (
+        ("off", "aqara_linkage_required"),
+        ("unavailable", "aqara_linkage_unavailable"),
+        ("unknown", "aqara_linkage_unavailable"),
+    ):
+        hass.states.async_set(current.entity_id, value)
+        assert cap.describe(source)["reason"] == reason
+        assert cap.resolve(saved) is None
+    hass.states.async_set(current.entity_id, "on")
+    assert cap.resolve(saved) is not None
+    registry.async_remove(current.entity_id)
+    assert hass.states.is_state(other["setting"], "on")
+    assert cap.describe(source)["reason"] == "aqara_linkage_missing"
+    assert cap.resolve(saved) is None
+    assert not calls
+
+
 async def test_write_only_aqara_uses_independent_device_feedback(hass, devices):
     add, calls, _ = devices
     origin = add("origin")
     attic = add("attic", "JY-GZ-01AQ", vendor="Aqara")
     other = add("other", "JY-GZ-01AQ", vendor="Aqara")
     cap = Capabilities(hass)
+    er.async_get(hass).async_update_entity(
+        attic["setting"], new_unique_id="sim_attic_switch_linkage_alarm_zigbee2mqtt"
+    )
     target = attic["target"]
     hass.states.async_set(target, "unknown", dict(hass.states.get(target).attributes))
     members = [origin["source"], attic["source"]]

@@ -319,7 +319,9 @@ async def main(requested):
             async def discover(
                 domain, prop, payload, uid=uid, topic=topic, device=device
             ):
-                unique = f"{uid}_{prop}_zigbee2mqtt"
+                # Zigbee2MQTT uses switch_<property> for writable binary exposes.
+                object_id = f"switch_{prop}" if domain == "switch" else prop
+                unique = f"{uid}_{object_id}_zigbee2mqtt"
                 await publish(
                     f"homeassistant/{domain}/{unique}/config",
                     {
@@ -379,7 +381,10 @@ async def main(requested):
                 await discover(
                     "button",
                     "selftest",
-                    {"command_topic": topic + "/set/selftest", "payload_press": "test"},
+                    {
+                        "command_topic": topic + "/set/selftest",
+                        "payload_press": "selftest",
+                    },
                 )
             payload = {"command_topic": topic + "/set/" + key}
             if domain == "select":
@@ -427,6 +432,15 @@ async def main(requested):
                 }
                 if gd == "switch":
                     extra["command_topic"] = topic + "/set/" + gk
+                if gk == "linkage_alarm":
+                    extra.update(
+                        payload_on="true",
+                        payload_off="false",
+                        value_template=(
+                            "{% if value_json.linkage_alarm %}true"
+                            "{% else %}false{% endif %}"
+                        ),
+                    )
                 await discover(gd, gk, extra)
             states[index] = {
                 "smoke": False,
@@ -438,6 +452,8 @@ async def main(requested):
                     {
                         gate[1]: "OFF"
                         if len(gate) == 3 and gate[2] == "off"
+                        else True
+                        if gate[1] == "linkage_alarm"
                         else "True"
                         if gate[0] == "binary_sensor"
                         else "ON"
@@ -520,6 +536,17 @@ async def main(requested):
                 await asyncio.sleep(0.05)
             raise AssertionError("Synthetic MQTT state did not arrive")
 
+        states[1]["linkage_alarm"] = False
+        await publish("alarmmesh_simulation/synthetic1", states[1])
+        await wait_state(
+            lambda: cap.describe(sources[1])["reason"] == "aqara_linkage_required"
+        )
+        states[1]["linkage_alarm"] = True
+        await publish("alarmmesh_simulation/synthetic1", states[1])
+        await wait_state(lambda: cap.describe(sources[1])["status"] == "linkable")
+        require(messages.empty(), "Changing the Aqara prerequisite sent a command")
+        passed("real_mqtt_aqara_discovery_switch_off_on")
+
         states[1]["buzzer_manual_alarm"] = True
         await publish("alarmmesh_simulation/synthetic1", states[1])
         await wait_state(
@@ -541,7 +568,7 @@ async def main(requested):
         topic, payload = await asyncio.wait_for(messages.get(), 10)
         require(
             topic == "alarmmesh_simulation/synthetic1/set/selftest"
-            and payload == "test",
+            and payload == "selftest",
             "Unexpected MQTT built-in self-test payload",
         )
         states[1]["test"] = True
