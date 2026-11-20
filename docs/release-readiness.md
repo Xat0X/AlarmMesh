@@ -1,6 +1,6 @@
-# Vrijgaveaudit na 0.1.0-beta.19
+# Vrijgaveaudit voor 0.1.0-beta.20
 
-**20 november 2026 · lokale kandidaat voor review.** Gebruik de Incidents-simulator op poort 8131. De drie belangrijkste wijzigingen zijn rechtstreeks naar actuele rook gaan vanuit een open formulier, terugkeren naar de betrokken melder en een onzekere opslag controleren met de daadwerkelijk bewaarde gegevens.
+**20 november 2026 · laatste testversie vóór de productiebeslissing.** Gebruik de Incidents-simulator op poort 8131. De drie belangrijkste wijzigingen zijn rechtstreeks naar actuele rook gaan vanuit een open formulier, terugkeren naar de betrokken melder en een onzekere opslag controleren met de daadwerkelijk bewaarde gegevens.
 
 | Taak | Wat is aangepast en hoe is het gecontroleerd? |
 | --- | --- |
@@ -19,7 +19,7 @@
 
 ### Reproduceerbare vrijgavecontroles
 
-De checkout is vergeleken met de tag `0.1.0-beta.19`. Gebruik `dev/validate.ps1` voor de volledige technische validatie en `dev/release/check-update.ps1 -PreviousRevision 0.1.0-beta.19 -HaVersion <versie>` voor de upgrade van het oude pakket naar de werkboom. De twee versies zijn 2026.10.4 en 2026.11.1. De updateproef controleert schone installatie, herstart en herstel van gestopte testbestanden. De vergelijking omvat groepsleden, expliciete koppeling, een geselecteerde telefoon met kritisch profiel, geluid, volume en een exacte onderhoudsregel. De pakketten worden tweemaal gebouwd en per bestand en SHA-256 vergeleken.
+De checkout is vergeleken met de tag `0.1.0-beta.19`. Gebruik `dev/validate.ps1` voor de volledige technische validatie en `dev/release/check-update.ps1 -PreviousRevision 0.1.0-beta.19 -HaVersion <versie> -CommittedCandidate` op de tag `0.1.0-beta.20` voor de upgrade vanaf bèta 19. De twee versies zijn 2026.10.4 en 2026.11.1. De updateproef controleert schone installatie, herstart en herstel van gestopte testbestanden. De vergelijking omvat groepsleden, expliciete koppeling, een geselecteerde telefoon met kritisch profiel, geluid, volume en een exacte onderhoudsregel. De pakketten worden tweemaal gebouwd en per bestand en SHA-256 vergeleken.
 
 **Open vóór stabiele publicatie.** De eigenaar beslist over vrijgave, licentie en distributierechten van het beeldmateriaal. Acceptatie van de eigen installatie-/back-uproute, werkelijk geluid en herstel per model/provider en bezorging op de eigen telefoons vraagt een afzonderlijke praktijktest. De lokale review gebruikte uitsluitend simulatoren en mockontvangers.
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.0-beta.20 — 2026-11-20
+
+- Open the current smoke incident directly from a maintenance task and return to the same detector. During a connection loss, the panel shows when it last received detector data.
+- Check saved groups, phone settings and maintenance notes after an interrupted save. The panel compares stored values with current edits and can verify a new group by its creation ID.
+- Verify upgrades from beta.19, including saved group membership, linked sounding choices, critical phone profiles and maintenance history.
+
 ## 0.1.0-beta.19 — 2026-11-20
 
 - Open Maintenance from the main menu and browse detectors by room. The overview links to alarm settings, silent practice and earlier activity. During a smoke report, open the current incident directly.
