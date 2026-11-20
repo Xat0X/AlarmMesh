@@ -1,7 +1,7 @@
 param(
     [ValidateSet('2026.10.4', '2026.11.1')]
     [string]$HaVersion = '2026.10.4',
-    [ValidateSet('0e7ba38', 'b2f3d7', '0.1.0-beta.14', '0.1.0-beta.15', '0.1.0-beta.16', '0.1.0-beta.17')]
+    [ValidateSet('0e7ba38', 'b2f3d7', '0.1.0-beta.14', '0.1.0-beta.15', '0.1.0-beta.16', '0.1.0-beta.17', '0.1.0-beta.18')]
     [string]$PreviousRevision = 'b2f3d7',
     [switch]$CommittedCandidate
 )

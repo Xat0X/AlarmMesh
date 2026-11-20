@@ -269,7 +269,7 @@ class PanelController:
             "alarmmesh-panel",
             sidebar_title="AlarmMesh",
             sidebar_icon="mdi:smoke-detector",
-            module_url=f"{ASSET_URL}/panel.js?v=heiman-linked-stop-1",
+            module_url=f"{ASSET_URL}/panel.js?v=panel-navigation-1",
             require_admin=True,
         )
         self.hub.controller = self

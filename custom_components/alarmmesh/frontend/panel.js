@@ -1,5 +1,5 @@
 import { exercise, incidentDetail, careView } from "./family.js?v=family-beta16";
-import { TEXT } from "./translations.js?v=heiman-linked-stop-1";
+import { TEXT } from "./translations.js?v=panel-navigation-1";
 import { Drafts } from "./drafts.js?v=family-beta16";
 
 // Safe DOM construction: names, labels and registry data are always text nodes.
@@ -21,6 +21,13 @@ const button = (label, action, cls = "button") => {
   node.addEventListener("click", action);
   return node;
 };
+
+const mainPages = [
+  ["overview", "view-dashboard-outline"], ["devices", "smoke-detector"],
+  ["groups", "select-group"], ["maintenance", "wrench-outline"], ["settings", "cog-outline"],
+];
+const parentPage = { rooms: "devices", activity: "overview", incidents: "overview",
+  matterHelp: "settings", catalog: "settings", diagnostics: "settings" };
 
 export class AlarmMeshPanel extends HTMLElement {
   constructor() {
@@ -88,6 +95,7 @@ export class AlarmMeshPanel extends HTMLElement {
         if (data.available && this.detail?.kind === "edit") this.detail.refreshSounders?.();
         if (data.available && this.detail?.kind === "alarmsettings") this.detail.refresh?.();
         if (!data.available || this.page !== "catalog" || !this.shadowRoot.querySelector(".catalog-filters")) this.render();
+        else this.updatePageSmoke(this.shadowRoot.querySelector("main"));
         if (this.detail && !["edit", "delete", "settings", "maintenance", "test", "reminder", "copy", "route", "recovery", "alarmsettings", "phoneObservation", "care"].includes(this.detail.kind)) this.renderDialog();
       }, { type: "alarmmesh/subscribe" }, { resubscribe: false });
       if (generation !== this.generation || !this.isConnected) unsubscribe()?.catch?.(() => {});
@@ -96,6 +104,7 @@ export class AlarmMeshPanel extends HTMLElement {
   }
   async go(page) {
     this.closeDialog(); this.page = page; this.render();
+    this.shadowRoot.querySelector("main h1")?.focus({preventScroll:true});
     if (page === "diagnostics") this.loadDiagnostics();
     this.shadowRoot.querySelector(".shell")?.scrollIntoView?.({ block: "start", behavior: "instant" });
     if (page === "catalog" && !this.catalog && this._hass?.user?.is_admin) {
@@ -126,7 +135,8 @@ export class AlarmMeshPanel extends HTMLElement {
     let warning=dialog.querySelector(".recovery-smoke");
     if(this.data?.result.smoke!=="SMOKE_REPORTED"){warning?.remove();return;}
     if(!warning){warning=el("p",undefined,"notice recovery-smoke");warning.setAttribute("role","alert");dialog.insertBefore(warning,dialog.children[1]);}
-    warning.textContent=`${this.t.SMOKE_REPORTED}: ${this.data.sources.filter(s=>s.status==="SMOKE_REPORTED").map(s=>`${this.sourceName(s.entity_id)}${s.capability?.matter?.source_kind === "interconnect_smoke" ? ` · ${this.t.forwardedSmoke}` : ""}`).join(", ")}`;
+    const message = `${this.t.SMOKE_REPORTED}: ${this.data.sources.filter(s=>s.status==="SMOKE_REPORTED").map(s=>`${this.sourceName(s.entity_id)}${s.capability?.matter?.source_kind === "interconnect_smoke" ? ` · ${this.t.forwardedSmoke}` : ""}`).join(", ")}`;
+    if (warning.textContent !== message) warning.textContent = message;
   }
   render() {
     this.updateRecoverySmoke();
@@ -135,7 +145,7 @@ export class AlarmMeshPanel extends HTMLElement {
     const t = this.t;
     const sticky = this.shadowRoot.activeElement;
     const stickyKey = sticky?.dataset.sticky, selection = stickyKey ? [sticky.selectionStart, sticky.selectionEnd] : null;
-    const link = el("link"); link.rel = "stylesheet"; link.href = "/alarmmesh-assets/panel.css?v=family-beta16";
+    const link = el("link"); link.rel = "stylesheet"; link.href = "/alarmmesh-assets/panel.css?v=panel-navigation-1";
     const shell = el("div", undefined, "shell");
     shell.classList.toggle("dark", Boolean(this._hass?.themes?.darkMode));
     const side = el("aside");
@@ -143,20 +153,28 @@ export class AlarmMeshPanel extends HTMLElement {
     const image = el("img"); image.src = "/alarmmesh-brand/icon.png"; image.alt = "";
     brand.append(image, el("strong", "AlarmMesh")); side.append(brand);
     const nav = el("nav"); nav.setAttribute("aria-label", "AlarmMesh");
-    for (const [page, symbol] of [["overview", "view-dashboard-outline"], ["devices", "smoke-detector"], ["rooms", "floor-plan"], ["groups", "select-group"], ["settings", "cog-outline"]]) {
+    for (const [page, symbol] of mainPages) {
       const item = button(t[page], () => this.go(page), "nav-item"); item.prepend(icon(symbol));
-      item.dataset.page = page;
+      item.dataset.page = page; item.dataset.sticky = "nav-" + page;
       if (this.page === page) item.setAttribute("aria-current", "page");
+      else if (parentPage[this.page] === page) item.setAttribute("aria-current", "location");
       nav.append(item);
     }
-    side.append(nav, el("small", t.noEvents, "side-note"));
+    side.append(nav);
     const workspace = el("div", undefined, "workspace");
     const header = el("header");
     const menu = button("☰", () => this.dispatchEvent(new CustomEvent("hass-toggle-menu", { bubbles: true, composed: true })), "menu-button");
     menu.setAttribute("aria-label", "Home Assistant menu");
     header.append(menu, icon("home-outline"), el("span", this.page === "diagnostics" ? "AlarmMesh" : this.data?.title || "AlarmMesh"), el("span", "", "muted"));
     const main = el("main");
-    main.append(el("h1", t[this.page]));
+    const heading = el("h1", t[this.page]);
+    heading.dataset.sticky = "heading-" + this.page;
+    heading.tabIndex = -1;
+    if (parentPage[this.page] && this.page !== "rooms") {
+      const back = button(t[parentPage[this.page]], () => this.go(parentPage[this.page]), "back-link");
+      back.prepend(icon("arrow-left")); main.append(back);
+    }
+    main.append(heading);
     if (this.page === "groups") main.append(el("p", t.groupIntro, "subtitle"));
     if (!this._hass?.user?.is_admin) main.append(el("p", t.restricted, "notice"));
     else if (!this.data) {
@@ -166,6 +184,18 @@ export class AlarmMeshPanel extends HTMLElement {
       main.append(message);
     } else {
       const data = this.data;
+      this.updatePageSmoke(main);
+      if (this.page === "devices" || this.page === "rooms") {
+        const views = el("div", undefined, "detector-views");
+        views.setAttribute("role", "group"); views.setAttribute("aria-label", t.detectorView);
+        for (const page of ["devices", "rooms"]) {
+          const item = button(page === "rooms" ? t.byRoom : t.allDetectors, () => this.go(page));
+          item.dataset.page = page; item.dataset.sticky = "view-" + page;
+          if (page === this.page) item.setAttribute("aria-current", "page");
+          views.append(item);
+        }
+        main.append(views);
+      }
       if (this.page === "overview") this.renderOverview(main);
       if (this.page === "catalog") this.renderCatalog(main);
       if (this.page === "settings") this.renderSettings(main);
@@ -192,16 +222,51 @@ export class AlarmMeshPanel extends HTMLElement {
         }
         main.append(cards);
       }
-      if (!data.sources.length && this.page !== "overview") main.append(el("p", t.empty, "notice"), button(t.choose, () => this.choose(), "button primary"));
+      if (!data.sources.length && !["overview", "devices", "maintenance", "settings"].includes(this.page)) main.append(el("p", t.empty, "notice"), button(t.choose, () => this.choose(), "button primary"));
     }
     main.append(el("footer", t.note)); workspace.append(header, main); shell.append(side, workspace);
     // Keep an open form separate: push updates never erase unsaved input or focus.
     const previous = this.shadowRoot.querySelector(".shell");
+    shell.dataset.view = this.page;
+    if (previous?.dataset.view === this.page && this.data) {
+      for (const selector of [".more-filters", ".settings-help", ".phone-settings-summary"]) {
+        const before = previous.querySelector(selector), after = shell.querySelector(selector);
+        if (before && after) after.open = before.open;
+      }
+    }
     if (previous) previous.replaceWith(shell);
     else this.shadowRoot.append(link, shell);
     if (stickyKey) { const field = [...shell.querySelectorAll('[data-sticky]')].find(n=>n.dataset.sticky === stickyKey); field?.focus({preventScroll:true}); if (field?.setSelectionRange && selection[0] != null) field.setSelectionRange(...selection); }
   }
   section(title, action) { const node = el("div", undefined, "section-head"); if (title) node.append(el("h2", title)); if (action) node.append(action); return node; }
+  updatePageSmoke(main) {
+    const existing = main?.querySelector(".page-smoke");
+    if (!main || this.data?.result.smoke !== "SMOKE_REPORTED" || this.page === "overview" ||
+        (this.page === "incidents" && !this.linkedIncident)) {
+      existing?.remove();
+      return;
+    }
+    const t = this.t;
+    const names = this.data.sources.filter(s => s.status === "SMOKE_REPORTED").map(s =>
+      this.sourceName(s.entity_id) + (s.capability?.matter?.source_kind === "interconnect_smoke" ? " · " + t.forwardedSmoke : "")).join(", ");
+    const banner = existing || el("section", undefined, this.page === "devices" ? "page-smoke filter-alarm" : "page-smoke");
+    if (!existing) {
+      const warning = el("div");
+      warning.setAttribute("role", "alert");
+      warning.append(el("strong", t.SMOKE_REPORTED), el("span", names));
+      if (this.page === "devices") warning.append(el("small", t[this.data.result.availability]));
+      banner.append(icon("fire"), warning, this.incidentButton());
+      main.querySelector("h1").after(banner);
+    } else if (banner.querySelector("span").textContent !== names) {
+      banner.querySelector("span").textContent = names;
+    }
+  }
+  incidentButton() {
+    return button(this.t.viewIncidents, () => {
+      this.linkedIncident = null;
+      this.go("incidents");
+    }, "button incident-link");
+  }
   renderOverview(main) {
     const t = this.t, data = this.data, smoke = data.result.smoke;
     if (!data.sources.length) {
@@ -236,15 +301,19 @@ export class AlarmMeshPanel extends HTMLElement {
     }
     main.append(hero);
     this.renderDrafts(main);
-    hero.append(button(t.viewIncidents, () => this.go("incidents"), "button incident-link"));
-    hero.append(button(t.activity, () => this.go("activity")));
-    hero.append(button(t.maintenance, () => this.go("maintenance"), "button maintenance-link"));
-    hero.append(button(t.silentDrill,()=>this.openDialog({kind:"drill"})));
-    hero.append(button(t.myAlarmSettings,()=>this.openDialog({kind:'alarmsettings'})));
+    if (smoke === "SMOKE_REPORTED") hero.append(this.incidentButton());
     const stats = el("div", undefined, "stats");
-    for (const [label, value, note] of [[t.sources, `${data.usable} / ${data.sources.length}`, data.usable === 1 ? t.usableSource : t.usable], [t.rooms, data.rooms.filter(r => r.id).length, "Home Assistant"], [t.groups, data.groups.length, t.organized]]) {
-      const destination = label === t.sources ? "devices" : label === t.rooms ? "rooms" : "groups";
-      const stat = button("", () => this.go(destination), "stat"); stat.setAttribute("aria-label", t[destination]); stat.append(el("span", label), el("strong", value), el("small", note)); stats.append(stat);
+    for (const [destination, value, note] of [
+      ["devices", String(data.usable) + " / " + data.sources.length, data.usable === 1 ? t.usableSource : t.usable],
+      ["rooms", data.rooms.filter(room => room.id).length, "Home Assistant"],
+      ["groups", data.groups.length, t.organized],
+    ]) {
+      const stat = button("", () => this.go(destination), "stat");
+      const count = el("strong", value), caption = el("small", note);
+      count.id = "stat-count-" + destination; caption.id = "stat-note-" + destination;
+      stat.setAttribute("aria-label", t[destination]);
+      stat.setAttribute("aria-describedby", count.id + " " + caption.id);
+      stat.append(el("span", t[destination]), count, caption); stats.append(stat);
     }
     main.append(stats);
     const incident = data.incident;
@@ -261,10 +330,27 @@ export class AlarmMeshPanel extends HTMLElement {
       }
       main.append(section);
     }
+    const tasks = el("section", undefined, "overview-tasks");
+    tasks.setAttribute("aria-label", t.overviewActions);
+    for (const [key, symbol, title, hint, action] of [
+      ["route", "routes", t.myAlarmSettings, t.alarmSettingsHint, () => this.openDialog({kind:"alarmsettings"})],
+      ["drill", "map-marker-path", t.silentDrill, t.practiceHint, () => this.openDialog({kind:"drill"})],
+      ["activity", "history", t.activity, t.historyHint, () => this.go("activity")],
+    ]) {
+      if (smoke === "SMOKE_REPORTED" && key === "drill") continue;
+      const tile = button("", action, "overview-task");
+      tile.dataset.task = key; tile.dataset.sticky = "task-" + key;
+      const copy = el("span"); copy.append(el("strong", title), el("small", hint));
+      const hintId = "task-hint-" + key;
+      copy.lastElementChild.id = hintId;
+      tile.setAttribute("aria-label", title);
+      tile.setAttribute("aria-describedby", hintId);
+      tile.append(icon(symbol), copy, icon("chevron-right")); tasks.append(tile);
+    }
+    main.append(tasks);
     this.renderSetupGuide(main);
 
-    const allRooms = button("→", () => this.go("rooms"));
-    allRooms.setAttribute("aria-label", t.rooms);
+    const allRooms = button(t.allRooms, () => this.go("rooms"));
     main.append(this.section(t.rooms, allRooms)); this.roomCards(main, data.rooms);
   }
   renderSetupGuide(parent) {
@@ -480,7 +566,11 @@ export class AlarmMeshPanel extends HTMLElement {
     this.detail?.dispose?.();
     this.shadowRoot?.querySelector("dialog")?.remove(); this.detail = null;
     if (this.previousFocus?.isConnected) this.previousFocus.focus();
-    else this.shadowRoot?.querySelector('[aria-current="page"]')?.focus();
+    else {
+      const key = this.previousFocus?.dataset.sticky;
+      const replacement = key && [...this.shadowRoot.querySelectorAll("[data-sticky]")].find(node => node.dataset.sticky === key);
+      (replacement || this.shadowRoot?.querySelector('main h1'))?.focus({preventScroll:true});
+    }
   }
   renderDialog() {
     if (!this.detail || !this.data) return;
@@ -491,6 +581,7 @@ export class AlarmMeshPanel extends HTMLElement {
     if (first) { dialog = el("dialog"); this.shadowRoot.append(dialog); }
     else dialog.replaceChildren();
     dialog.classList.toggle("dark", Boolean(this._hass?.themes?.darkMode));
+    dialog.removeAttribute("aria-labelledby");
     dialog.setAttribute("aria-label", t.details);
     const close = button(t.close, () => this.closeDialog());
     dialog.append(close);
@@ -604,6 +695,8 @@ export class AlarmMeshPanel extends HTMLElement {
         await this.mutate({ operation: "delete", group_id: detail.group.id, revision: detail.revision }, error);
       }, "button destructive"));
     }
+    const title = dialog.querySelector("h2");
+    if (title) { title.id = "detail-heading"; dialog.setAttribute("aria-labelledby", title.id); }
     this.updateRecoverySmoke();
     dialog.oncancel = () => this.closeDialog();
     if (first) { dialog.showModal(); close.focus(); }
@@ -896,8 +989,6 @@ export class AlarmMeshPanel extends HTMLElement {
   renderSettings(parent) {
     const t=this.t,a=this.data.automation,d=this.data;
     if(!a){this.renderSetupGuide(parent);return;}
-    parent.append(el('p',t.settingsIntro,'section-note'));
-    parent.append(button(t.myAlarmSettings,()=>this.openDialog({kind:'alarmsettings'})));
     const grid=el('div',undefined,'settings-grid');
     const card=(key,title,summary,label,action,primary=false)=>{
       const box=el('section',undefined,'notice settings-task');box.dataset.setting=key;
@@ -905,10 +996,11 @@ export class AlarmMeshPanel extends HTMLElement {
     };
     card('detectors',t.settingsDetectors,`${this.detectorCount(d.sources.length)} · ${t[d.result.availability]}`,t.choose,()=>this.choose(),!d.sources.length);
     const linked=d.groups.filter(g=>g.linking?.enabled).length;
-    const groupCard=card('groups',t.settingsGroups,`${d.groups.length} ${t.groups.toLowerCase()} · ${linked} ${t.groupsSoundOn}`,t.manageGroups,()=>this.go('groups'));
+    const groupCard=card('groups',t.settingsGroups,`${d.groups.length} ${d.groups.length === 1 ? t.groupSingular : t.groups.toLowerCase()} · ${linked} ${t.groupsSoundOn}`,t.manageGroups,()=>this.go('groups'));
     groupCard.append(el('p',t.groupSetupNote));
     const selected=a.settings.recipients.filter(r=>r.enabled).length;
-    const phones=card('phones',t.settingsPhones,`${selected} ${t.phonesChosen} · ${t[a.settings.enabled?'automaticOn':'automaticOff']}`,t.configureNotifications,()=>this.openDialog({kind:'settings'}),Boolean(d.sources.length));
+    const phones=card('phones',t.settingsPhones,`${selected} ${selected === 1 ? t.phoneChosen : t.phonesChosen} · ${t[a.settings.enabled?'automaticOn':'automaticOff']}`,t.configureNotifications,()=>this.openDialog({kind:'settings'}),Boolean(d.sources.length));
+    if (d.sources.length) grid.prepend(phones);
     if(a.settings.recipients.length){
       const details=el('details',undefined,'phone-settings-summary');details.append(el('summary',t.savedPhones));
       for(const r of a.settings.recipients){const name=a.recipients.find(p=>p.service===r.service)?.name || r.service.replace(/^mobile_app_/,'');
@@ -924,10 +1016,10 @@ export class AlarmMeshPanel extends HTMLElement {
     this.phoneEvidenceList(phones);
     if(a.error)phones.append(el('p',t[a.error] || t.error,'warning-text'));
     const actions=d.groups.filter(g=>g.actions?.enabled).length;
-    groupCard.append(el('p',`${actions} ${t.groupsActionsOn}`));
+    groupCard.append(el('p',`${actions} ${actions === 1 ? t.groupActionsOn : t.groupsActionsOn}`));
     const maintenance=card('maintenance',t.settingsMaintenance,t.maintenanceSetupShort,t.maintenance,()=>this.go('maintenance'));
     if(d.maintenance)maintenance.append(el('p',`${t.maintenanceNotifications}: ${t[d.maintenance.settings.enabled?'enabled':'disabled']}`));
-    parent.append(grid);
+    parent.append(grid, button(t.myAlarmSettings, () => this.openDialog({kind:'alarmsettings'})));
     const help=el('details',undefined,'advanced-options settings-help');help.append(el('summary',t.installationAndHelp));this.renderSetupGuide(help);
     help.append(button(t.matterHelp,()=>this.go('matterHelp')),button(t.catalog,()=>this.go('catalog')),button(t.diagnostics,()=>this.go('diagnostics')));parent.append(help);
   }
@@ -1641,13 +1733,28 @@ export class AlarmMeshPanel extends HTMLElement {
   }
   renderDevices(parent) {
     const t=this.t, data=this.data, f=this.deviceFilters;
-    const status=el("section",undefined,"notice filter-alarm"); status.append(this.badge(data.result),el("p",t[data.result.availability])); parent.append(status);
+    if (data.result.smoke !== "SMOKE_REPORTED") {
+      const status=el("section",undefined,"notice filter-alarm");
+      status.append(this.badge(data.result),el("p",t[data.result.availability])); parent.append(status);
+    }
     if(!data.sources.length) return;
     const bar=el("div",undefined,"filter-bar device-filters"), results=el("section",undefined,"filtered-devices");
-    const draw=()=> { results.replaceChildren(); const rows=data.sources.filter(s=>{
+    const clearFilters = () => {
+      for (const key of Object.keys(f)) f[key] = "";
+      this.render();
+      this.shadowRoot.querySelector('[name="device-name"]')?.focus();
+    };
+    const draw=()=> { results.replaceChildren(); const term = f.name.trim().toLocaleLowerCase(); const rows=data.sources.filter(s=>{
       const h=s.capability?.details?.maintenance, attention=h?.end_of_service===true || h?.fault===true || h?.battery_low===true || h?.battery_percent!=null && h.battery_percent<=20;
-      return (!f.name || s.name.toLocaleLowerCase().includes(f.name.toLocaleLowerCase())) && (!f.room || (s.area_id || "none")===f.room) && (!f.group || s.groups.includes(f.group)) && (!f.provider || (s.capability?.origin === "zigbee2mqtt" ? "mqtt" : s.capability?.origin || "unknown_origin")===f.provider) && (!f.status || (f.status==="unusable" ? ["UNREACHABLE","MISSING"].includes(s.status) : s.status===f.status)) && (!f.maintenance || (f.maintenance==="attention" ? attention : h?.fault==null && h?.battery_low==null && h?.battery_percent==null));
-    }); if(!rows.length) results.append(el("p",t.noFilterResults,"notice")); else this.sourceList(results,rows); };
+      return (!term || [s.name, s.area_name].some(label => label?.toLocaleLowerCase().includes(term))) && (!f.room || (s.area_id || "none")===f.room) && (!f.group || s.groups.includes(f.group)) && (!f.provider || (s.capability?.origin === "zigbee2mqtt" ? "mqtt" : s.capability?.origin || "unknown_origin")===f.provider) && (!f.status || (f.status==="unusable" ? ["UNREACHABLE","MISSING"].includes(s.status) : s.status===f.status)) && (!f.maintenance || (f.maintenance==="attention" ? attention : h?.fault==null && h?.battery_low==null && h?.battery_percent==null));
+    });
+      if (rows.length) this.sourceList(results, rows);
+      else {
+        const empty = el("div", undefined, "notice");
+        empty.append(el("p", t.noFilterResults), button(t.clearFilters, clearFilters));
+        results.append(empty);
+      }
+    };
     const field=(label,key,choices)=>this.filterField(bar,label,`device-${key}`,f[key],choices,value=>{ f[key]=value; draw(); });
     field(t.findDetector,"name"); field(t.room,"room",data.rooms.map(r=>[r.id || "none",r.name || t.noRoom])); field(t.groups,"group",data.groups.map(g=>[g.id,g.name])); field(t.provider,"provider",[["mqtt",t.zigbee2mqtt],["zha",t.zha],["matter",t.matter],["zwave_js",t.zwave_js],["unknown_origin",t.unknown_origin]]);
     field(t.state,"status",[["SMOKE_REPORTED",t.SMOKE_REPORTED],["unusable",t.unavailable],["UNKNOWN",t.UNKNOWN]]); field(t.maintenance,"maintenance",[["attention",t.attention],["unknown",t.missingInformation]]);
@@ -1655,11 +1762,12 @@ export class AlarmMeshPanel extends HTMLElement {
     filters.open = Object.entries(f).some(([key, value]) => key !== "name" && value);
     filters.append(el("summary", t.moreFilters));
     for (const field of [...bar.children].slice(1)) filters.append(field);
-    filters.append(button(t.clearFilters, () => { for (const key of Object.keys(f)) f[key] = ""; this.render(); }));
+    filters.append(button(t.clearFilters, clearFilters));
     bar.append(filters); parent.append(bar,results); draw();
   }
   renderActivity(parent) {
     const t=this.t, history=this.data.activity, f=this.activityFilters;
+    parent.append(this.incidentButton());
     parent.append(el("p",t.activitySummary,"section-note"));const limits=el('details',undefined,'activity-limits');limits.append(el('summary',t.aboutInformation),el('p',t.activityLimit));parent.append(limits);
     if(!history) {parent.append(el("p",t.guide_unknown));return;}
     if(history.incomplete) parent.append(el("p",t.activityIncomplete,"notice warning-text"));

@@ -502,8 +502,8 @@ Object.assign(TEXT.nl, {
 Object.assign(TEXT.en,{count_activity_events:"Recorded activity entries",count_reminders:"Configured reminders"});
 Object.assign(TEXT.nl,{count_activity_events:"Geregistreerde activiteiten",count_reminders:"Ingestelde herinneringen"});
 
-Object.assign(TEXT.en,{findDetector:"Find detector",saveReminder:"Save reminder",chooseRecipient:"Choose a recipient"});
-Object.assign(TEXT.nl,{findDetector:"Zoek melder",saveReminder:"Herinnering bewaren",chooseRecipient:"Kies een ontvanger"});
+Object.assign(TEXT.en,{findDetector:"Search by detector or room",saveReminder:"Save reminder",chooseRecipient:"Choose a recipient"});
+Object.assign(TEXT.nl,{findDetector:"Zoek op melder of ruimte",saveReminder:"Herinnering bewaren",chooseRecipient:"Kies een ontvanger"});
 
 Object.assign(TEXT.en,{removeReminder:"Remove reminder"});
 Object.assign(TEXT.nl,{removeReminder:"Herinnering verwijderen"});
@@ -1083,4 +1083,17 @@ Object.assign(TEXT.en, {
   aqara_feedback_needed: "Home Assistant has no current reading for this Aqara’s remote alarm. Look for the ‘Buzzer manual alarm’ sensor on this device.",
   soundAutoStop: "AlarmMesh can stop the sound it started once all involved detectors report no smoke.",
   soundManualStop: "This detector can sound along. AlarmMesh cannot automatically stop the sound on this model."
+});
+
+Object.assign(TEXT.nl, {
+  groupSingular: "groep", groupActionsOn: "groep met extra acties aan", phoneChosen: "telefoon gekozen",
+  detectorView: "Melders weergeven", allDetectors: "Alle melders", byRoom: "Per ruimte", allRooms: "Alle ruimtes",
+  overviewActions: "Alarm bekijken en oefenen", alarmSettingsHint: "Bekijk wie een melding krijgt en welke melders meeklinken.",
+  practiceHint: "Volg een rookmelding stap voor stap op het scherm.", historyHint: "Bekijk eerdere meldingen en acties."
+});
+Object.assign(TEXT.en, {
+  groupSingular: "group", groupActionsOn: "group with extra actions enabled", phoneChosen: "phone selected",
+  detectorView: "Detector view", allDetectors: "All detectors", byRoom: "By room", allRooms: "All rooms",
+  overviewActions: "Alarm routes and practice", alarmSettingsHint: "See who gets notified and which detectors can sound together.",
+  practiceHint: "Follow a smoke report step by step on screen.", historyHint: "Review earlier reports and actions."
 });

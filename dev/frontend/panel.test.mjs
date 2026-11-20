@@ -37,7 +37,7 @@ test("four screens use pushed data, safe long labels and existing HA metadata", 
     root.querySelector(`[data-page="${page}"]`).click();
     assert.equal(root.querySelector('[aria-current="page"]').dataset.page, page);
   }
-  assert.equal(root.querySelector(".section-head button").getAttribute("aria-label"), "Rooms");
+  assert.equal(root.querySelector(".section-head button").textContent, "All rooms");
   panel.go("devices");
   assert.ok([...root.childNodes].map(n => n.textContent).join("").includes(data.sources[0].name));
   assert.equal(root.querySelectorAll(".source img").length, 0);
@@ -986,7 +986,7 @@ test("member search hides rows without losing selected members and origin counts
 });
 
 test("detector search and reminder controls use their own bilingual labels",()=>{
- for(const [lang,search,save,choose] of [['nl','Zoek melder','Herinnering bewaren','Kies een ontvanger'],['en','Find detector','Save reminder','Choose a recipient']]) {
+ for(const [lang,search,save,choose] of [['nl','Zoek op melder of ruimte','Herinnering bewaren','Kies een ontvanger'],['en','Search by detector or room','Save reminder','Choose a recipient']]) {
   const {panel,root,transport}=setup(lang);const data=normal();data.sources[0].reminder_identity='a'.repeat(64);data.reminders={items:[],revision:0,time_zone:'Europe/Brussels'};data.automation={recipients:[{service:'mobile_app_mock',name:'SIMULATED phone'}]};transport.callbacks.at(-1)(data);
   panel.go('devices');assert.equal(root.querySelector('[name="device-name"]').parentNode.textContent,search);
   panel.openDialog({kind:'reminder',id:source.entity_id});assert.equal(root.querySelector('dialog [type="submit"]').textContent,save);assert.equal(root.querySelector('[name="reminder-recipient"] option').textContent,choose);panel.remove();
@@ -1421,7 +1421,7 @@ test("task settings separate global phone choices from per-group outputs without
   v.transport.callbacks.at(-1)(data);v.panel.go('settings');
   assert.equal(v.root.querySelectorAll('.settings-task').length,4);
   assert.ok(v.root.querySelector('[data-setting=groups]').textContent.includes('1 met samen afgaan ingeschakeld'));
-  assert.ok(v.root.querySelector('[data-setting=groups]').textContent.includes('1 groepen met extra acties aan'));
+  assert.ok(v.root.querySelector('[data-setting=groups]').textContent.includes('1 groep met extra acties aan'));
   assert.ok(v.root.querySelector('[data-setting=phones]').textContent.includes('Automatisch melden uit'));
   assert.equal(v.root.querySelectorAll('.settings-grid .primary').length,1);assert.deepEqual(v.calls,[]);v.panel.remove();
 });
@@ -1706,4 +1706,72 @@ test("old incident link shows current smoke before the cleared history", () => {
   assert.equal(v.panel.linkedIncident, "old");
   assert.deepEqual(v.calls, []);
   v.panel.remove();
+});
+
+test("primary navigation exposes maintenance and room views in both languages", () => {
+  for (const language of ["nl", "en"]) {
+    const { panel, root, calls } = setup(language);
+    assert.deepEqual([...root.querySelectorAll("aside nav button")].map(b => b.dataset.page),
+      ["overview", "devices", "groups", "maintenance", "settings"]);
+    root.querySelector('aside [data-page="devices"]').click();
+    root.querySelector('.detector-views [data-page="rooms"]').click();
+    assert.equal(root.querySelector("main h1").textContent, panel.t.rooms);
+    assert.equal(root.querySelector('aside [aria-current="location"]').dataset.page, "devices");
+    root.querySelector('aside [data-page="maintenance"]').click();
+    assert.equal(panel.page, "maintenance");
+    assert.deepEqual(calls, []);
+    panel.remove();
+  }
+});
+
+test("daily routes keep the live incident separate from practice and archived links", () => {
+  const { panel, root, transport, calls } = setup();
+  root.querySelector('[data-task="drill"]').click();
+  assert.equal(panel.detail.kind, "drill");
+  panel.closeDialog();
+  const snapshot = normal();
+  snapshot.result.smoke = snapshot.sources[0].status = "SMOKE_REPORTED";
+  transport.callbacks.at(-1)(snapshot);
+  assert.equal(root.querySelector('[data-task="drill"]'), null);
+  assert.ok(root.querySelector(".hero .incident-link"));
+  panel.go("groups");
+  assert.ok(root.querySelector(".page-smoke").textContent.includes(snapshot.sources[0].name));
+  panel.linkedIncident = "previous";
+  root.querySelector(".page-smoke button").click();
+  assert.equal(panel.page, "incidents"); assert.equal(panel.linkedIncident, null);
+  panel.go("settings");
+  transport.event("disconnected");
+  assert.equal(root.querySelector(".page-smoke"), null);
+  assert.deepEqual(calls, []);
+  panel.remove();
+});
+
+test("settings follow setup order and open filters survive a live update", () => {
+  const { panel, root, transport } = setup();
+  const snapshot = phoneData();
+  transport.callbacks.at(-1)(snapshot); panel.go("settings");
+  assert.equal(root.querySelector(".settings-task").dataset.setting, "phones");
+  panel.go("devices");
+  root.querySelector(".more-filters").open = true;
+  transport.callbacks.at(-1)(snapshot);
+  assert.equal(root.querySelector(".more-filters").open, true);
+  snapshot.sources = []; snapshot.usable = 0;
+  transport.callbacks.at(-1)(snapshot); panel.go("settings");
+  assert.equal(root.querySelector(".settings-task").dataset.setting, "detectors");
+  panel.remove();
+});
+
+test("detector search finds a room and can reset an empty result in place", () => {
+  const { panel, root, transport, calls } = setup("nl");
+  const d = normal();
+  d.sources[0].area_name = "Bovenverdieping";
+  transport.callbacks.at(-1)(d); panel.go("devices");
+  const search = root.querySelector('[name="device-name"]');
+  search.value = "  BOVEN  "; search.dispatchEvent(new Event("input"));
+  assert.equal(root.querySelectorAll(".filtered-devices .source").length, 1);
+  search.value = "kelder"; search.dispatchEvent(new Event("input"));
+  root.querySelector(".filtered-devices .notice button").click();
+  assert.equal(root.querySelector('[name="device-name"]').value, "");
+  assert.equal(root.querySelectorAll(".filtered-devices .source").length, 1);
+  assert.deepEqual(calls, []); panel.remove();
 });

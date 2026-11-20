@@ -276,3 +276,39 @@ dialog:has(.exercise) > button:first-child { position: relative; z-index: 1; }
 .exercise-example .exercise-branches section p { margin: 4px 0 0; }
 
 .binding-row .sound-choice{display:flex;align-items:center;gap:12px;min-height:44px}.binding-row .binding-help{margin:4px 0 8px}
+
+/* Primary navigation and everyday tasks share the panel's theme and touch targets. */
+.nav-item[aria-current=location] { background:var(--soft); color:var(--teal); font-weight:650; }
+.detector-views { display:inline-flex; flex-wrap:wrap; gap:3px; padding:3px; background:var(--soft); border-radius:12px; }
+.detector-views .button { border:1px solid transparent; background:transparent; color:var(--muted); }
+.detector-views [aria-current=page] { background:var(--surface); border-color:var(--line); color:var(--ink); font-weight:650; }
+.back-link { display:inline-flex; align-items:center; gap:8px; min-height:44px; margin-bottom:6px; padding:0 6px 0 0; border:0; color:var(--teal); background:transparent; }
+.overview-tasks { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr)); margin:20px 0; gap:12px; }
+.overview-task { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:12px; min-height:74px; width:100%; padding:16px; border:1px solid var(--line); border-radius:14px; background:var(--surface); color:var(--ink); text-align:start; }
+.overview-task > ha-icon:first-child { color:var(--teal); }
+.overview-task > ha-icon:last-child { width:16px; height:16px; --mdc-icon-size:16px; color:var(--muted); }
+.overview-task small { margin-top:3px; color:var(--muted); font-size:13px; }
+.overview-task:hover, .stat:hover { border-color:var(--teal); }
+.hero { min-height:0; }
+.page-smoke { display:flex; align-items:center; flex-wrap:wrap; gap:10px; margin:0 0 18px; padding:14px; border:2px solid var(--alarm); border-radius:12px; color:var(--alarm); background:var(--surface); }
+.page-smoke > div { flex:1; min-width:min(14ch,100%); overflow-wrap:anywhere; }
+.page-smoke span { display:block; }
+.page-smoke .incident-link, .hero .incident-link { color:var(--alarm); border-color:currentColor; }
+h1:focus-visible { outline:2px solid var(--teal); outline-offset:4px; border-radius:4px; }
+h1:focus:not(:focus-visible) { outline:none; }
+.workspace { container-type:inline-size; }
+.stat { display:flex; flex-direction:column; align-items:flex-start; }
+@container (max-width:860px) {
+  .overview-tasks { grid-template-columns:1fr; gap:0; border:1px solid var(--line); border-radius:14px; background:var(--surface); }
+  .overview-task { background:transparent; border:0; border-radius:0; }
+  .overview-task + .overview-task { border-top:1px solid var(--line); }
+  .overview-task:focus-visible { outline-offset:-4px; }
+}
+@media (max-width:620px) {
+  .shell { padding-bottom:calc(76px + env(safe-area-inset-bottom)); }
+  aside nav { grid-template-columns:repeat(5,minmax(0,1fr)); gap:0; padding-inline:0; }
+  aside .nav-item { min-width:0; min-height:52px; padding-inline:1px; font-size:clamp(10px,2.85vw,12px); }
+  .hero > .incident-link { margin:12px 0 0; }
+  .stats { grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; }
+  .stat { padding:10px 8px; }
+}

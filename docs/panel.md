@@ -9,6 +9,14 @@ with per-detector routes and links to the existing configuration screens.
 Phone test observations are explicitly user-reported; incident chronology stays
 separate from current smoke. See the [five-minute tour and local evidence](alarm-settings-review.md).
 
+## Find a task
+
+- Open **Maintenance** in the main menu for battery readings, connectivity problems and reminders.
+- Open **Detectors → By room** to browse the same detectors by their Home Assistant room.
+- Choose **Overview → Silent practice** to walk through a smoke report on screen, or **Overview → Activity** to review earlier events.
+- An active smoke report has a direct link to current incident details while you browse other pages.
+- In **Settings**, new installations start with detector selection. Once a detector is selected, phone notifications appear first.
+
 ## Open and choose sources
 
 After configuring AlarmMesh, administrators see **AlarmMesh** in the HA sidebar
@@ -45,7 +53,7 @@ navigation. All new automatic delivery starts off; no existing setting is enable
   source entity, assigned area, known device/model/manufacturer and groups. The
   Home Assistant button opens HA's entity information. No model, battery level or
   radio-contact time is guessed. Available cached diagnostics are shown when HA exposes them; missing data stays unavailable.
-- **Rooms** uses HA assignments, with entity assignment before device assignment.
+- **Detectors → By room** uses HA assignments, with entity assignment before device assignment.
   Only areas containing selected sources appear; others are under **No area**.
   Change assignments in HA, not in a second AlarmMesh room registry.
 - **Groups** lets administrators create, rename, edit memberships and delete an
@@ -58,8 +66,7 @@ navigation. All new automatic delivery starts off; no existing setting is enable
   the source-to-target preview and acknowledge its limits before saving. The
   [linking guide](linked-sounding.md) lists profiles and stopping restrictions.
 
-**Settings** presents five tasks: choose detectors, set up groups, choose phones,
-choose extra actions and review maintenance. Each shows its current setting.
+**Settings** shows the current choices for phone notifications, detectors, groups and maintenance. Group settings include optional actions.
 **Set up phone alerts** opens the phone form with separate iPhone/Android controls,
 permission help, save and test steps. Saving sends nothing. **Prepare test
 notification** previews the request; only separate confirmation sends it.

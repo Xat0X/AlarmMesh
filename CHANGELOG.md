@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.0-beta.19 — 2026-11-20
+
+- Open Maintenance from the main menu and browse detectors by room. The overview links to alarm settings, silent practice and earlier activity. During a smoke report, open the current incident directly.
+- New installations start Settings with detector selection. Configured installations show phone notifications first.
+
 ## 0.1.0-beta.18 — 2026-11-20
 
 - Automatically stop linked sounding on six additional Zigbee2MQTT Heiman models, including S1-M. All contributing detectors and the sounding detector must explicitly report clear. Previously selected targets from these six models require confirmation in Groups.
