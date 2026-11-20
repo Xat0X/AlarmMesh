@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.0-beta.18 — 2026-11-20
+
+- Automatically stop linked sounding on six additional Zigbee2MQTT Heiman models, including S1-M. All contributing detectors and the sounding detector must explicitly report clear. Previously selected targets from these six models require confirmation in Groups.
+
 ## 0.1.0-beta.17 — 2026-11-19
 
 - Recognize Zigbee2MQTT discovery switch identifiers for Aqara, Bosch and ShinaSystem. Explain a missing, unreadable or duplicate Aqara linkage switch separately from an off switch. An open group editor now updates the affected checkbox while preserving other edits.

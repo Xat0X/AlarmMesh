@@ -1632,17 +1632,19 @@
             "reboot_count"
           ],
           "activation": "implemented",
-          "profile": "heiman_activation_mqtt",
-          "stop": "not_authorized",
+          "profile": "heiman_cascade_mqtt",
+          "stop": "implemented",
           "self_test": "implemented_read_only",
           "requirements": [
             "Eligible selected binary_sensor smoke entity on the same registry device/config entry; exact matching control, features/options and explicit admin confirmation.",
-            "ZHA route is basic IAS WD, not MQTT automation-only cascade control; activation only, no automatic stop."
+            "ZHA route is basic IAS WD, not MQTT automation-only cascade control; activation only, no automatic stop.",
+            "Stop applies to the attributed external smoke_siren on deviceCascadeState. The target and every contributing smoke source must currently report clear."
           ],
           "gaps": [],
           "sources": [
             "https://www.zigbee2mqtt.io/devices/HM-636THV-AC-M.html",
-            "https://github.com/Koenkk/zigbee-herdsman-converters/blob/afdaa028a0972d801da762196ddfb2df631ea0cc/src/devices/heiman.ts"
+            "https://github.com/Koenkk/zigbee-herdsman-converters/blob/afdaa028a0972d801da762196ddfb2df631ea0cc/src/devices/heiman.ts",
+            "https://github.com/Koenkk/zigbee-herdsman-converters/blob/a2573dbbd7b5d28916c9007fd0f9e469b89befde/src/devices/heiman.ts"
           ]
         },
         "zha": {
@@ -1866,16 +1868,18 @@
             "reboot_count"
           ],
           "activation": "implemented",
-          "profile": "heiman_activation_mqtt",
-          "stop": "not_authorized",
+          "profile": "heiman_cascade_mqtt",
+          "stop": "implemented",
           "self_test": "implemented_read_only",
           "requirements": [
-            "Eligible selected binary_sensor smoke entity on the same registry device/config entry; exact matching control, features/options and explicit admin confirmation."
+            "Eligible selected binary_sensor smoke entity on the same registry device/config entry; exact matching control, features/options and explicit admin confirmation.",
+            "Stop applies to the attributed external smoke_siren on deviceCascadeState. The target and every contributing smoke source must currently report clear."
           ],
           "gaps": [],
           "sources": [
             "https://www.zigbee2mqtt.io/devices/HS1SA-E_Lover.html",
-            "https://github.com/Koenkk/zigbee-herdsman-converters/blob/afdaa028a0972d801da762196ddfb2df631ea0cc/src/devices/heiman.ts"
+            "https://github.com/Koenkk/zigbee-herdsman-converters/blob/afdaa028a0972d801da762196ddfb2df631ea0cc/src/devices/heiman.ts",
+            "https://github.com/Koenkk/zigbee-herdsman-converters/blob/a2573dbbd7b5d28916c9007fd0f9e469b89befde/src/devices/heiman.ts"
           ]
         },
         "zha": {
@@ -2285,16 +2289,18 @@
             "reboot_count"
           ],
           "activation": "implemented",
-          "profile": "heiman_activation_mqtt",
-          "stop": "not_authorized",
+          "profile": "heiman_cascade_mqtt",
+          "stop": "implemented",
           "self_test": "implemented_read_only",
           "requirements": [
-            "Eligible selected binary_sensor smoke entity on the same registry device/config entry; exact matching control, features/options and explicit admin confirmation."
+            "Eligible selected binary_sensor smoke entity on the same registry device/config entry; exact matching control, features/options and explicit admin confirmation.",
+            "Stop applies to the attributed external smoke_siren on deviceCascadeState. The target and every contributing smoke source must currently report clear."
           ],
           "gaps": [],
           "sources": [
             "https://www.zigbee2mqtt.io/devices/S1-M.html",
-            "https://github.com/Koenkk/zigbee-herdsman-converters/blob/afdaa028a0972d801da762196ddfb2df631ea0cc/src/devices/heiman.ts"
+            "https://github.com/Koenkk/zigbee-herdsman-converters/blob/afdaa028a0972d801da762196ddfb2df631ea0cc/src/devices/heiman.ts",
+            "https://github.com/Koenkk/zigbee-herdsman-converters/blob/a2573dbbd7b5d28916c9007fd0f9e469b89befde/src/devices/heiman.ts"
           ]
         },
         "zha": {
@@ -2380,17 +2386,19 @@
             "reboot_count"
           ],
           "activation": "implemented",
-          "profile": "heiman_activation_mqtt",
-          "stop": "not_authorized",
+          "profile": "heiman_cascade_mqtt",
+          "stop": "implemented",
           "self_test": "implemented_read_only",
           "requirements": [
             "Eligible selected binary_sensor smoke entity on the same registry device/config entry; exact matching control, features/options and explicit admin confirmation.",
-            "ZHA route is basic IAS WD, not MQTT automation-only cascade control; activation only, no automatic stop."
+            "ZHA route is basic IAS WD, not MQTT automation-only cascade control; activation only, no automatic stop.",
+            "Stop applies to the attributed external smoke_siren on deviceCascadeState. The target and every contributing smoke source must currently report clear."
           ],
           "gaps": [],
           "sources": [
             "https://www.zigbee2mqtt.io/devices/S1-TL.html",
-            "https://github.com/Koenkk/zigbee-herdsman-converters/blob/afdaa028a0972d801da762196ddfb2df631ea0cc/src/devices/heiman.ts"
+            "https://github.com/Koenkk/zigbee-herdsman-converters/blob/afdaa028a0972d801da762196ddfb2df631ea0cc/src/devices/heiman.ts",
+            "https://github.com/Koenkk/zigbee-herdsman-converters/blob/a2573dbbd7b5d28916c9007fd0f9e469b89befde/src/devices/heiman.ts"
           ]
         },
         "zha": {
@@ -2460,16 +2468,18 @@
             "secure"
           ],
           "activation": "implemented",
-          "profile": "heiman_activation_mqtt",
-          "stop": "not_authorized",
+          "profile": "heiman_cascade_mqtt",
+          "stop": "implemented",
           "self_test": "implemented_read_only",
           "requirements": [
-            "Eligible selected binary_sensor smoke entity on the same registry device/config entry; exact matching control, features/options and explicit admin confirmation."
+            "Eligible selected binary_sensor smoke entity on the same registry device/config entry; exact matching control, features/options and explicit admin confirmation.",
+            "Stop applies to the attributed external smoke_siren on deviceCascadeState. The target and every contributing smoke source must currently report clear."
           ],
           "gaps": [],
           "sources": [
             "https://www.zigbee2mqtt.io/devices/S1-TL-AI.html",
-            "https://github.com/Koenkk/zigbee-herdsman-converters/blob/afdaa028a0972d801da762196ddfb2df631ea0cc/src/devices/heiman.ts"
+            "https://github.com/Koenkk/zigbee-herdsman-converters/blob/afdaa028a0972d801da762196ddfb2df631ea0cc/src/devices/heiman.ts",
+            "https://github.com/Koenkk/zigbee-herdsman-converters/blob/a2573dbbd7b5d28916c9007fd0f9e469b89befde/src/devices/heiman.ts"
           ]
         },
         "zha": {
@@ -2548,16 +2558,18 @@
             "reboot_count"
           ],
           "activation": "implemented",
-          "profile": "heiman_activation_mqtt",
-          "stop": "not_authorized",
+          "profile": "heiman_cascade_mqtt",
+          "stop": "implemented",
           "self_test": "implemented_read_only",
           "requirements": [
-            "Eligible selected binary_sensor smoke entity on the same registry device/config entry; exact matching control, features/options and explicit admin confirmation."
+            "Eligible selected binary_sensor smoke entity on the same registry device/config entry; exact matching control, features/options and explicit admin confirmation.",
+            "Stop applies to the attributed external smoke_siren on deviceCascadeState. The target and every contributing smoke source must currently report clear."
           ],
           "gaps": [],
           "sources": [
             "https://www.zigbee2mqtt.io/devices/S2-E.html",
-            "https://github.com/Koenkk/zigbee-herdsman-converters/blob/afdaa028a0972d801da762196ddfb2df631ea0cc/src/devices/heiman.ts"
+            "https://github.com/Koenkk/zigbee-herdsman-converters/blob/afdaa028a0972d801da762196ddfb2df631ea0cc/src/devices/heiman.ts",
+            "https://github.com/Koenkk/zigbee-herdsman-converters/blob/a2573dbbd7b5d28916c9007fd0f9e469b89befde/src/devices/heiman.ts"
           ]
         },
         "zha": {

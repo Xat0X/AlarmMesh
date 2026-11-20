@@ -1,5 +1,5 @@
 import { exercise, incidentDetail, careView } from "./family.js?v=family-beta16";
-import { TEXT } from "./translations.js?v=sounder-discovery-1";
+import { TEXT } from "./translations.js?v=heiman-linked-stop-1";
 import { Drafts } from "./drafts.js?v=family-beta16";
 
 // Safe DOM construction: names, labels and registry data are always text nodes.

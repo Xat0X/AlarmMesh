@@ -82,8 +82,8 @@ def validate_catalog(data: dict) -> None:
                     raise ValueError(
                         "Alias authority requires its own provider matcher"
                     )
-                if review["stop"] == "implemented" and (
-                    not profile or not PROFILES[profile].safe_stop
+                if (review["stop"] == "implemented") != bool(
+                    profile and PROFILES[profile].safe_stop
                 ):
                     raise ValueError("Unreviewed stop authority")
     if data["website_rows"] != len(variants) or data["variants"] != len(variants) - len(

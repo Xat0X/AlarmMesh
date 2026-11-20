@@ -35,7 +35,7 @@ MQTT = (
         "stop",
         None,
         "smoke_siren",
-        "heiman_activation_mqtt",
+        "heiman_cascade_mqtt",
     ),
     (
         "Aqara",
@@ -719,8 +719,35 @@ async def main(requested):
             and payload == "smoke_siren",
             "Heiman MQTT payload",
         )
-        passed("mqtt_action_heiman_activation_mqtt")
+        passed("mqtt_action_heiman_cascade_mqtt")
         engine = panel.linking
+        # The device reports its external tone independently from its local smoke.
+        # Inspect all wire commands while the local alarm outlives the initiating one.
+        states[0]["siren_for_automation_only"] = "smoke_siren"
+        await publish("alarmmesh_simulation/synthetic0", states[0])
+        await wait_state(lambda: heiman["target"] in engine.owned)
+        states[0]["smoke"] = True
+        await publish("alarmmesh_simulation/synthetic0", states[0])
+        await wait_state(lambda: sources[0] in engine.active)
+        states[1]["smoke"] = False
+        await publish("alarmmesh_simulation/synthetic1", states[1])
+        await wait_state(lambda: sources[1] not in engine.active)
+        await settle()
+        require(messages.empty(), "Sent command while S1-M detected local smoke")
+        states[0]["smoke"] = False
+        await publish("alarmmesh_simulation/synthetic0", states[0])
+        topic, payload = await asyncio.wait_for(messages.get(), 10)
+        require(
+            topic == "alarmmesh_simulation/synthetic0/set/siren_for_automation_only"
+            and payload == "stop",
+            "Expected external-only stop after both smoke reports cleared",
+        )
+        states[0]["siren_for_automation_only"] = "stop"
+        await publish("alarmmesh_simulation/synthetic0", states[0])
+        await wait_state(lambda: hass.states.is_state(heiman["target"], "stop"))
+        await settle()
+        require(messages.empty(), "Duplicate Heiman stop")
+        passed("mqtt_heiman_stop_after_local_smoke_clears")
         require(
             await hass.config_entries.async_unload(entry.entry_id),
             "Driver unload failed",

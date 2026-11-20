@@ -24,6 +24,14 @@ class PendingStart:
     record: dict
 
 
+def _reports_linked_tone(state: State | None, control: Control) -> bool:
+    return bool(
+        state
+        and state.state == control.option
+        and not state.attributes.get("assumed_state")
+    )
+
+
 class LinkingRuntime:
     """One attempt per target/incident; errors never cause a retry storm."""
 
@@ -77,7 +85,7 @@ class LinkingRuntime:
         target = event.data["entity_id"]
         state = event.data["new_state"]
         owned = self.owned.get(target)
-        if owned and owned.safe_stop and (not state or state.state != owned.option):
+        if owned and owned.safe_stop and not _reports_linked_tone(state, owned):
             # A manual stop followed by a rapid new sound can fit in one HA
             # loop iteration. The later sound no longer belongs to AlarmMesh.
             self.owned.pop(target)
@@ -89,9 +97,10 @@ class LinkingRuntime:
                 self.records.get(target) is pending.record
                 and event.data["old_state"] is pending.before
                 and state
-                and state.state == pending.control.option
+                and _reports_linked_tone(state, pending.control)
                 and pending.context_id in {state.context.id, state.context.parent_id}
-                and self.capabilities.resolve(pending.control.binding()) is not None
+                and (resolved := self.capabilities.resolve(pending.control.binding()))
+                and resolved.safe_stop
             ):
                 self.owned[target] = pending.control
                 pending.record["status"] = "sent"
@@ -144,6 +153,12 @@ class LinkingRuntime:
                 for binding in group["linking"]["bindings"]:
                     if (attempted := self.attempted.get(binding["target"])) is not None:
                         attempted.update(origins)
+                        if (record := self.records.get(binding["target"])) and record[
+                            "source"
+                        ] == binding["source"]:
+                            record["origins"] = sorted(
+                                set(record["origins"]) | (origins - {binding["source"]})
+                            )
         self.attempted = {
             target: origins for target, origins in self.attempted.items() if origins
         }
@@ -239,7 +254,12 @@ class LinkingRuntime:
     async def _activate(self, activation, slots):
         async with slots:
             target = activation.binding["target"]
-            if target in self.attempted or self._closed or self._paused:
+            if (
+                target in self.attempted
+                or self._closed
+                or self._paused
+                or (target in self.owned and self.owned[target].safe_stop)
+            ):
                 return
             record = {
                 "source": activation.binding["source"],
@@ -303,11 +323,34 @@ class LinkingRuntime:
                         )
                         record["status"] = "sent"
                         return
-                    if not state or state.state != control.option:
+                    if (
+                        not state
+                        or not _reports_linked_tone(state, control)
+                        or context.id not in {state.context.id, state.context.parent_id}
+                        or not (
+                            resolved := self.capabilities.resolve(control.binding())
+                        )
+                        or not resolved.safe_stop
+                    ):
                         record["status"] = "not_stopped"
                         return
                 self.owned[target] = control
                 record["status"] = "sent" if control.safe_stop else "sent_no_auto_stop"
+
+    def _reports_clear(self, source: str) -> bool:
+        state = self.hass.states.get(source)
+        return bool(
+            state
+            and state.state == "off"
+            and not state.attributes.get("assumed_state")
+            and self.runtime.source_statuses.get(source)
+            is SourceStatus.NO_SMOKE_REPORTED
+            and not self.capabilities.source_identity_changed(source)
+            and (
+                self.capabilities.metadata(source)[2] != "matter"
+                or matter.origin_allowed(self.hass, source)
+            )
+        )
 
     async def _stop(self, target, control):
         # No stop after disable/remap/reload; ownership is process-local only.
@@ -324,20 +367,21 @@ class LinkingRuntime:
         if not control.safe_stop:
             return
         target_state = self.hass.states.get(target)
-        if not target_state or target_state.state != control.option:
+        if not _reports_linked_tone(target_state, control):
             # A later manual tone/stop or lost feedback cannot remain our action.
             self.records[target]["status"] = "not_stopped"
             self.owned.pop(target, None)
             return
-        state = self.hass.states.get(control.source)
+        resolved = self.capabilities.resolve(control.binding())
         if (
             self._closed
             or self._paused
-            or not state
-            or state.state != "off"
-            or self.capabilities.resolve(control.binding()) is None
-            or self.runtime.source_statuses.get(control.source)
-            is not SourceStatus.NO_SMOKE_REPORTED
+            or not resolved
+            or not resolved.safe_stop
+            or any(
+                not self._reports_clear(source)
+                for source in {control.source, *self.records[target]["origins"]}
+            )
         ):
             self.records[target]["status"] = "not_stopped"
             return
@@ -372,9 +416,7 @@ class LinkingRuntime:
                 self._dirty = False
                 for target, control in tuple(self.owned.items()):
                     state = self.hass.states.get(target)
-                    if control.safe_stop and (
-                        not state or state.state != control.option
-                    ):
+                    if control.safe_stop and not _reports_linked_tone(state, control):
                         self.records[target]["status"] = "not_stopped"
                         self.owned.pop(target, None)
                 desired = self._plan()

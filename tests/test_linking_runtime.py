@@ -31,6 +31,7 @@ def devices(hass):
             data["entity_id"],
             data.get("option", "on"),
             dict(hass.states.get(data["entity_id"]).attributes),
+            context=call.context,
         )
 
     hass.services.async_register("select", "select_option", command)
@@ -428,9 +429,23 @@ async def test_mixed_targets_fail_independently_deduplicate_and_never_mute(
     assert len(calls) == 3 and all(call[2].get("option") != "mute" for call in calls)
 
 
-async def test_multiple_origins_unknown_and_local_smoke_never_stop(hass, devices):
+@pytest.mark.parametrize(
+    "model",
+    [
+        "S1-M",
+        "S1-TL",
+        "S1-TL-AI",
+        "S2-E",
+        "HS1SA-E Lover",
+        "HM-636THV-AC-M",
+        "HS1SA-E-PLUS",
+    ],
+)
+async def test_multiple_origins_unknown_and_local_smoke_never_stop(
+    hass, devices, model
+):
     add, calls, _ = devices
-    a, b, c = add("a"), add("b"), add("c")
+    a, b, c = add("a"), add("b", model), add("c")
     members = [d["source"] for d in (a, b, c)]
     entry = await setup(hass, members)
     await configure(hass, entry, members, [b])
@@ -446,9 +461,52 @@ async def test_multiple_origins_unknown_and_local_smoke_never_stop(hass, devices
     hass.states.async_set(c["source"], "off", {"device_class": "smoke"})
     await flush(hass, entry)
     assert len(calls) == 1  # B now has local smoke; never hush it.
+    hass.states.async_set(a["source"], "unavailable", {"device_class": "smoke"})
     hass.states.async_set(b["source"], "off", {"device_class": "smoke"})
     await flush(hass, entry)
+    assert len(calls) == 1  # Even an earlier cleared origin is now unreadable.
+    hass.states.async_set(
+        a["source"], "off", {"device_class": "smoke", "assumed_state": True}
+    )
+    await flush(hass, entry)
+    assert len(calls) == 1
+    hass.states.async_set(a["source"], "off", {"device_class": "smoke"})
+    await flush(hass, entry)
     assert [call[2]["option"] for call in calls] == ["smoke_siren", "stop"]
+
+
+@pytest.mark.parametrize("feedback", ["unattributed", "assumed", "became_assumed"])
+async def test_s1m_requires_attributable_observed_tone(hass, devices, feedback):
+    add, calls, _ = devices
+    source, target = add("source"), add("target", "S1-M")
+    members = [source["source"], target["source"]]
+    entry = await setup(hass, members)
+    await configure(hass, entry, members, [target])
+    sounder = target["target"]
+    attrs = dict(hass.states.get(sounder).attributes)
+
+    async def report(call):
+        calls.append(call.data["option"])
+        hass.states.async_set(
+            sounder,
+            call.data["option"],
+            {**attrs, "assumed_state": feedback == "assumed"},
+            context=None if feedback == "unattributed" else call.context,
+        )
+
+    hass.services.async_register("select", "select_option", report)
+    hass.states.async_set(source["source"], "on", {"device_class": "smoke"})
+    await flush(hass, entry)
+    if feedback == "became_assumed":
+        assert sounder in entry.runtime_data.panel.linking.owned
+        hass.states.async_set(sounder, "smoke_siren", {**attrs, "assumed_state": True})
+        hass.states.async_set(sounder, "smoke_siren", attrs)
+        await flush(hass, entry)
+    hass.states.async_set(source["source"], "off", {"device_class": "smoke"})
+    await flush(hass, entry)
+    assert sounder not in entry.runtime_data.panel.linking.owned
+    assert calls == ["smoke_siren"]
+    assert await hass.config_entries.async_unload(entry.entry_id)
 
 
 async def test_selftest_and_manual_sounding_are_not_sources(hass, devices):

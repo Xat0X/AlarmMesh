@@ -126,7 +126,7 @@ async def async_setup_entry(hass, entry):
         return hass.states.is_state(f"input_boolean.link_{name}", "on")
 
     @callback
-    def update(_event=None):
+    def update(_event=None, *, command_target=None, context=None):
         for name, item in fixtures.items():
             state = (
                 "unavailable"
@@ -174,6 +174,7 @@ async def async_setup_entry(hass, entry):
                     if is_on(f"{name}_control_unreachable")
                     else outputs[target],
                     attrs,
+                    context=context if target == command_target else None,
                 )
         hass.states.async_set(
             "sensor.link_sim_requests",
@@ -204,7 +205,7 @@ async def async_setup_entry(hass, entry):
             raise HomeAssistantError("SIMULATED target failure; no device command")
         outputs[target] = call.data.get("option", "on")
         record["result"] = "simulated acceptance, not audible confirmation"
-        update()
+        update(command_target=target, context=call.context)
 
     # Restricted test doubles for the standard actions, not a broker/driver.
     hass.services.async_register("select", "select_option", execute)

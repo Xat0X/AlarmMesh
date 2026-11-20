@@ -198,7 +198,7 @@ async def async_setup_catalog(hass, entry):
         return hass.states.is_state(f"input_boolean.catalog_{flag}", "on")
 
     @callback
-    def update(_event=None):
+    def update(_event=None, *, command_target=None, context=None):
         for name, item in fixtures.items():
             attrs = {
                 "device_class": "smoke",
@@ -266,6 +266,7 @@ async def async_setup_catalog(hass, entry):
                     if enabled(f"{name}_control_unreachable")
                     else outputs[item["target"]],
                     attrs,
+                    context=context if item["target"] == command_target else None,
                 )
         hass.states.async_set(
             "sensor.catalog_requests",
@@ -295,7 +296,7 @@ async def async_setup_catalog(hass, entry):
             update()
             raise HomeAssistantError("Simulated failure, no transport")
         outputs[target] = call.data.get("option", "on")
-        update()
+        update(command_target=target, context=call.context)
 
     for domain, service in (
         ("select", "select_option"),

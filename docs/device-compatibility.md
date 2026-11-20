@@ -42,8 +42,8 @@ an actual eligible HA smoke entity; none is automatically selected or fabricated
 | Catalog assessed | 52/52 definitions; 67/67 rows | 52/52 definitions; 67/67 rows |
 | Read smoke | Generic eligible HA smoke entities; documented smoke expose for 50 definitions, including three non-optical types; two dedicated sirens excluded as smoke-detector claims | Generic eligible HA smoke entities; standard IAS/quirk availability is conditional on the actual signature and provider-created entities |
 | Reviewed activation contract | 17/52 definitions, covering 21 website rows | 10/52 definitions, conditional on the exact raw model/manufacturer and actual control/features; marketing aliases alone do not authorize ZHA |
-| Activation only | 16/52 definitions | All 10 action definitions |
-| Automatic stop | 1/52: existing HS1SA-E-PLUS automation-only MQTT route | 0/52 |
+| Activation only | 10/52 definitions | All 10 action definitions |
+| Automatic stop | 7/52: reviewed Heiman automation-only routes | 0/52 |
 | Read self-test status | 28/52 have a reviewed readable flag/enum; read only if HA exposes it | Read only when HA exposes known test-status keys; no blanket model-count claim |
 | Physical acceptance in this work | **0** | **0** |
 
@@ -62,7 +62,7 @@ profile contracts share three small adapters: HA select, siren and switch.
 
 | Family | Added or expanded route | Limits |
 | --- | --- | --- |
-| Heiman | MQTT automation select for Lover, HM-636THV-AC-M, S1-M, S1-TL, S1-TL-AI, S2-E; PLUS keeps its existing route | New models activation only; automation property similarity does not establish model-specific safe stopping |
+| Heiman | MQTT automation select for Lover, HM-636THV-AC-M, S1-M, S1-TL, S1-TL-AI, S2-E; PLUS keeps its existing route | Own external tone may be stopped after every contributing source and the target explicitly clear |
 | Heiman ZHA | Actual basic IAS siren for PLUS raw identities, HM-636THV-AC-M and S1-TL | Different from MQTT cascade control; one 60 s request, no automatic stop |
 | Aqara | Documented JY-GZ-03AQ MQTT alias; ZHA `buzzer_manual_alarm` switch for `LUMI/lumi.sensor_smoke.acn03` | Existing `linkage_alarm` must already report on; firmware 21/0021/0.0.0_0021 blocked; no mute or stop |
 | Develco/frient/Cavius | SMSZB-120 MQTT aliases 94430 and 2103; existing raw ZHA SMSZB-120 route retained | Marketing ID 94430 is not assumed to be a ZHA raw model; one 60 s IAS request |
@@ -82,8 +82,7 @@ published contracts are frozen. Existing mappings/options are not rewritten.
 Manual or unknown control values are never claimed as idle. All routes retain
 the existing bounded executor, independent origin lifetime, shared-target
 deduplication, no retries after a failed attempt, target-local-smoke exclusion,
-self-test-origin exclusion and detached old runtimes. Automatic stopping remains
-exclusive to owned PLUS automation-only activations with explicit release.
+self-test-origin exclusion and detached old runtimes. The seven Heiman MQTT profiles listed above support stopping an owned external tone after explicit release.
 
 ## Read-only detector details
 

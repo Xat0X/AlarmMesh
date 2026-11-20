@@ -449,7 +449,8 @@ class Capabilities:
             "domain": profile.domain,
             "service": "select_option" if profile.domain == "select" else "turn_on",
             "option": profile.option,
-            "safe_stop": profile.safe_stop,
+            "safe_stop": profile.safe_stop
+            and not state.attributes.get("assumed_state", False),
             "idle_states": profile.idle,
         }
         if profile.domain == "select":

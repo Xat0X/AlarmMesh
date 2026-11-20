@@ -541,7 +541,7 @@ async def main(requested: str, config_dir: Path) -> int:
         panel = entry.runtime_data.panel
         caps = panel.linking.capabilities
         expected = {
-            "e": "heiman_activation_mqtt",
+            "e": "heiman_cascade_mqtt",
             "f": "basic_ias_zha",
             "h": "bosch_twinguard_mqtt",
             "i": "bosch_bsd_mqtt",
@@ -621,7 +621,7 @@ async def main(requested: str, config_dir: Path) -> int:
         )
         require(
             {r["status"] for r in panel.linking.records.values()}
-            == {"sent_no_auto_stop", "failed"},
+            == {"sent", "sent_no_auto_stop", "failed"},
             "Target failure not isolated",
         )
         passed(current)
@@ -651,7 +651,11 @@ async def main(requested: str, config_dir: Path) -> int:
         hass.states.async_set("input_boolean.catalog_m_smoke", "off")
         registry.async_update_entity(fixtures["m"]["source"], device_class="smoke")
         await settle()
-        require(len(requests) == len(names), "Activation-only unsafe stop")
+        require(
+            [(r["target"], r["data"].get("option")) for r in requests[len(names) :]]
+            == [(fixtures["e"]["target"], "stop")],
+            "Expected exactly one automation-only stop for the Heiman",
+        )
         hass.states.async_set("input_boolean.catalog_j_permission", "off")
         await settle()
         require(
@@ -666,7 +670,7 @@ async def main(requested: str, config_dir: Path) -> int:
         old_engine.changed()
         require(
             old_engine._closed
-            and len(requests) == len(names)
+            and len(requests) == len(names) + 1
             and identity() == original_identity,
             "Retired catalog engine or identity leak",
         )

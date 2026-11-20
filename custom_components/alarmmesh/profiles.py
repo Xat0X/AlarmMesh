@@ -2,7 +2,7 @@
 
 import hashlib
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 
 
 @dataclass(frozen=True)
@@ -28,17 +28,18 @@ class Profile:
         ).hexdigest()
 
 
+HEIMAN_LINKED_TONE = Profile(
+    "zigbee2mqtt",
+    "select",
+    "siren_for_automation_only",
+    "smoke_siren",
+    ("smoke_siren", "stop"),
+    ("stop",),
+    safe_stop=True,
+)
+
 PROFILES = {
-    "heiman_mqtt": Profile(
-        "zigbee2mqtt",
-        "select",
-        "siren_for_automation_only",
-        "smoke_siren",
-        ("smoke_siren", "stop"),
-        ("stop",),
-        safe_stop=True,
-        legacy_identity=True,
-    ),
+    "heiman_mqtt": replace(HEIMAN_LINKED_TONE, legacy_identity=True),
     "aqara_mqtt": Profile(
         "zigbee2mqtt",
         "select",
@@ -67,14 +68,7 @@ PROFILES = {
         duration=60,
         legacy_identity=True,
     ),
-    "heiman_activation_mqtt": Profile(
-        "zigbee2mqtt",
-        "select",
-        "siren_for_automation_only",
-        "smoke_siren",
-        ("smoke_siren", "stop"),
-        ("stop",),
-    ),
+    "heiman_cascade_mqtt": HEIMAN_LINKED_TONE,
     "ias_mqtt": Profile(
         "zigbee2mqtt", "siren", features=21, tone="burglar", duration=60
     ),
@@ -144,7 +138,10 @@ def validate_profiles() -> None:
             raise ValueError("Invalid prerequisite contract")
         if profile.duration is not None and not 1 <= profile.duration <= 60:
             raise ValueError("Unbounded sounder duration")
-        if profile.safe_stop and name != "heiman_mqtt":
+        if profile.safe_stop and (
+            name not in {"heiman_mqtt", "heiman_cascade_mqtt"}
+            or replace(profile, legacy_identity=False) != HEIMAN_LINKED_TONE
+        ):
             raise ValueError("Unreviewed stop authority")
         if profile.legacy_identity and LEGACY_DIGESTS.get(name) != profile.digest():
             raise ValueError("Changed legacy authority requires a new profile identity")

@@ -422,7 +422,7 @@ firmware and existing prerequisites. Small select/siren/switch adapters feed the
 same executor. The original four authority fingerprints stay stable. New profiles
 include a contract digest and prerequisite identity; a changed contract invalidates
 saved authority. Group data and options are never silently expanded or rewritten.
-Only the published PLUS MQTT contract has stop authority. Targets must have their
+The PLUS and reviewed Heiman cascade MQTT contracts have stop authority after attributable feedback. Unknown smoke on any contributing detector blocks release. Targets must have their
 profile's explicit idle state, preventing takeover of manual Bosch fire/burglar
 or other non-idle controls. HA feature IntFlags are accepted as bitmasks; booleans
 are rejected. The earlier per-target origin-lifetime fix is retained unchanged.

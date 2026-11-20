@@ -49,14 +49,17 @@ def catalog_devices(hass):
         target = call.data["entity_id"]
         hass.states.async_set(
             target,
-            call.data.get("option", "on"),
+            call.data.get("option", "off" if call.service == "turn_off" else "on"),
             dict(hass.states.get(target).attributes),
+            context=call.context,
         )
 
     for domain, service in (
         ("select", "select_option"),
         ("switch", "turn_on"),
         ("siren", "turn_on"),
+        ("siren", "turn_off"),
+        ("switch", "turn_off"),
     ):
         hass.services.async_register(domain, service, command)
 
@@ -181,6 +184,34 @@ def test_catalog_rejects_incomplete_or_expanded_authority(mutation):
         validate_catalog(data)
 
 
+def test_stop_is_limited_to_the_reviewed_models_and_external_tone(monkeypatch):
+    stops = {
+        (provider, model["model"])
+        for model in CATALOG["entries"]
+        for provider, review in model["providers"].items()
+        if review["stop"] == "implemented"
+    }
+    assert stops == {
+        ("zigbee2mqtt", model)
+        for model in (
+            "HS1SA-E-PLUS",
+            "HS1SA-E Lover",
+            "HM-636THV-AC-M",
+            "S1-M",
+            "S1-TL",
+            "S1-TL-AI",
+            "S2-E",
+        )
+    }
+    monkeypatch.setitem(
+        PROFILES,
+        "heiman_cascade_mqtt",
+        replace(PROFILES["heiman_cascade_mqtt"], key="temporary_mute"),
+    )
+    with pytest.raises(ValueError, match="stop authority"):
+        validate_profiles()
+
+
 def test_legacy_contract_does_not_silently_expand(monkeypatch):
     validate_profiles()
     monkeypatch.setitem(
@@ -202,7 +233,7 @@ CASES = (
         "stop",
         {"options": ["stop", "smoke_siren", "co_siren"]},
         None,
-        "heiman_activation_mqtt",
+        "heiman_cascade_mqtt",
         {"option": "smoke_siren"},
     ),
     (
@@ -254,6 +285,30 @@ CASES = (
         {"tone": "Burglar", "duration": 60},
     ),
     (
+        "SMSZB-120",
+        "Develco",
+        "mqtt",
+        "siren",
+        "sounder",
+        "off",
+        {"supported_features": 21, "available_tones": ["burglar"]},
+        None,
+        "smszb_mqtt",
+        {"tone": "burglar", "duration": 60},
+    ),
+    (
+        "SMSZB-120",
+        "Develco",
+        "zha",
+        "siren",
+        "sounder",
+        "off",
+        {"supported_features": 17},
+        None,
+        "smszb_zha",
+        {"duration": 60},
+    ),
+    (
         "8750001213",
         "Bosch",
         "mqtt",
@@ -293,9 +348,7 @@ CASES = (
 
 
 @pytest.mark.parametrize("case", CASES, ids=[case[-2] for case in CASES])
-async def test_new_adapter_exact_request_and_no_automatic_stop(
-    hass, catalog_devices, case
-):
+async def test_adapter_commands_and_reviewed_stop(hass, catalog_devices, case):
     add, calls = catalog_devices
     model, vendor, origin, domain, key, idle, attrs, gate, profile, expected = case
     target = add(model, vendor, origin, domain, key, attrs, idle, gate)
@@ -303,7 +356,8 @@ async def test_new_adapter_exact_request_and_no_automatic_stop(
     entry = await setup(hass, [target["source"], source["source"]])
     info = Capabilities(hass).describe(target["source"])
     assert info["status"] == "linkable" and info["controls"][0]["profile"] == profile
-    assert not info["controls"][0]["safe_stop"]
+    can_stop = profile == "heiman_cascade_mqtt"
+    assert info["controls"][0]["safe_stop"] is can_stop
     assert not calls  # Discovery, setup and snapshots never actuate.
     await configure(hass, entry, [target["source"], source["source"]], [target])
     hass.states.async_set(source["source"], "on")
@@ -315,11 +369,54 @@ async def test_new_adapter_exact_request_and_no_automatic_stop(
             {"entity_id": target["target"], **expected},
         )
     ]
-    # Related repeats and explicitly clearing the origin never issue mute/stop/retry.
+    # Local smoke on a sounding target takes priority over any linked stop.
+    hass.states.async_set(target["source"], "on")
+    await flush(hass, entry)
     hass.states.async_set(source["source"], "on", {"extra": "repeat"})
     hass.states.async_set(source["source"], "off")
     await flush(hass, entry)
     assert len(calls) == 1
+    hass.states.async_set(target["source"], "off")
+    await flush(hass, entry)
+    assert calls[1:] == (
+        [("select", "select_option", {"entity_id": target["target"], "option": "stop"})]
+        if can_stop
+        else []
+    )
+    assert await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_s1m_saved_start_only_binding_requires_review(
+    hass, catalog_devices, monkeypatch
+):
+    add, calls = catalog_devices
+    target = add(
+        "S1-M",
+        "Heiman",
+        key="siren_for_automation_only",
+        idle="stop",
+        attrs={"options": ["smoke_siren", "stop"]},
+    )
+    source = add("Unknown", "Simulation")
+    members = [source["source"], target["source"]]
+    entry = await setup(hass, members)
+    panel = entry.runtime_data.panel
+    with monkeypatch.context() as old:
+        review = recognize("zigbee2mqtt", "S1-M", "Heiman")["providers"]["zigbee2mqtt"]
+        old.setitem(review, "profile", "heiman_activation_mqtt")
+        old.setitem(
+            PROFILES,
+            "heiman_activation_mqtt",
+            replace(PROFILES["heiman_cascade_mqtt"], safe_stop=False),
+        )
+        await configure(hass, entry, members, [target])
+        binding = dict(panel.groups.groups[0]["linking"]["bindings"][0])
+    assert panel.linking.capabilities.resolve(binding) is None
+    hass.states.async_set(source["source"], "on", {"device_class": "smoke"})
+    await flush(hass, entry)
+    hass.states.async_set(source["source"], "off", {"device_class": "smoke"})
+    await flush(hass, entry)
+    assert not calls
     assert await hass.config_entries.async_unload(entry.entry_id)
 
 

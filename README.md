@@ -8,7 +8,7 @@
 
 Smoke reports and source availability from existing Home Assistant smoke detector
 entities, with a local panel for detectors, rooms and groups. This test release adds [optional linked sounding](docs/linked-sounding.md), off by default.
-Version 0.1.0-beta.17 also offers [Companion notifications, group
+Version 0.1.0-beta.18 also offers [Companion notifications, group
 script actions, incident details and reviewed built-in self-test requests](docs/incident-features.md).
 New automatic behavior defaults off; existing explicit choices are preserved.
 It includes [opt-in maintenance messages, non-executing action
@@ -48,17 +48,17 @@ This test release includes an offline catalog of **52 converter definitions /
 67 model and variant rows**, additional reviewed HA select/siren/switch profiles,
 read-only battery/fault/test details and searchable compatibility in the existing
 panel. Linking remains off by default; the catalog alone never permits control.
-See [linked sounding and stopping for Aqara and Heiman](docs/meeklinken-en-stoppen.md).
+Seven Heiman models connected through Zigbee2MQTT can stop linked sounding after every contributing detector and the sounding detector report clear. See [linked sounding and stopping for Aqara and Heiman](docs/meeklinken-en-stoppen.md).
 See [device coverage, prerequisites, upstream gaps and current evidence](docs/device-compatibility.md).
 BSD-2 activation requires its broadcast setting to explicitly report off;
 AlarmMesh never changes that setting. The original branding, two overview
 entities, source-selection schema and smoke rules remain unchanged.
 
-## Test release: 0.1.0-beta.17
+## Test release: 0.1.0-beta.18
 
 For opt-in testing, enable **Pre-release** in the AlarmMesh Marketplace page and
-choose **0.1.0-beta.17**. Back up before updating and follow the restart prompt.
-Read the [release notes](docs/releases/0.1.0-beta.17.md) before installing.
+choose **0.1.0-beta.18**. Back up before updating and follow the restart prompt.
+Read the [release notes](docs/releases/0.1.0-beta.18.md) before installing.
 
 ## Current status: local panel and two read-only overviews
 

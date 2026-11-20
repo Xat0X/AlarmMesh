@@ -33,8 +33,7 @@ AlarmMesh never enables a device prerequisite itself.
 The [device support guide](device-compatibility.md) records the expanded catalog,
 new MQTT/ZHA routes, read-only details, current checks and upstream gaps. It
 supersedes the beta.2-only support table below for the current working tree.
-Model detection never enables linking. New routes are activation-only; existing
-PLUS MQTT stop authority and published bindings remain unchanged. Physical
+Model detection never enables linking. Six additional Heiman models now support a separate linked-tone stop via Zigbee2MQTT. Previously selected start-only bindings for these six models require fresh confirmation. Physical
 behavior remains untested.
 
 ## Published beta.2 profiles (historical scope)

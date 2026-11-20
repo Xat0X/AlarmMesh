@@ -21,18 +21,18 @@ Generated from [the reviewed snapshot](../dev/catalog/review.json). Use [the gui
 | [GS SSHM-I1](https://www.zigbee2mqtt.io/devices/SSHM-I1.html) | — | smoke | No reviewed action | No reviewed action |
 | [Halo Smart Labs HALO](https://www.zigbee2mqtt.io/devices/HALO.html) | — | smoke | No reviewed action | No reviewed action |
 | [Halo Smart Labs HALO+](https://www.zigbee2mqtt.io/devices/HALO+.html) | — | smoke | No reviewed action | No reviewed action |
-| [Heiman HM-636THV-AC-M](https://www.zigbee2mqtt.io/devices/HM-636THV-AC-M.html) | — | smoke | heiman_activation_mqtt | basic_ias_zha |
+| [Heiman HM-636THV-AC-M](https://www.zigbee2mqtt.io/devices/HM-636THV-AC-M.html) | — | smoke | heiman_cascade_mqtt | basic_ias_zha |
 | [Heiman HS15A-M](https://www.zigbee2mqtt.io/devices/HS15A-M.html) | — | smoke | ias_mqtt | ias_zha |
 | [Heiman HS1SA-E](https://www.zigbee2mqtt.io/devices/HS1SA-E.html) | — | smoke | No reviewed action | No reviewed action |
-| [Heiman HS1SA-E Lover](https://www.zigbee2mqtt.io/devices/HS1SA-E_Lover.html) | — | smoke | heiman_activation_mqtt | No reviewed action |
+| [Heiman HS1SA-E Lover](https://www.zigbee2mqtt.io/devices/HS1SA-E_Lover.html) | — | smoke | heiman_cascade_mqtt | No reviewed action |
 | [Heiman HS1SA-E-PLUS](https://www.zigbee2mqtt.io/devices/HS1SA-E-PLUS.html) | — | smoke | heiman_mqtt | basic_ias_zha |
 | [Heiman HS2SA-1](https://www.zigbee2mqtt.io/devices/HS2SA-1.html) | — | smoke | No reviewed action | No reviewed action |
 | [Heiman HS2SA-EF-3.0](https://www.zigbee2mqtt.io/devices/HS2SA-EF-3.0.html) | — | smoke | No reviewed action | No reviewed action |
 | [Heiman HS3SA/HS1SA](https://www.zigbee2mqtt.io/devices/HS3SA_HS1SA.html) | — | smoke | No reviewed action | No reviewed action |
-| [Heiman S1-M](https://www.zigbee2mqtt.io/devices/S1-M.html) | — | smoke | heiman_activation_mqtt | No reviewed action |
-| [Heiman S1-TL](https://www.zigbee2mqtt.io/devices/S1-TL.html) | — | smoke | heiman_activation_mqtt | basic_ias_zha |
-| [Heiman S1-TL-AI](https://www.zigbee2mqtt.io/devices/S1-TL-AI.html) | — | smoke | heiman_activation_mqtt | No reviewed action |
-| [Heiman S2-E](https://www.zigbee2mqtt.io/devices/S2-E.html) | — | smoke | heiman_activation_mqtt | No reviewed action |
+| [Heiman S1-M](https://www.zigbee2mqtt.io/devices/S1-M.html) | — | smoke | heiman_cascade_mqtt | No reviewed action |
+| [Heiman S1-TL](https://www.zigbee2mqtt.io/devices/S1-TL.html) | — | smoke | heiman_cascade_mqtt | basic_ias_zha |
+| [Heiman S1-TL-AI](https://www.zigbee2mqtt.io/devices/S1-TL-AI.html) | — | smoke | heiman_cascade_mqtt | No reviewed action |
+| [Heiman S2-E](https://www.zigbee2mqtt.io/devices/S2-E.html) | — | smoke | heiman_cascade_mqtt | No reviewed action |
 | [Heimgard Technologies HT-SMO-2](https://www.zigbee2mqtt.io/devices/HT-SMO-2.html) | — | smoke | No reviewed action | No reviewed action |
 | [Konke TW-S1](https://www.zigbee2mqtt.io/devices/TW-S1.html) | — | smoke | No reviewed action | No reviewed action |
 | [Moes ZSS-HM-SSD01](https://www.zigbee2mqtt.io/devices/ZSS-HM-SSD01.html) | — | smoke | No reviewed action | No reviewed action |
