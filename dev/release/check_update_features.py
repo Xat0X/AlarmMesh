@@ -44,6 +44,42 @@ async def check_features(hass, entry, phase, root, helper, require, checks):
         }
         await panel.care.append(row, lambda: True)
         journal_path.write_text(json.dumps(row), encoding="utf-8")
+    phones_path = root / "published-phones.json"
+    if phase == "seed" and hasattr(panel, "care"):
+        from custom_components.alarmmesh.notification_profiles import receiver_metadata
+
+        service = "mobile_app_simulated_phone_a"
+        metadata = receiver_metadata(hass, service)
+        profile = {
+            "version": 1,
+            "origin": metadata["origin"],
+            "platform": "ios",
+            "identity": metadata["identity"],
+            "critical": True,
+            "sound": "default",
+            "sound_source": "bundled",
+            "volume": 0.65,
+        }
+        await panel.effects.settings.save(
+            {
+                "enabled": False,
+                "recovery": False,
+                "recipients": [
+                    {"service": service, "enabled": True, "profile": profile}
+                ],
+            },
+            panel.effects.settings.revision,
+            True,
+        )
+        phones_path.write_text(
+            json.dumps(panel.effects.settings.value), encoding="utf-8"
+        )
+    elif phase in {"restore", "update"} and phones_path.exists():
+        require(
+            panel.effects.settings.value == json.loads(phones_path.read_text()),
+            "Published receiver selection, critical sound or volume changed",
+        )
+        checks.append("published_phone_profile_and_disabled_automatic_output_preserved")
     if phase == "fresh":
         require(not panel.care.rows, "Fresh installation inherited a journal")
     elif phase != "seed" and journal_path.exists():
@@ -136,7 +172,14 @@ async def check_features(hass, entry, phase, root, helper, require, checks):
                 "enabled": True,
                 "recovery": True,
                 "recipients": [
-                    {"service": "mobile_app_simulated_phone_" + n, "enabled": True}
+                    next(
+                        (
+                            r
+                            for r in panel.effects.settings.value["recipients"]
+                            if r["service"] == "mobile_app_simulated_phone_" + n
+                        ),
+                        {"service": "mobile_app_simulated_phone_" + n, "enabled": True},
+                    )
                     for n in "ab"
                 ],
             },

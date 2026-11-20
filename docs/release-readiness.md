@@ -1,4 +1,31 @@
-# Vrijgaveaudit voor 0.1.0-beta.15
+# Vrijgaveaudit na 0.1.0-beta.19
+
+**20 november 2026 · lokale kandidaat voor review.** Gebruik de Incidents-simulator op poort 8131. De drie belangrijkste wijzigingen zijn rechtstreeks naar actuele rook gaan vanuit een open formulier, terugkeren naar de betrokken melder en een onzekere opslag controleren met de daadwerkelijk bewaarde gegevens.
+
+| Taak | Wat is aangepast en hoe is het gecontroleerd? |
+| --- | --- |
+| Eerste gebruik en dagelijks overzicht | Bij maximaal drie melders met een duidelijke rookvrije status staan de namen op het overzicht. Een verse simulator met twee gekozen melders werkt zonder groep of telefoon. De browserproef omvat ruimtefilter, gelijke lange namen en een melder zonder ruimte. |
+| Onderhoud tijdens rook | Op bèta 19 had de rookwaarschuwing in een geopend venster geen incidentknop. Vanuit onderhoud in Hal opent de knop nu de lopende rookmelding van Zolder. Vanuit het incident kun je terug naar Hal. Een onderbroken oefening gaat meteen naar de actuele melding. Een oude incidentlink houdt zijn eigen historie. |
+| Tijdelijk offline | Na het sluiten van de WebSocket toont het paneel de laatste ontvangsttijd en de toen gemelde rook. Na opnieuw verbinden vervangt een actuele momentopname die informatie. |
+| Groepen en telefoons | Een terugleesactie vergelijkt de server met het formulier zoals het er aan het einde van het ophalen uitziet. Groepen hebben bij aanmaken een herkenbaar, uniek ID. Twee browsertabs zijn gebruikt voor verlies vóór ontvangst, verlies na opslag, latere invoer en conflicten. Controleren verstuurt alleen een leesaanvraag. |
+| Onderhoudslogboek | Controle vergelijkt melderidentiteit, registratie-ID, soort, datum en tekst. Latere invoer kan als een afzonderlijke nieuwe vermelding worden opgeslagen. Een tweede tab kan de eerdere registratie met hetzelfde ID niet overschrijven. |
+| Meeklinken en telefoons | De standaardgroep verzond bij gesimuleerde rook geen opdracht. De modeltest volgt een Heiman S1-M en Aqara JY-GZ-01AQ via MQTT, ook wanneer het doel zelf rook meldt. De Heiman mag zijn eigen gekoppelde geluid na vrijgave stoppen. Voor deze Aqara verstuurt AlarmMesh geen automatische stilzetopdracht. De telefonieschermen onderscheiden instellingen, aanvraagstatus en de persoonlijke bevestiging van ontvangst of geluid. |
+
+### Zelf beoordelen in vijf minuten
+
+1. Open **Overzicht → Stille oefening → Zolder**. Ga één stap verder en open **Waarom blijven deze acties uit?** Bij Hal zie je via welke twee groepen hij is opgenomen. Bij de gekozen oefentelefoons staat waarom ze stil blijven.
+2. Open **Melders → Hal**. Bekijk de batterij en de alarmroute. Onder **Onderhoud noteren** staat de weg terug naar dezelfde melder.
+3. Bekijk de voor/na-beelden van de onderbroken onderhoudstaak en de matrix van Nederlands/Engels, licht/donker en telefoon/tablet. De rookknop opent het actuele incident. Op de smalle weergave blijft hij met het toetsenbord bereikbaar.
+
+### Reproduceerbare vrijgavecontroles
+
+De checkout is vergeleken met de tag `0.1.0-beta.19`. Gebruik `dev/validate.ps1` voor de volledige technische validatie en `dev/release/check-update.ps1 -PreviousRevision 0.1.0-beta.19 -HaVersion <versie>` voor de upgrade van het oude pakket naar de werkboom. De twee versies zijn 2026.10.4 en 2026.11.1. De updateproef controleert schone installatie, herstart en herstel van gestopte testbestanden. De vergelijking omvat groepsleden, expliciete koppeling, een geselecteerde telefoon met kritisch profiel, geluid, volume en een exacte onderhoudsregel. De pakketten worden tweemaal gebouwd en per bestand en SHA-256 vergeleken.
+
+**Open vóór stabiele publicatie.** De eigenaar beslist over vrijgave, licentie en distributierechten van het beeldmateriaal. Acceptatie van de eigen installatie-/back-uproute, werkelijk geluid en herstel per model/provider en bezorging op de eigen telefoons vraagt een afzonderlijke praktijktest. De lokale review gebruikte uitsluitend simulatoren en mockontvangers.
+
+---
+
+## Historische vrijgaveaudit voor 0.1.0-beta.15
 
 **19 november 2026.** Deze kandidaat volgt op de gepubliceerde bèta 14. De praktijkcontrole door de beheerder en zijn beslissing over stabiele publicatie staan open. De [release-instructies](releases/0.1.0-beta.15.md) bevatten een korte rondleiding.
 

@@ -1775,3 +1775,61 @@ test("detector search finds a room and can reset an empty result in place", () =
   assert.equal(root.querySelectorAll(".filtered-devices .source").length, 1);
   assert.deepEqual(calls, []); panel.remove();
 });
+
+test("smoke in the open editor has one direct link to the current incident", () => {
+  const {panel, root, transport} = setup();
+  panel.linkedIncident = "earlier";
+  panel.openDialog({kind:"edit",group:null});
+  const d=normal(); d.result.smoke="SMOKE_REPORTED"; d.sources[0].status="SMOKE_REPORTED";
+  transport.callbacks.at(-1)(d);
+  const buttons=root.querySelectorAll("dialog .recovery-smoke button");
+  assert.equal(buttons.length,1);
+  buttons[0].click();
+  assert.equal(panel.page,"incidents"); assert.equal(panel.linkedIncident,null);
+  panel.remove();
+});
+
+test("lost group reply checks the stored group against edits during readback", async () => {
+  const {panel,root,calls,transport}=setup();
+  const d=normal(), g={id:"4".repeat(32),name:"Before",members:[source.entity_id],unselected:[],linking:{enabled:false,bindings:[]}};
+  d.groups=[g];transport.callbacks.at(-1)(d);panel.openDialog({kind:"edit",group:g});
+  let resolveRead;
+  panel._hass.callWS=m=>{calls.push(m.type);if(m.type==="alarmmesh/group")return Promise.reject({code:"connection_lost"});return new Promise(r=>{resolveRead=r;});};
+  const name=root.querySelector("#group-name");name.value="First";
+  root.querySelector("form").dispatchEvent(new Event("submit",{cancelable:true}));await tick();
+  const check=root.querySelector(".check-group-save");
+  assert.ok(check);check.click();name.value="Later";name.dispatchEvent(new Event("input",{bubbles:true}));
+  resolveRead({...d,revision:1,groups:[{...g,name:"First"}]});await tick();
+  assert.equal(name.value,"Later");assert.equal(root.querySelector(".group-readback p").textContent,panel.t.groupSaveDifferent);
+  assert.deepEqual(calls,["alarmmesh/group","alarmmesh/current"]);panel.remove();
+});
+
+test("opening a recovered draft during smoke retains the incident action", () => {
+  const {panel,root,transport}=setup(), model=normal();
+  model.result.smoke=model.sources[0].status="SMOKE_REPORTED";
+  transport.callbacks.at(-1)(model);
+  panel.openDialog({kind:"edit",group:null,pendingDraft:{signature:panel.draftSignature()}});
+  assert.ok(root.querySelector("dialog .recovery-smoke button")); panel.remove();
+});
+
+test("a new care note edited during readback can be saved separately with a fresh id", async () => {
+  const {panel,root,transport,calls}=setup(), model=normal();
+  model.sources[0].reminder_identity="a".repeat(64); transport.callbacks.at(-1)(model);
+  let finish, first;
+  panel._hass.callWS=message=>{
+    calls.push(message);
+    if(message.type==="alarmmesh/current")return new Promise(resolve=>{finish=resolve;});
+    if(!first){first=message.record;return Promise.reject(Error("reply lost"));}
+    return Promise.resolve({});
+  };
+  panel.openDialog({kind:"care",id:source.entity_id});
+  const form=root.querySelector("dialog form"), save=form.querySelector("[type=submit]"), note=form.querySelectorAll("input")[1];
+  form.querySelector("option").selected=true;form.querySelector("[type=date]").value="2026-11-19";note.value="First";
+  form.dispatchEvent(new Event("submit",{cancelable:true}));await tick();
+  form.querySelector("[type=button]").click();note.value="Later";
+  finish({...model,care_log:[first]});await tick();
+  assert.equal(save.disabled,false);assert.equal(note.value,"Later");
+  form.dispatchEvent(new Event("submit",{cancelable:true}));await tick();
+  assert.equal(calls.length,3);assert.notEqual(calls[2].record.id,first.id);assert.equal(calls[2].record.note,"Later");
+  panel.remove();
+});

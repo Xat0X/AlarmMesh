@@ -269,7 +269,7 @@ class PanelController:
             "alarmmesh-panel",
             sidebar_title="AlarmMesh",
             sidebar_icon="mdi:smoke-detector",
-            module_url=f"{ASSET_URL}/panel.js?v=panel-navigation-1",
+            module_url=f"{ASSET_URL}/panel.js?v=candidate-readback-1",
             require_admin=True,
         )
         self.hub.controller = self
@@ -525,6 +525,7 @@ class PanelController:
             "rooms": list(rooms.values()),
             "groups": groups,
             "revision": self.groups.revision,
+            "group_creation_id": True,
             "care_log": deepcopy(self.care.rows),
             "care_error": self.care.damaged,
             "incident": self.linking.snapshot(),
@@ -601,6 +602,7 @@ def ws_subscribe(hass, connection, msg):
         vol.Required("operation"): vol.In(["create", "update", "delete"]),
         vol.Required("revision"): vol.All(int, vol.Range(min=0)),
         vol.Optional("group_id"): vol.All(str, vol.Length(min=32, max=32)),
+        vol.Optional("creation_id"): vol.All(str, vol.Match(r"^[a-f0-9]{32}\Z")),
         vol.Optional("name"): vol.All(str, vol.Length(max=256)),
         vol.Optional("members"): vol.All(
             [vol.All(str, vol.Length(max=255))], vol.Length(max=256)

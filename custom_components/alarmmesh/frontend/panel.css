@@ -73,7 +73,14 @@ summary:focus-visible, select:focus-visible { outline: 3px solid var(--teal); ou
 dialog { overscroll-behavior: contain; scrollbar-gutter: stable; }
 dialog .actions { position: sticky; bottom: -1px; background: var(--surface); padding: 12px 0; border-top: 1px solid var(--line); z-index: 1; }
 dialog .actions button { flex: 1; }
-dialog .recovery-smoke { border: 2px solid var(--alarm); }
+dialog .recovery-smoke {
+  display: grid;
+  gap: 8px;
+  border: 2px solid var(--alarm);
+  max-height: min(40dvh, 260px);
+}
+dialog .recovery-smoke span { overflow: auto; }
+dialog .recovery-smoke .incident-link { justify-self: start; margin: 0; }
 @media (max-width: 620px) {
   main { padding: 20px 16px; }
   .shell { padding-bottom: 88px; }

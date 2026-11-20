@@ -1,6 +1,12 @@
 // Product UI text follows the current Home Assistant profile language.
 export const TEXT = {
   en: {
+    backToDetector: "Back to detector",
+    lastReading: "Last update before disconnection",
+    followed: "Following",
+    checkGroup: "Check saved group",
+    groupSaveVerified: "The saved group matches this form.",
+    groupSaveDifferent: "The saved group differs. Your edits are still here. Reopen the group to work from the latest settings.",
     execution_paused: "Sounder execution is paused after an interrupted lifecycle. Read-only reports remain available. Resolve the integration error and restart Home Assistant.",
     linkTogether: "Sound together", linkIntro: "Only selected smoke reports initiate linked sounding. Unsupported detectors can still be smoke sources.",
     enableLink: "Enable linked sounding", smokeSource: "Smoke source", proposedControl: "Proposed control",
@@ -57,6 +63,12 @@ export const TEXT = {
     alarmFrom: "Reported by", noEvents: "Current reports · opt-in linked sounding",
   },
   nl: {
+    backToDetector: "Terug naar melder",
+    lastReading: "Laatste gegevens vóór verbindingsverlies",
+    followed: "Gevolgde melders",
+    checkGroup: "Controleer opgeslagen groep",
+    groupSaveVerified: "De opgeslagen groep komt overeen met dit formulier.",
+    groupSaveDifferent: "De opgeslagen groep wijkt af. Je invoer staat hier nog. Open de groep opnieuw om verder te werken met de nieuwste instellingen.",
     execution_paused: "Zoemeropdrachten zijn onderbroken na een lifecyclefout. Alleen-lezen meldingen blijven beschikbaar. Los de integratiefout op en herstart Home Assistant.",
     linkTogether: "Samen laten afgaan", linkIntro: "Alleen rookmeldingen van geselecteerde bronnen starten koppeling. Niet-bedienbare melders kunnen wel rookbron zijn.",
     enableLink: "Samen afgaan inschakelen", smokeSource: "Rookbron", proposedControl: "Voorgestelde bediening",

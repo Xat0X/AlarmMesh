@@ -1,6 +1,6 @@
 # Acceptatieoverzicht
 
-De [vrijgaveaudit voor bèta 15](release-readiness.md) beschrijft de kandidaat en de resterende praktijkcontroles. Hieronder staan eerdere beoordelingen op datum.
+De [lokale vrijgaveaudit na bèta 19](release-readiness.md) beschrijft de browserproeven, de upgrade vanaf bèta 19 en de resterende praktijkcontroles. De oudere beoordelingen volgen hieronder op datum.
 
 ## Historical test release — 0.1.0-beta.7
 

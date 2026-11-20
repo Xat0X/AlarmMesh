@@ -1184,3 +1184,35 @@ async def test_local_target_smoke_does_not_end_a_continuing_target_incident(
         "option": "stop",
     }
     assert len([call for call in calls if call[2]["entity_id"] == e["target"]]) == 1
+
+
+@pytest.mark.parametrize(
+    ("model", "vendor", "expected_calls"),
+    [("S1-M", "Heiman", 2), ("JY-GZ-01AQ", "Aqara", 1)],
+)
+async def test_linked_targets_own_smoke_visible_until_explicit_clear(
+    hass, devices, model, vendor, expected_calls
+):
+    add, calls, _ = devices
+    source = add("hall")["source"]
+    detector = add("attic", model, vendor=vendor)
+    target = detector["source"]
+    entry = await setup(hass, [source, target])
+    await configure(hass, entry, [source, target], [detector])
+    hass.states.async_set(source, "on", {"device_class": "smoke"})
+    await flush(hass, entry)
+    assert len(calls) == 1
+    hass.states.async_set(target, "on", {"device_class": "smoke"})
+    hass.states.async_set(source, "off", {"device_class": "smoke"})
+    await flush(hass, entry)
+    current = entry.runtime_data.panel.snapshot()
+    assert current["result"]["smoke"] == "SMOKE_REPORTED"
+    assert [
+        s["entity_id"] for s in current["sources"] if s["status"] == "SMOKE_REPORTED"
+    ] == [target]
+    assert len(calls) == 1
+    hass.states.async_set(target, "off", {"device_class": "smoke"})
+    await flush(hass, entry)
+    assert len(calls) == expected_calls
+    if expected_calls == 2:
+        assert calls[-1][2] == {"entity_id": detector["target"], "option": "stop"}

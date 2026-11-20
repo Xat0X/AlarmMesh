@@ -443,3 +443,19 @@ async def test_group_load_failure_does_not_leave_panel_or_sources(hass):
         assert not await hass.config_entries.async_setup(entry.entry_id)
     assert hass.data[DATA_HUB].controller is None
     assert "alarmmesh" not in hass.data[frontend.DATA_PANELS]
+
+
+async def test_browser_creation_id_identifies_exact_group_after_lost_reply(hass):
+    store = GroupStore(hass, "test")
+    command = {
+        "operation": "create",
+        "revision": 0,
+        "name": "Home",
+        "members": [A],
+        "creation_id": "a" * 32,
+    }
+    await store.async_mutate(command, (A,))
+    assert store.groups[0]["id"] == command["creation_id"]
+    with pytest.raises(GroupError, match="conflict"):
+        await store.async_mutate({**command, "revision": 1}, (A,))
+    assert len(store.groups) == 1 and store.revision == 1

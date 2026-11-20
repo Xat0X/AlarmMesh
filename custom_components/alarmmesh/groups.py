@@ -259,6 +259,19 @@ class GroupStore:
             if operation == "create":
                 if group_id is not None or len(self.groups) >= MAX_GROUPS:
                     raise GroupError("group_limit")
+                creation_id = command.get("creation_id")
+                if creation_id is not None:
+                    if (
+                        not isinstance(creation_id, str)
+                        or len(creation_id) != 32
+                        or any(c not in "0123456789abcdef" for c in creation_id)
+                    ):
+                        raise GroupError("invalid_operation")
+                    if any(group["id"] == creation_id for group in self.groups):
+                        raise GroupError("conflict")
+                    group_id = creation_id
+            elif "creation_id" in command:
+                raise GroupError("invalid_operation")
             elif previous is None:
                 raise GroupError("not_found")
             groups = deepcopy(self.groups)

@@ -225,6 +225,7 @@ export function exercise(panel, host, detail, initial) {
 
 export function incidentDetail(panel, parent, id) {
   const say=language(panel), events=(panel.data.activity?.events || []).filter(e=>e.category==="alarm" && e.correlation===id);
+  const viewCurrent = action(say("Bekijk de huidige situatie","View current situation"),()=>{panel.linkedIncident=null;panel.go("incidents");});
   if (panel.data.result.smoke === "SMOKE_REPORTED") {
     const current = node("section");
     current.className = "notice incident-now";
@@ -232,6 +233,7 @@ export function incidentDetail(panel, parent, id) {
     for (const source of panel.data.sources.filter(s => s.status === "SMOKE_REPORTED")) {
       current.append(node("p", panel.sourceName(source.entity_id)));
     }
+    current.append(viewCurrent);
     parent.append(current);
   }
   parent.append(node("h2",say("Incident uit deze melding","Incident from this alert")));
@@ -251,7 +253,7 @@ export function incidentDetail(panel, parent, id) {
       event.kind==="incident_origin" ? say("Rook waargenomen","Smoke observed") : panel.activityResult(event);
     parent.append(node("p",[panel.formatTime(event.observed_at),name,label].filter(Boolean).join(" · ")));
   }
-  parent.append(action(say("Bekijk de huidige situatie","View current situation"),()=>{panel.linkedIncident=null;panel.go("incidents");}));
+  if (!viewCurrent.parentElement) parent.append(viewCurrent);
 }
 
 export function careView(panel,parent,source,edit=false) {
@@ -259,6 +261,7 @@ export function careView(panel,parent,source,edit=false) {
   const health=source.capability?.details?.maintenance, record=source.selftest?.record;
   const entryId = panel.data.entry_id;
   const kinds={battery:say("Batterij vervangen","Battery replaced"),clean:say("Melder schoongemaakt","Detector cleaned"),note:say("Notitie","Note")};
+  if (edit) parent.append(action(t.backToDetector + " · " + panel.sourceName(source.entity_id), () => panel.openDialog({kind:"source",id:source.entity_id})));
   parent.append(node("h3",t.maintenance));
   const percent=health?.battery_percent;
   parent.append(node("p",t.battery+" · "+(!source.identity_changed && Number.isFinite(percent) && percent>=0 && percent<=100 ? percent+"%" : t.guide_unknown)));
@@ -274,14 +277,17 @@ export function careView(panel,parent,source,edit=false) {
   for(const [key,label] of Object.entries(kinds)){const option=node("option",label);option.value=key;kind.append(option);}
   for(const [field,title] of [[kind,t.maintenance],[day,say("Datum","Date")],[note,kinds.note]]){const label=node("label",title);label.append(field);form.append(label);}
   const save=node("button",say("Vermelding opslaan","Save entry"));save.type="submit";save.className="button primary";form.append(save,status);parent.append(form);
-  const id=Array.from(crypto.getRandomValues(new Uint8Array(16)),v=>v.toString(16).padStart(2,"0")).join("");
+  const newId = () => Array.from(crypto.getRandomValues(new Uint8Array(16)),v=>v.toString(16).padStart(2,"0")).join("");
+  let id = newId();
   let pending = null;
   let uncertain = false;
   const check = action(say("Controleer opgeslagen vermelding","Check saved entry"), async () => {
     if (!uncertain || !pending || check.disabled || !panel.data) return;
     check.disabled = true;
+    const generation = panel.generation;
     try {
       const fresh = await panel._hass.callWS({type:"alarmmesh/current"});
+      if (!form.isConnected || generation !== panel.generation) return;
       if (!fresh.available || fresh.entry_id !== entryId || fresh.care_error || !Array.isArray(fresh.care_log) ||
           !fresh.sources?.some(s => s.entity_id === source.entity_id && s.reminder_identity === identity)) {
         status.textContent = t.saveResultUnknown;
@@ -289,8 +295,17 @@ export function careView(panel,parent,source,edit=false) {
       }
       const row = fresh.care_log.find(r => r.id === id);
       if (row && Object.keys(pending).every(key => row[key] === pending[key])) {
-        status.textContent = [say("Opgeslagen","Saved"),row.date,kinds[row.kind],row.note].filter(Boolean).join(" · ");
+        const same = day.value === row.date && kind.value === row.kind && note.value.trim() === row.note;
+        status.textContent = [same ? say("Opgeslagen","Saved") : say("Eerdere vermelding teruggevonden. Je nieuwe invoer is nog niet opgeslagen.","Earlier entry found. Your new edits are unsaved."),row.date,kinds[row.kind],row.note].filter(Boolean).join(" · ");
         uncertain = false;
+        if (same) {
+          for (const field of [day,kind,note]) field.disabled = true;
+        } else {
+          id = newId();
+          pending = null;
+          delete save.dataset.started;
+          save.disabled = false;
+        }
       } else if (!row) {
         status.textContent = say("Geen opgeslagen vermelding gevonden. Je kunt opnieuw opslaan.","No saved entry found. You can save again.");
         pending = null;
@@ -325,6 +340,7 @@ export function careView(panel,parent,source,edit=false) {
       status.textContent = say("Opgeslagen","Saved");
     } catch {
       uncertain = true;
+      for (const field of [day,kind,note]) field.disabled = false;
       check.disabled = false;
       status.textContent = t.saveResultUnknown;
     }
