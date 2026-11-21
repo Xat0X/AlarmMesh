@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.0 — 2026-11-21
+
+- First stable release. Follow a detector's smoke report from a phone notification to its incident, rehearse the route on screen, and review earlier reports and maintenance.
+- The English getting-started guide includes simulator screenshots and explains per-model sounder support. The panel links to the creator's GitHub profile and explains the safety limits in English and Dutch.
+
 ## 0.1.0-rc.5 — 2026-11-21
 
 - Identify the reporting detector from the notification title and its known Home Assistant area from the first line. An update leads with the newly reporting detector.

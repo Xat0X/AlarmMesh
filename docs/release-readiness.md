@@ -1,4 +1,8 @@
-# Vrijgaveaudit voor 0.1.0-rc.5
+# Vrijgave van 0.1.0
+
+De eerste stabiele versie bouwt voort op RC5. De gebruiker rapporteerde dat zijn iPhone-proef goed verliep. Deze praktijkervaring geldt voor zijn installatie. De release voegt een Engelstalige startgids, simulatorbeelden, een makersvermelding en een veiligheidsverklaring toe. De groepsinstellingen en modelgebonden start- en stopregels zijn gelijk aan RC5. [Versie 0.1.0](releases/0.1.0.md)
+
+## Vrijgaveaudit voor 0.1.0-rc.5
 
 De simulator volgde de meldingslink van iOS en Android tot op het incidentscherm. Eén druk op de groepsknop stopte het meeklinken van twee geschikte Heiman-melders. Toen de tweede melder tijdens het indrukken zelf rook ging melden, kreeg alleen de andere melder een stopopdracht. De weergave op een vergrendelde iPhone is het praktijkpunt voor deze kandidaat. [RC5 en het testpad](releases/0.1.0-rc.5.md)
 

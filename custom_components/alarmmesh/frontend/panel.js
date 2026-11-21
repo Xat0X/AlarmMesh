@@ -1,5 +1,5 @@
 import { exercise, incidentDetail, careView } from "./family.js?v=phone-incident-1";
-import { TEXT } from "./translations.js?v=phone-incident-1";
+import { TEXT } from "./translations.js?v=public-010";
 import { Drafts } from "./drafts.js?v=family-beta16";
 
 // Safe DOM construction: names, labels and registry data are always text nodes.
@@ -197,7 +197,7 @@ export class AlarmMeshPanel extends HTMLElement {
     const t = this.t;
     const sticky = this.shadowRoot.activeElement;
     const stickyKey = sticky?.dataset.sticky, selection = stickyKey ? [sticky.selectionStart, sticky.selectionEnd] : null;
-    const link = el("link"); link.rel = "stylesheet"; link.href = "/alarmmesh-assets/panel.css?v=phone-incident-1";
+    const link = el("link"); link.rel = "stylesheet"; link.href = "/alarmmesh-assets/panel.css?v=public-010";
     const shell = el("div", undefined, "shell");
     shell.classList.toggle("dark", Boolean(this._hass?.themes?.darkMode));
     const side = el("aside");
@@ -278,7 +278,14 @@ export class AlarmMeshPanel extends HTMLElement {
       }
       if (!data.sources.length && !["overview", "devices", "maintenance", "settings"].includes(this.page)) main.append(el("p", t.empty, "notice"), button(t.choose, () => this.choose(), "button primary"));
     }
-    main.append(el("footer", t.note)); workspace.append(header, main); shell.append(side, workspace);
+    const footer = el("footer");
+    const credit = el("a", "Created with ❤️ by Xat0X", "author-credit");
+    credit.href = "https://github.com/Xat0X";
+    credit.target = "_blank";
+    credit.rel = "noopener noreferrer";
+    credit.dataset.sticky = "author-credit";
+    footer.append(el("p", t.note), el("p", t.safetyDisclaimer), credit);
+    main.append(footer); workspace.append(header, main); shell.append(side, workspace);
     // Keep an open form separate: push updates never erase unsaved input or focus.
     const previous = this.shadowRoot.querySelector(".shell");
     shell.dataset.view = this.page;

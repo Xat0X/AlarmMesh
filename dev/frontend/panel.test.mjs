@@ -156,7 +156,22 @@ test("every product label has Dutch and English text; no remote runtime imports"
   assert.deepEqual(Object.keys(TEXT.en).sort(), Object.keys(TEXT.nl).sort());
   for (const locale of Object.values(TEXT)) assert.ok(!/[A-Za-z]\?[A-Za-z]|\uFFFD/.test(Object.values(locale).join(" ")), "Translation contains a broken character");
   const js = await readFile(new URL("../../custom_components/alarmmesh/frontend/panel.js", import.meta.url), "utf8");
-  assert.ok(!/innerHTML|window\.openai|Tweak|https?:\/\//.test(js));
+  const withoutAuthorLink = js.replace('credit.href = "https://github.com/Xat0X";', "");
+  assert.ok(!/innerHTML|window\.openai|Tweak|https?:\/\//.test(withoutAuthorLink));
+});
+
+test("the footer identifies the author and explains the safety limits in both languages", () => {
+  for (const [language, safety] of [["en", /cannot replace a certified fire alarm system/], ["nl", /gecertificeerd brandalarmsysteem niet vervangen/]]) {
+    const {panel, root, calls} = setup(language);
+    const footer = root.querySelector("footer");
+    assert.match(footer.textContent, safety);
+    const link = footer.querySelector("a");
+    assert.equal(link.textContent, "Created with ❤️ by Xat0X");
+    assert.equal(link.getAttribute("href"), "https://github.com/Xat0X");
+    assert.equal(link.getAttribute("rel"), "noopener noreferrer");
+    assert.deepEqual(calls, []);
+    panel.remove();
+  }
 });
 
 function linkedData() {

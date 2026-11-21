@@ -2,188 +2,76 @@
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="custom_components/alarmmesh/brand/dark_logo@2x.png">
-  <source media="(prefers-color-scheme: light)" srcset="custom_components/alarmmesh/brand/logo@2x.png">
-  <img src="custom_components/alarmmesh/brand/logo.png" alt="AlarmMesh â€” read-only smoke reports and source availability for Home Assistant" width="560">
+  <img src="custom_components/alarmmesh/brand/logo@2x.png" alt="AlarmMesh" width="330">
 </picture>
 
-Smoke reports and source availability from existing Home Assistant smoke detector
-entities, with a local panel for detectors, rooms and groups. This test release adds [optional linked sounding](docs/linked-sounding.md), off by default.
-Version 0.1.0-rc.5 also offers [Companion notifications, group
-script actions, incident details and reviewed built-in self-test requests](docs/incident-features.md).
-New automatic behavior defaults off; existing explicit choices are preserved.
-It includes [opt-in maintenance messages, non-executing action
-examples and anonymized support diagnosis](docs/maintenance-tools.md).
-This beta adds [bounded activity history, optional check reminders,
-detector filters and organizational group copies](docs/activity-reminders.md).
-The reviewed panel also improves [guided setup, maintenance and incident details](docs/usability-review.md).
-The local [morning UI refinement](docs/morning-review.md) simplifies daily status,
-source routes, group setup and notification settings without changing execution rules.
-The local [notification correction and review](docs/notification-review.md) adds
-request diagnosis and safer confirmation/reconnect handling. Actual phone delivery
-and the originally reported live failure remain unverified in that historical review.
-The current local work adds [per-phone critical smoke alerts and phone setup help](docs/phone-alerts.md).
-The user reports a successful critical notification on the tested iPhone and
-settings. This does not establish other phones, sounds or Focus modes.
-The local [alarm settings and phone observation review](docs/alarm-settings-review.md)
-adds one read-only overview, request-bound user observations, change summaries
-and an incident timeline. Earlier [critical-alert evidence](docs/critical-notification-review.md)
-remains a dated record of simulation, not a physical test.
-Open **Maintenance** from the main menu or browse **Detectors → By room**. Explore the silent family drill under **Overview → Silent practice**, follow a smoke alert to its incident, and record detector maintenance. See the [panel guide](docs/panel.md).
+AlarmMesh brings the smoke detectors you already have in Home Assistant into one view. If the landing detector reports smoke, you can see its name on your phone, tap the alert to open that incident, and see which other detectors have reported smoke. You decide whether any phones, linked sounders or Home Assistant scripts take part.
 
-Earlier [finishing checks](docs/finish-review.md) remain dated historical evidence.
+> [!IMPORTANT]
+> **AlarmMesh is a supplementary tool, provided as is, without warranty.** It cannot replace certified smoke alarms or a certified fire alarm system. During a fire, a detector, Home Assistant or the network can fail, and an alert may arrive late or never arrive. Never rely on AlarmMesh alone for your safety. “No smoke reported” only describes the readings available to Home Assistant.
 
-> AlarmMesh is not a certified fire alarm system and must not replace certified standalone smoke detectors.
+<img src="assets/screenshots/overview.png" alt="AlarmMesh Overview in a simulated home. Four detectors are reporting a status, and the shortcuts open alarm settings, silent practice and activity." width="860">
 
-## Device support
+## Get started
 
-The **Matter integration** adds HA-only smoke sources, endpoint-bound
-optional diagnostics/self-test requests and separate provider/transport labels.
-It offers no Matter sounder, stop or mute command. See the [Matter model/function
-matrix and setup](docs/matter-support.md) and [current review results](docs/matter-review.md).
-The local draft feature preserves selected unsent configuration input through a
-full browser reload, without restoring confirmation or bypassing revisions.
-Existing [Z-Wave JS smoke entities](docs/zwave-support.md) can also join mixed groups and provide device health information.
+You need Home Assistant **2026.10.4 or later**, administrator access, and at least one existing smoke detector entity (`binary_sensor` with device class `smoke`). Set up the detectors in their own integration first. You can use AlarmMesh immediately for monitoring, with all automatic actions off.
 
-This test release includes an offline catalog of **52 converter definitions /
-67 model and variant rows**, additional reviewed HA select/siren/switch profiles,
-read-only battery/fault/test details and searchable compatibility in the existing
-panel. Linking remains off by default; the catalog alone never permits control.
-Seven Heiman models connected through Zigbee2MQTT can stop linked sounding after every contributing detector and the sounding detector report clear. See [linked sounding and stopping for Aqara and Heiman](docs/meeklinken-en-stoppen.md).
-See [device coverage, prerequisites, upstream gaps and current evidence](docs/device-compatibility.md).
-BSD-2 activation requires its broadcast setting to explicitly report off;
-AlarmMesh never changes that setting. The original branding, two overview
-entities, source-selection schema and smoke rules remain unchanged.
+1. **Install the integration.** On Home Assistant 2026.11 or later, open **Settings → Marketplace → Add from link** and enter `https://github.com/Xat0X/AlarmMesh`. On 2026.10.4 with HACS, open **HACS → ⋮ → Custom repositories**, add the same URL and select **Integration**. Install AlarmMesh and follow the restart prompt. [Installation and updates](docs/installation.md)
+2. **Choose your detectors.** Open **Settings → Devices & services → Add integration → AlarmMesh** and select the smoke entities you want to follow. Give each a recognizable name and assign its area in Home Assistant. These names appear in the panel and in phone alerts.
+3. **Check your setup.** Open **AlarmMesh** in the sidebar. **My alarm settings** shows the route for each detector. Open **Silent practice** to walk through an example with your family. You can do this before enabling any notifications or linked sound.
 
-## Release candidate 0.1.0-rc.5
+## When a detector reports smoke
 
-A smoke notification names the reporting detector in its title and shows its Home Assistant area when available. Tap the alert to see which detectors currently report smoke. The incident screen lists the eligible detectors above **Stop linked sound in this group**. A Heiman reporting its own smoke keeps alarming. The Aqara JY-GZ-01AQ supports starting linked sound only.
+- **On your phone**, an alert such as **Smoke alert · Landing detector** identifies the source. The first line includes its Home Assistant area when assigned. If a second detector reports smoke, the next alert leads with that detector. In AlarmMesh, choose which Companion App phones receive alerts and whether each phone uses a critical alert. Delivery and sound depend on the phone's permissions and settings.
+- **On the incident screen**, you see which detectors are reporting smoke now and when the first report arrived. The affected group's **Stop linked sound in this group** button lists the detectors it can control. A detector reporting its own smoke keeps alarming. Opening the notification only displays the incident.
+- **Afterwards**, the activity timeline shows smoke reports and clearances, which starts and stops AlarmMesh requested, and any available siren feedback. A command accepted by Home Assistant does not establish what anyone heard. An older notification opens the incident it came from.
 
-The group button can also stop a Heiman that confirms its linked tone late. If a fresh reply to the stop still reports the linked tone, AlarmMesh checks again after five seconds and may request one more stop. The timeline shows the reported siren state.
+## What you can set up
 
-Open **Activity → Smoke and sounder commands** to see which detector reported smoke and when AlarmMesh requested each linked start or stop. Filter by the local start time of your test. For Heiman detectors, the timeline also shows when Home Assistant reported the tone, whether the report matched the start request and why a stop was withheld.
+| Feature | How you might use it |
+| --- | --- |
+| Detectors and rooms | Find a detector by name or room. Check its smoke state, battery percentage and device information where the provider exposes them. An unreachable source is marked separately. |
+| Groups and linked sound | Group detectors by floor or zone. If a detector supports remote activation, explicitly select it to sound when another group member reports smoke. Creating a group leaves linked sound off by default. |
+| Phone alerts and actions | Choose Companion App recipients, configure critical alerts, and record whether a test notification was received and heard. Optionally run selected Home Assistant scripts when smoke starts or clears. |
+| Silent practice | Pick a detector and follow the branches to other sounders, phones and scripts. See why a particular action would stay off. The exercise runs on screen and sends no commands. |
+| Maintenance | Review battery and connectivity reports, schedule reminders and record a battery change or maintenance visit. A manual journal entry stays separate from device readings and self-test results. |
+| Dashboards | Use the smoke and source-availability entities in your own dashboards. The optional family card opens the relevant incident or detector. The management panel and family card require an administrator account. |
 
-For opt-in testing, enable **Pre-release** in the AlarmMesh Marketplace page and
-choose **0.1.0-rc.5**. Back up before updating and follow the restart prompt.
-Read the [release notes](docs/releases/0.1.0-rc.5.md) before installing.
+### Two views from the simulator
 
-## Current status: local panel and two read-only overviews
+<details>
+<summary><strong>Phone screen during an incident</strong> — see the source and the group stop button</summary>
 
-**Optional linked sounding:** explicit, administrator-confirmed sounder mappings
-in groups, with conservative model/provider profiles and separate action results.
-Upgrading from beta.1 leaves existing groups unlinked; new groups also default off.
-For this installation review, leave linking off and do not change device prerequisites.
-Previously enabled groups retain their explicit configuration: switch them off in
-AlarmMesh before updating if any are enabled. Installing this beta must not be used
-as a physical alarm test.
-Back up before updating: the new group format requires the pre-update backup for rollback. See [support, lifecycle and simulation
-evidence](docs/linked-sounding.md). Physical linked-sounding acceptance remains unperformed.
+The landing detector is reporting smoke. The group button lists the hall and bedroom detectors because they are sounding along.
 
-The interface adds **AlarmMesh** to the Home Assistant sidebar for
-administrators: overview, detectors and details, HA rooms, and persistent
-organizational groups. It uses the signed-in HA session and needs no YAML,
-resource installation, Node on the HA host or separate server. See the
-[panel user guide](docs/panel.md). Release validation is separate from earlier hosted
-CI or installer acceptance; those dated results remain in the acceptance matrix.
+<img src="assets/screenshots/incident.png" alt="Mobile smoke alert showing the landing detector, its upstairs location and a group stop button for the hall and bedroom detectors." width="310">
+</details>
 
-Source selection, passive local tracking and the two read-only overview entities
-remain available with linking off. The supplied artwork is unchanged.
-AlarmMesh lets you select existing smoke detector entities during setup and
-replace that selection later through the integration options. Select at least
-one `binary_sensor` with device class `smoke`. AlarmMesh reads their current local
-Home Assistant states when loaded and follows changes to those selected IDs.
-An already active smoke report is recognized immediately on loading. The shared
-in-memory result is shown by exactly two entities, with no physical device entry:
+<details>
+<summary><strong>Silent practice</strong> — follow the same route before you enable it</summary>
 
-- A smoke binary sensor: `on` means smoke reported; `off` means **no smoke
-  reported** ("geen rook gemeld"). An indeterminate result is `unavailable`, never
-  `off`. A smoke report remains `on` even if another source is unreachable or
-  missing.
-- A source availability enum-sensor: `complete`, `incomplete` or `not_configured`.
-  This sensor remains available when sources are unreachable. It describes
-  completeness of source information, not fire safety.
+In this example, a report from the landing would sound the bedroom detector and notify the family phone. You can expand each branch to see why it participates.
 
-No smoke reported is not a guarantee of safety. Optional linking calls only
-explicitly mapped, verified existing HA controls. It adds no arbitrary AlarmMesh services or device transport. In the current
-version, notifications and script actions require separate opt-in; built-in
-self-test requests require a reviewed model/provider contract and confirmation.
-Activation-only profiles have no automatic stop; a completed HA action is not audible confirmation.
+<img src="assets/screenshots/silent-practice.png" alt="Silent practice route branching from the landing detector to a bedroom detector and a family phone." width="700">
+</details>
 
-## Install and select sources
+## Will my detector work?
 
-On **HA 2026.11+**, use the built-in **Settings > Marketplace > Add from link**
-with `https://github.com/Xat0X/AlarmMesh`. On the older **2026.10.4** baseline,
-use HACS's **Custom repositories**, type **Integration**, with the same URL.
-See [installation, updates and removal](docs/installation.md) for the supported
-steps and restart prompts. Adding a repository does not mean public catalog
-admission or Home Assistant approval.
+**Reading smoke, starting linked sound and stopping linked sound are separate capabilities.** AlarmMesh can follow an existing Home Assistant smoke entity even when its model has no remote sounder control. Groups can mix sources from Zigbee2MQTT, ZHA, Matter and Z-Wave JS. Available controls depend on the receiving model, its provider and the entities exposed in your installation.
 
-After installation, in **Settings > Devices & services > Add integration**,
-select **AlarmMesh**, choose an existing smoke detector entity, and submit the
-form. Check both overviews: an explicit `off` source gives smoke `off` and source
-availability `complete`. More sources can be selected. Only one configuration
-can be added.
-Use **Configure** on the integration entry to view or replace the selection.
-Saving changed options reloads the integration to follow the new selection.
-Closing the form or submitting invalid input keeps the saved selection unchanged.
-Remove the integration entry to stop tracking and remove its configuration;
-uninstall through the installer separately to remove the installed files.
+| Example | What to expect |
+| --- | --- |
+| Heiman HS1SA-E-PLUS via Zigbee2MQTT | With a verified control and linking enabled, it can sound along. The group button can stop a linked tone that AlarmMesh started and identified. The detector's own smoke status is checked again before a stop. |
+| Aqara JY-GZ-01AQ via Zigbee2MQTT | Can start linked sound when its prerequisites are met. AlarmMesh never sends the Aqara mute command because it can also silence the detector's own local alarm. |
+| Matter smoke detector | AlarmMesh can display smoke reports and the diagnostics exposed by Home Assistant. The Matter integration in AlarmMesh offers no remote sounder or mute command. |
 
-Temporarily `unknown` or `unavailable` detectors can remain selected when Home
-Assistant's entity metadata identifies them as smoke detectors. Duplicate,
-nonexistent, non-smoke and AlarmMesh-owned entities are rejected. Existing empty
-foundation configurations still load; open **Configure** to add sources. Without
-sources, the smoke overview is `unavailable` and source availability is
-`not_configured`. Selected IDs are fixed: renamed sources are not followed
-automatically. Home Assistant generates the overview entity IDs; users can
-customize their names and IDs. Their identities stay stable across restarts,
-reloads and source-selection changes. Either overview can be disabled without
-stopping the other.
+Look up your model **and its provider** in the compatibility catalog. The catalog covers **52 converter definitions and 67 model or variant entries**, including devices with limited capabilities. [Device catalog](docs/device-catalog.md) · [Linked sound and prerequisites](docs/linked-sounding.md) · [Matter](docs/matter-support.md) · [Z-Wave JS](docs/zwave-support.md)
 
-`on` means smoke reported, `off` explicitly means no smoke reported, `unknown`
-remains unknown, and `unavailable` means unreachable. An absent or removed entity
-is missing; unexpected state values are unknown. Any smoke report takes
-precedence, while incomplete source availability is shown separately. AlarmMesh
-does not store or restore observations as current truth; every load starts from
-Home Assistant's current local states. Home Assistant may record entity history
-according to its own configuration; AlarmMesh adds no observation history.
-Group names, stable IDs, member references, optional explicit linking settings
-and an edit revision are persisted in HA storage, separately from source selection.
-Tracking and overview subscriptions stop on unload or removal.
-AlarmMesh does not directly query devices, poll sources, or create network
-connections. The overviews do not establish alarm readiness.
+## Guides and support
 
-Do not add `alarmmesh:` to `configuration.yaml`; configuration is UI-only.
-Repository metadata supports custom-repository installation. No catalog
-approval is claimed. Development does not require an
-installer; use the isolated environment described below.
-
-## Development and design
-
-- [Plain-language interface review and five-minute walkthrough](docs/plain-language-review.md)
-- [Current acceptance matrix: hosted CI, fresh UI and open checks](docs/acceptance-matrix.md)
-- [Local package, file-update and snapshot-recovery checks](docs/release-package.md)
-- [Disposable Marketplace and HA backup acceptance](docs/installer-acceptance.md)
-- [Development setup and checks](docs/development.md)
+- [Panel guide and dashboard card setup](docs/panel.md)
 - [Installation, updates and removal](docs/installation.md)
-- [Reproducible compatibility checks: 2026.10.4 and 2026.11.1](docs/compatibility.md)
-- [Isolated local MVP acceptance environment and results](docs/mvp-acceptance.md)
-- [Read-only pilot and passive observation protocol](docs/read-only-pilot.md)
-- [Architecture and scope](docs/architecture.md)
-- [Guidelines and publication readiness](docs/guidelines.md)
-- [Troubleshooting](docs/troubleshooting.md)
-- [Release readiness and draft release text](docs/release-readiness.md)
-- [Changelog](CHANGELOG.md) and [roadmap](docs/roadmap.md)
+- [Troubleshooting](docs/troubleshooting.md) · [Report an issue](https://github.com/Xat0X/AlarmMesh/issues)
+- [Releases and installation packages](https://github.com/Xat0X/AlarmMesh/releases) · [Changelog](CHANGELOG.md) · [Development and simulator setup](docs/development.md)
 
-The repository includes tests, lint/format configuration, a Linux development
-container, and GitHub workflows for tests and hassfest. No hardware access or
-Home Assistant credentials are needed for the tests.
-
-The optional acceptance environment uses HA 2026.10.4 on localhost port 8124
-with simulated sources only. The twelve documented UI acceptance scenarios were
-executed on 2026-11-11, including a real container restart. Results and limitations
-are recorded in the acceptance guide; physical-device validation is outside scope.
-The real-device pilot records user-reported installation and current status on
-Core 2026.11.1 separately. Physical smoke transitions, connection loss/recovery
-and a production restart remain unvalidated.
-
-Z-Wave JS rookmelders via bestaande HA-entiteiten: [ondersteuning en grenzen](docs/zwave-support.md).
+Created with ❤️ by [Xat0X](https://github.com/Xat0X).
