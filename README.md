@@ -14,9 +14,11 @@ AlarmMesh brings the smoke detectors you already have in Home Assistant into one
 
 ## Get started
 
+[![Open AlarmMesh in your Home Assistant](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Xat0X&repository=AlarmMesh&category=integration)
+
 You need Home Assistant **2026.10.4 or later**, administrator access, and at least one existing smoke detector entity (`binary_sensor` with device class `smoke`). Set up the detectors in their own integration first. You can use AlarmMesh immediately for monitoring, with all automatic actions off.
 
-1. **Install the integration.** On Home Assistant 2026.11 or later, open **Settings → Marketplace → Add from link** and enter `https://github.com/Xat0X/AlarmMesh`. On 2026.10.4 with HACS, open **HACS → ⋮ → Custom repositories**, add the same URL and select **Integration**. Install AlarmMesh and follow the restart prompt. [Installation and updates](docs/installation.md)
+1. **Install the integration.** The button opens AlarmMesh in the Marketplace on Home Assistant 2026.11 or later, or in HACS on 2026.10.4. Confirm adding the repository if prompted, install AlarmMesh, and restart Home Assistant if asked. [Manual installation and updates](docs/installation.md)
 2. **Choose your detectors.** Open **Settings → Devices & services → Add integration → AlarmMesh** and select the smoke entities you want to follow. Give each a recognizable name and assign its area in Home Assistant. These names appear in the panel and in phone alerts.
 3. **Check your setup.** Open **AlarmMesh** in the sidebar. **My alarm settings** shows the route for each detector. Open **Silent practice** to walk through an example with your family. You can do this before enabling any notifications or linked sound.
 
@@ -74,4 +76,4 @@ Look up your model **and its provider** in the compatibility catalog. The catalo
 - [Troubleshooting](docs/troubleshooting.md) · [Report an issue](https://github.com/Xat0X/AlarmMesh/issues)
 - [Releases and installation packages](https://github.com/Xat0X/AlarmMesh/releases) · [Changelog](CHANGELOG.md) · [Development and simulator setup](docs/development.md)
 
-Created with ❤️ by [Xat0X](https://github.com/Xat0X).
+Created with ❤️ by [Xat0X](https://github.com/Xat0X). [MIT License](LICENSE)

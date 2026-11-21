@@ -248,7 +248,7 @@ Ook ontvangers, wachttijd, bevestiging en ontvangstbewijzen zijn aanvullend beke
 Dit is browseremulatie, geen fysieke telefoon-/tablet- of volledige WCAG-audit.
 
 Beelden staan onder
-`C:/Users/Steven/Documents/ChatGPT/AlarmMesh/ui-maintenance-2026-11-15/`.
+`ui-maintenance-2026-11-15/`.
 Matrixnamen: `{nl,en}-{light,dark}-{phone,tablet}-{settings,preview,diagnosis}.jpg`.
 Enkele vroege opnamen toonden nog het vorige animatieframe; de matrix is daarom
 in afzonderlijke stappen opnieuw vastgelegd en geïnspecteerd. De matrixbestanden

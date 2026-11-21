@@ -394,28 +394,28 @@ function guidedGroupData() {
 test("one group stop click submits only displayed starts and survives a live update", async () => {
   const { panel, root, transport } = setup("nl");
   const data = guidedGroupData();
-  const [senne, jana] = data.sources;
-  senne.name = "Senne"; jana.name = "Jana";
-  const testDetector = {...jana, name: "TEST", entity_id: "binary_sensor.test"};
+  const [landing, hall] = data.sources;
+  landing.name = "Landing"; hall.name = "Hall";
+  const testDetector = {...hall, name: "TEST", entity_id: "binary_sensor.test"};
   data.sources.push(testDetector);
   const group = data.groups[0];
   group.members.push(testDetector.entity_id);
   group.linking.enabled = true;
-  group.group_stop_choices = [{source:jana.entity_id, start_id:"jana-start"}, {source:testDetector.entity_id, start_id:"test-start"}];
-  data.incident = {active_sources:[senne.entity_id], targets:[]};
-  senne.status = data.result.smoke = "SMOKE_REPORTED";
+  group.group_stop_choices = [{source:hall.entity_id, start_id:"hall-start"}, {source:testDetector.entity_id, start_id:"test-start"}];
+  data.incident = {active_sources:[landing.entity_id], targets:[]};
+  landing.status = data.result.smoke = "SMOKE_REPORTED";
   transport.callbacks.at(-1)(data);
   panel.go("incidents");
   const action = root.querySelector(".group-stop-action");
   assert.equal(action.textContent, "Stop meeklinken in deze groep");
-  assert.match(action.parentNode.textContent, /Jana.*TEST/);
+  assert.match(action.parentNode.textContent, /Hall.*TEST/);
   const requests = [];
   let resolve;
   panel._hass.callWS = msg => { requests.push(msg); return new Promise(done => {resolve = done;}); };
   action.click(); action.click();
   transport.callbacks.at(-1)(data);
   assert.equal(root.querySelector(".group-stop-action").disabled, true);
-  assert.deepEqual(requests, [{type:"alarmmesh/group_stop", group_id:group.id, revision:data.revision, start_ids:["jana-start", "test-start"]}]);
+  assert.deepEqual(requests, [{type:"alarmmesh/group_stop", group_id:group.id, revision:data.revision, start_ids:["hall-start", "test-start"]}]);
   group.group_stop_choices = [];
   transport.callbacks.at(-1)(data);
   resolve({accepted:2, requested:2}); await tick();
@@ -431,17 +431,17 @@ test("one group stop click submits only displayed starts and survives a live upd
 
 test("group dialog offers a late matched start after smoke clears and shows stop feedback", () => {
   const {panel, root, transport} = setup("nl");
-  const data = guidedGroupData(), group = data.groups[0], jana = data.sources[1];
-  jana.name = "Jana";
+  const data = guidedGroupData(), group = data.groups[0], hall = data.sources[1];
+  hall.name = "Hall";
   group.linking.enabled = true;
-  group.group_stop_choices = [{source: jana.entity_id, start_id: "late-start"}];
+  group.group_stop_choices = [{source: hall.entity_id, start_id: "late-start"}];
   data.incident = {active_sources: [], targets: [{
-    source: jana.entity_id, start_id: "late-start", status: "not_stopped",
+    source: hall.entity_id, start_id: "late-start", status: "not_stopped",
     stop_reason: "feedback_late_group_stop"
   }]};
   transport.callbacks.at(-1)(data);
   panel.openDialog({kind:"group", id:group.id});
-  assert.match(root.querySelector(".group-stop").textContent, /Jana/);
+  assert.match(root.querySelector(".group-stop").textContent, /Hall/);
   assert.equal(root.querySelector(".group-stop-action").disabled, false);
   panel.closeDialog();
   group.group_stop_choices = [];
@@ -1787,8 +1787,8 @@ test("old incident link shows current smoke before the cleared history", () => {
 test("opening a live phone alert shows its reporting detector and group stop directly", async () => {
   const {panel, root, transport, calls} = setup("nl"), data = guidedGroupData();
   const [origin, follower] = data.sources, group = data.groups[0];
-  origin.name = "Senne"; origin.area_name = "Slaapkamer boven";
-  origin.status = data.result.smoke = "SMOKE_REPORTED"; follower.name = "Jana";
+  origin.name = "Landing"; origin.area_name = "Slaapkamer boven";
+  origin.status = data.result.smoke = "SMOKE_REPORTED"; follower.name = "Hall";
   const id = "live-alert";
   data.automation = {...data.automation, episodes: [{
     group_id:"notifications", id, phase:"start", origins:[origin.entity_id], started:"2026-11-21T20:34:30Z"
@@ -1797,17 +1797,17 @@ test("opening a live phone alert shows its reporting detector and group stop dir
   data.activity = {events:[{category:"alarm", kind:"source", source:follower.entity_id,
     result:"NO_SMOKE_REPORTED", correlation:id, observed_at:"2026-11-21T20:34:32Z"}]};
   group.linking.enabled = true;
-  group.group_stop_choices = [{source:follower.entity_id, start_id:"jana-start"}];
+  group.group_stop_choices = [{source:follower.entity_id, start_id:"hall-start"}];
   data.groups.push({...group, id:"elsewhere", name:"Andere groep", origins:["binary_sensor.elsewhere"]});
   panel.linkedIncident = id; panel.page = "incidents";
   transport.callbacks.at(-1)(data);
-  assert.match(root.querySelector(".phone-incident").textContent, /Senne.*Slaapkamer boven/);
+  assert.match(root.querySelector(".phone-incident").textContent, /Landing.*Slaapkamer boven/);
   assert.doesNotMatch(root.querySelector(".phone-incident-history").textContent, /rookmelding is vrijgegeven/);
   assert.equal(root.querySelectorAll(".group-stop-action").length, 1);
-  assert.match(root.querySelector(".group-stop").textContent, /Jana/);
+  assert.match(root.querySelector(".group-stop").textContent, /Hall/);
   assert.equal(calls.length, 0);
   root.querySelector(".group-stop-action").click(); await tick();
-  assert.deepEqual(calls, [{type:"alarmmesh/group_stop", group_id:group.id, revision:data.revision, start_ids:["jana-start"]}]);
+  assert.deepEqual(calls, [{type:"alarmmesh/group_stop", group_id:group.id, revision:data.revision, start_ids:["hall-start"]}]);
   data.automation.episodes[0].phase = "recovery";
   transport.callbacks.at(-1)(data);
   assert.equal(root.querySelector(".group-stop-action"), null);

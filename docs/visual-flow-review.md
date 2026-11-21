@@ -38,7 +38,7 @@ De assetcacheversie is `20261115-flows-1`. Een volledige browservernieuwing is g
 ## Bewijs
 
 Screenshots en aanvullende logs staan lokaal onder:
-`C:\Users\Steven\Documents\ChatGPT\AlarmMesh\ui-flows-2026-11-15\`.
+`ui-flows-2026-11-15/`.
 
 Belangrijke bestanden: `incident-active.png`, `incident-awaiting-clear.png`, `selftest-active.png`, `selftest-timeout.png`, `selftest-explicit-success.png`, `selftest-explicit-failure.png`, `offline-draft.png`, `reconnected-draft.png`, `confirmation-fixed-reloaded.png`, `incident-phone-fixed.png`, `incident-tablet-fixed.png`, `helpers-idle.png`, `final-automation-off.png`.
 

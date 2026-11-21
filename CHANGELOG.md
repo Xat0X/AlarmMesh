@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.1 — 2026-11-21
+
+- Open AlarmMesh in your Home Assistant Marketplace or HACS directly from the README.
+- Documentation, release notes and test scenarios now use neutral detector names and portable paths.
+- AlarmMesh is available under the [MIT License](LICENSE).
+
 ## 0.1.0 — 2026-11-21
 
 - First stable release. Follow a detector's smoke report from a phone notification to its incident, rehearse the route on screen, and review earlier reports and maintenance.

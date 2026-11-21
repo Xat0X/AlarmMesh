@@ -175,25 +175,27 @@ async def configure(hass, entry, members, targets, *, group_id=None, enabled=Tru
     return panel.groups.groups[-1]["id"]
 
 
-@pytest.mark.parametrize("jana_state", ["off", "on", "unavailable"])
-async def test_group_stop_during_senne_smoke(hass, devices, hass_ws_client, jana_state):
+@pytest.mark.parametrize("hall_state", ["off", "on", "unavailable"])
+async def test_group_stop_during_origin_smoke(
+    hass, devices, hass_ws_client, hall_state
+):
     add, calls, _ = devices
-    senne, jana, test = (add(name) for name in ("senne", "jana", "test"))
-    attic = add("zolder", "JY-GZ-01AQ", vendor="Aqara")
-    members = [d["source"] for d in (senne, jana, test, attic)]
+    landing, hall, test = (add(name) for name in ("landing", "hall", "test"))
+    attic = add("attic", "JY-GZ-01AQ", vendor="Aqara")
+    members = [d["source"] for d in (landing, hall, test, attic)]
     entry = await setup(hass, members)
-    group = await configure(hass, entry, members, [jana, test, attic])
+    group = await configure(hass, entry, members, [hall, test, attic])
     client = await hass_ws_client(hass)
-    hass.states.async_set(senne["source"], "on", {"device_class": "smoke"})
+    hass.states.async_set(landing["source"], "on", {"device_class": "smoke"})
     await flush(hass, entry)
     await client.send_json({"id": 1, "type": "alarmmesh/current"})
     snapshot = (await client.receive_json())["result"]
     choices = snapshot["groups"][0]["group_stop_choices"]
-    assert {row["source"] for row in choices} == {jana["source"], test["source"]}
+    assert {row["source"] for row in choices} == {hall["source"], test["source"]}
     assert [call[2]["option"] for call in calls].count("smoke_siren") == 2
     assert [call[2]["option"] for call in calls].count("alarm") == 1
-    # The user still sees the old screen when Jana starts reporting smoke or drops out.
-    hass.states.async_set(jana["source"], jana_state, {"device_class": "smoke"})
+    # The linked detector can report smoke or go offline while the screen is open.
+    hass.states.async_set(hall["source"], hall_state, {"device_class": "smoke"})
     payload = {
         "type": "alarmmesh/group_stop",
         "group_id": group,
@@ -203,17 +205,17 @@ async def test_group_stop_during_senne_smoke(hass, devices, hass_ws_client, jana
     await client.send_json({"id": 2, **payload})
     result = (await client.receive_json())["result"]
     expected = (
-        {test["target"], jana["target"]} if jana_state == "off" else {test["target"]}
+        {test["target"], hall["target"]} if hall_state == "off" else {test["target"]}
     )
     assert result == {"accepted": len(expected), "requested": 2}
     await flush(hass, entry)
     assert {(data["entity_id"], data["option"]) for _, _, data in calls[3:]} == {
         (target, "stop") for target in expected
     }
-    assert hass.states.is_state(senne["source"], "on")
-    assert hass.states.is_state(jana["source"], jana_state)
-    if jana_state != "off":
-        assert hass.states.is_state(jana["target"], "smoke_siren")
+    assert hass.states.is_state(landing["source"], "on")
+    assert hass.states.is_state(hall["source"], hall_state)
+    if hall_state != "off":
+        assert hass.states.is_state(hall["target"], "smoke_siren")
     assert hass.states.is_state(attic["target"], "alarm")
     panel = entry.runtime_data.panel
     assert panel.snapshot()["result"]["smoke"] == "SMOKE_REPORTED"
@@ -226,10 +228,10 @@ async def test_group_stop_during_senne_smoke(hass, devices, hass_ws_client, jana
     assert (await client.receive_json())["result"]["accepted"] == 0
     await flush(hass, entry)
     assert len(calls) == 3 + len(expected)
-    for source in (senne["source"], jana["source"]):
+    for source in (landing["source"], hall["source"]):
         hass.states.async_set(source, "off", {"device_class": "smoke"})
     await flush(hass, entry)
-    hass.states.async_set(senne["source"], "on", {"device_class": "smoke"})
+    hass.states.async_set(landing["source"], "on", {"device_class": "smoke"})
     await flush(hass, entry)
     before = len(calls)
     await client.send_json({"id": 4, **payload})
@@ -240,22 +242,24 @@ async def test_group_stop_during_senne_smoke(hass, devices, hass_ws_client, jana
 @pytest.mark.parametrize(
     "case",
     [
-        "senne_smoke",
-        "senne_clear",
+        "landing_smoke",
+        "landing_clear",
         "clear_before_report",
-        "jana_smoke",
+        "hall_smoke",
         "foreign",
         "intervening",
     ],
 )
-async def test_janas_late_start_group_button(hass, devices, hass_ws_client, case):
+async def test_group_button_after_late_start_feedback(
+    hass, devices, hass_ws_client, case
+):
     add, calls, _ = devices
-    senne, jana = add("senne"), add("jana")
+    landing, hall = add("landing"), add("hall")
     attic = add("attic", "JY-GZ-01AQ", vendor="Aqara")
-    members = [d["source"] for d in (senne, jana, attic)]
+    members = [d["source"] for d in (landing, hall, attic)]
     entry = await setup(hass, members)
     panel = entry.runtime_data.panel
-    group = await configure(hass, entry, members, [jana, attic])
+    group = await configure(hass, entry, members, [hall, attic])
     contexts = {}
 
     async def device_action(call):
@@ -269,16 +273,16 @@ async def test_janas_late_start_group_button(hass, devices, hass_ws_client, case
             )
 
     hass.services.async_register("select", "select_option", device_action)
-    hass.states.async_set(senne["source"], "on", {"device_class": "smoke"})
+    hass.states.async_set(landing["source"], "on", {"device_class": "smoke"})
     await flush(hass, entry)
-    target = jana["target"]
-    if case == "senne_smoke":
+    target = hall["target"]
+    if case == "landing_smoke":
         await asyncio.sleep(2.35)
     else:
         panel.linking._expire_pending(target)
     assert panel.linking.records[target]["stop_reason"] == "feedback_window_expired"
     if case == "clear_before_report":
-        hass.states.async_set(senne["source"], "off", {"device_class": "smoke"})
+        hass.states.async_set(landing["source"], "off", {"device_class": "smoke"})
         await flush(hass, entry)
     if case == "intervening":
         hass.states.async_set(target, "co_siren", hass.states.get(target).attributes)
@@ -290,8 +294,8 @@ async def test_janas_late_start_group_button(hass, devices, hass_ws_client, case
         context=None if case == "foreign" else contexts[target],
     )
     await flush(hass, entry)
-    if case == "senne_clear":
-        hass.states.async_set(senne["source"], "off", {"device_class": "smoke"})
+    if case == "landing_clear":
+        hass.states.async_set(landing["source"], "off", {"device_class": "smoke"})
         await flush(hass, entry)
     choices = panel.snapshot()["groups"][0]["group_stop_choices"]
     assert sorted(calls) == sorted(
@@ -300,10 +304,10 @@ async def test_janas_late_start_group_button(hass, devices, hass_ws_client, case
     if case in {"foreign", "intervening"}:
         assert not choices
         return
-    assert [row["source"] for row in choices] == [jana["source"]]
+    assert [row["source"] for row in choices] == [hall["source"]]
     assert target not in panel.linking.owned
-    if case == "jana_smoke":
-        hass.states.async_set(jana["source"], "on", {"device_class": "smoke"})
+    if case == "hall_smoke":
+        hass.states.async_set(hall["source"], "on", {"device_class": "smoke"})
     client = await hass_ws_client(hass)
     await client.send_json(
         {
@@ -315,11 +319,11 @@ async def test_janas_late_start_group_button(hass, devices, hass_ws_client, case
         }
     )
     assert (await client.receive_json())["result"]["accepted"] == int(
-        case != "jana_smoke"
+        case != "hall_smoke"
     )
     await flush(hass, entry)
-    if case == "jana_smoke":
-        assert hass.states.is_state(jana["source"], "on")
+    if case == "hall_smoke":
+        assert hass.states.is_state(hall["source"], "on")
         assert hass.states.is_state(target, "smoke_siren")
         assert len(calls) == 2
     else:
@@ -348,12 +352,12 @@ async def test_group_stop_checks_fresh_feedback_and_limits_retries(
             "custom_components.alarmmesh.linking_runtime.GROUP_STOP_CHECK_SECONDS", 0.08
         )
     add, calls, _ = devices
-    senne, jana = add("senne"), add("jana")
-    members = [d["source"] for d in (senne, jana)]
+    landing, hall = add("landing"), add("hall")
+    members = [d["source"] for d in (landing, hall)]
     entry = await setup(hass, members)
     panel = entry.runtime_data.panel
-    group = await configure(hass, entry, members, [jana])
-    target = jana["target"]
+    group = await configure(hass, entry, members, [hall])
+    target = hall["target"]
     stop_times = []
 
     async def device_action(call):
@@ -384,10 +388,10 @@ async def test_group_stop_checks_fresh_feedback_and_limits_retries(
                     target, "stop", state.attributes, context=call.context
                 )
             if reply == "own_smoke":
-                hass.states.async_set(jana["source"], "on", {"device_class": "smoke"})
+                hass.states.async_set(hall["source"], "on", {"device_class": "smoke"})
 
     hass.services.async_register("select", "select_option", device_action)
-    hass.states.async_set(senne["source"], "on", {"device_class": "smoke"})
+    hass.states.async_set(landing["source"], "on", {"device_class": "smoke"})
     await flush(hass, entry)
     start = panel.snapshot()["groups"][0]["group_stop_choices"][0]["start_id"]
     assert (await panel.linking.stop_group(group, panel.groups.revision, {start}))[
@@ -414,19 +418,19 @@ async def test_group_stop_checks_fresh_feedback_and_limits_retries(
         "accepted"
     ] == 0
     if reply == "own_smoke":
-        assert hass.states.is_state(jana["source"], "on") and hass.states.is_state(
+        assert hass.states.is_state(hall["source"], "on") and hass.states.is_state(
             target, "smoke_siren"
         )
 
 
 async def test_group_stop_keeps_target_needed_by_other_group(hass, devices):
     add, calls, _ = devices
-    senne, jana, other = (add(n) for n in ("senne", "jana", "other_floor"))
-    entry = await setup(hass, [d["source"] for d in (senne, jana, other)])
-    group = await configure(hass, entry, [senne["source"], jana["source"]], [jana])
-    await configure(hass, entry, [other["source"], jana["source"]], [jana])
+    landing, hall, other = (add(n) for n in ("landing", "hall", "other_floor"))
+    entry = await setup(hass, [d["source"] for d in (landing, hall, other)])
+    group = await configure(hass, entry, [landing["source"], hall["source"]], [hall])
+    await configure(hass, entry, [other["source"], hall["source"]], [hall])
     panel = entry.runtime_data.panel
-    hass.states.async_set(senne["source"], "on", {"device_class": "smoke"})
+    hass.states.async_set(landing["source"], "on", {"device_class": "smoke"})
     await flush(hass, entry)
     start = panel.snapshot()["groups"][0]["group_stop_choices"][0]["start_id"]
     hass.states.async_set(other["source"], "on", {"device_class": "smoke"})
@@ -441,12 +445,12 @@ async def test_group_stop_rechecks_ownership_and_handles_concurrent_requests(
     hass, devices
 ):
     add, calls, failures = devices
-    senne, jana, test = (add(name) for name in ("senne", "jana", "test"))
-    members = [d["source"] for d in (senne, jana, test)]
+    landing, hall, test = (add(name) for name in ("landing", "hall", "test"))
+    members = [d["source"] for d in (landing, hall, test)]
     entry = await setup(hass, members)
-    group = await configure(hass, entry, members, [jana, test])
+    group = await configure(hass, entry, members, [hall, test])
     panel = entry.runtime_data.panel
-    hass.states.async_set(senne["source"], "on", {"device_class": "smoke"})
+    hass.states.async_set(landing["source"], "on", {"device_class": "smoke"})
     await flush(hass, entry)
     choices = panel.snapshot()["groups"][0]["group_stop_choices"]
     starts = {row["start_id"] for row in choices}
@@ -454,8 +458,8 @@ async def test_group_stop_rechecks_ownership_and_handles_concurrent_requests(
     stale = await panel.linking.stop_group(group, revision - 1, starts)
     assert stale["accepted"] == 0
     # A new, unrelated context can report the same tone.
-    attrs = dict(hass.states.get(jana["target"]).attributes)
-    hass.states.async_set(jana["target"], "smoke_siren", {**attrs, "sequence": 2})
+    attrs = dict(hass.states.get(hall["target"]).attributes)
+    hass.states.async_set(hall["target"], "smoke_siren", {**attrs, "sequence": 2})
     failures.add(test["target"])
     results = await asyncio.gather(
         panel.linking.stop_group(group, revision, starts),
@@ -467,7 +471,7 @@ async def test_group_stop_rechecks_ownership_and_handles_concurrent_requests(
         {"entity_id": test["target"], "option": "stop"}
     ]
     assert panel.linking.records[test["target"]]["status"] == "stop_failed"
-    assert all(hass.states.is_state(d["target"], "smoke_siren") for d in (jana, test))
+    assert all(hass.states.is_state(d["target"], "smoke_siren") for d in (hall, test))
 
 
 @pytest.mark.parametrize(
@@ -1282,8 +1286,8 @@ async def test_heiman_feedback_timeline_two_targets(
 ):
     """Two independent starts, a late report and a timely uncorrelated report."""
     add, calls, _ = devices
-    senne, jana, other = add("senne"), add("jana"), add("test")
-    members = [device["source"] for device in (senne, jana, other)]
+    landing, hall, other = add("landing"), add("hall"), add("test")
+    members = [device["source"] for device in (landing, hall, other)]
     entry = await setup(hass, members)
     panel = entry.runtime_data.panel
     contexts = {}
@@ -1294,13 +1298,13 @@ async def test_heiman_feedback_timeline_two_targets(
         contexts[target] = call.context
 
     hass.services.async_register("select", "select_option", accept)
-    hass.states.async_set(senne["source"], "on", {"device_class": "smoke"})
+    hass.states.async_set(landing["source"], "on", {"device_class": "smoke"})
     await flush(hass, entry)
     assert calls == []  # No default permission.
-    hass.states.async_set(senne["source"], "off", {"device_class": "smoke"})
+    hass.states.async_set(landing["source"], "off", {"device_class": "smoke"})
     await flush(hass, entry)
-    await configure(hass, entry, members, [jana, other])
-    hass.states.async_set(senne["source"], "on", {"device_class": "smoke"})
+    await configure(hass, entry, members, [hall, other])
+    hass.states.async_set(landing["source"], "on", {"device_class": "smoke"})
     await flush(hass, entry)
 
     def report(device, value, context=None):
@@ -1313,18 +1317,18 @@ async def test_heiman_feedback_timeline_two_targets(
     other_observed = report(other, "smoke_siren")
     await flush(hass, entry)
     # Drive the actual deadline callback before the next HA report.
-    panel.linking._expire_pending(jana["target"])
-    context = contexts[jana["target"]] if late_context_matches else None
-    jana_observed = report(jana, "smoke_siren", context)
+    panel.linking._expire_pending(hall["target"])
+    context = contexts[hall["target"]] if late_context_matches else None
+    hall_observed = report(hall, "smoke_siren", context)
     await flush(hass, entry)
-    for device in (other, jana):
+    for device in (other, hall):
         report(device, "stop")
         await flush(hass, entry)
-    hass.states.async_set(senne["source"], "off", {"device_class": "smoke"})
+    hass.states.async_set(landing["source"], "off", {"device_class": "smoke"})
     await flush(hass, entry)
     assert not panel.linking.owned
     assert sorted(calls) == sorted(
-        (device["target"], "smoke_siren") for device in (jana, other)
+        (device["target"], "smoke_siren") for device in (hall, other)
     )
     assert await hass.config_entries.async_reload(entry.entry_id)
     await flush(hass, entry)
@@ -1333,7 +1337,7 @@ async def test_heiman_feedback_timeline_two_targets(
     traces = {}
     for device, expected, observed in (
         (
-            jana,
+            hall,
             [
                 "feedback_window_expired",
                 "feedback_late_matched"
@@ -1341,7 +1345,7 @@ async def test_heiman_feedback_timeline_two_targets(
                 else "feedback_late_unmatched",
                 "feedback_idle_observed",
             ],
-            jana_observed,
+            hall_observed,
         ),
         (other, ["feedback_context_missing", "feedback_idle_observed"], other_observed),
     ):
@@ -1353,7 +1357,7 @@ async def test_heiman_feedback_timeline_two_targets(
         ]
         assert [r["result"] for r in events] == ["start_requested", *expected]
         assert all(
-            r["source"] == device["source"] and r["origins"] == [senne["source"]]
+            r["source"] == device["source"] and r["origins"] == [landing["source"]]
             for r in events
         )
         assert len({r["correlation"] for r in events}) == 1

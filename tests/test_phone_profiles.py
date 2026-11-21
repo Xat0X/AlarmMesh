@@ -52,10 +52,12 @@ async def test_critical_real_adapter_and_ordinary_recovery(hass, companion, plat
         True,
     )
     assert delivered == []
-    hass.states.async_set(A, "on", {"device_class": "smoke", "friendly_name": "Senne"})
+    hass.states.async_set(
+        A, "on", {"device_class": "smoke", "friendly_name": "Landing"}
+    )
     await settle(hass, entry)
     data = delivered[0][1]["data"]
-    assert delivered[0][1]["title"] == "Smoke alert · Senne"
+    assert delivered[0][1]["title"] == "Smoke alert · Landing"
     episode = effects.episodes["notifications"]
     link = "url" if platform == "ios" else "clickAction"
     assert data[link] == f"/alarmmesh?incident={episode['id']}"

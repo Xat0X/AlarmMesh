@@ -8,11 +8,11 @@ De simulator volgde de meldingslink van iOS en Android tot op het incidentscherm
 
 ## Vrijgaveaudit voor 0.1.0-rc.4
 
-Met een vertraging van 2,35 seconden bij Jana kon de groepsknop in de simulator Jana en TEST stoppen. Toen Jana vlak voor de klik zelf rook meldde, kreeg alleen TEST een stop. De simulator controleerde ook de terugmelding na een groepsstop, één herhaling bij een herkenbare actieve sirenestand en het uitblijven van een herhaling bij onduidelijke feedback. Het hoorbare resultaat thuis is een afzonderlijke praktijkcontrole. [RC4 en het testpad](releases/0.1.0-rc.4.md)
+Met een vertraging van 2,35 seconden bij de melder in de hal kon de groepsknop in de simulator de melders in de hal en de berging stoppen. Toen de melder in de hal vlak voor de klik zelf rook meldde, kreeg alleen de melder in de berging een stop. De simulator controleerde ook de terugmelding na een groepsstop, één herhaling bij een herkenbare actieve sirenestand en het uitblijven van een herhaling bij onduidelijke feedback. Het hoorbare resultaat thuis is een afzonderlijke praktijkcontrole. [RC4 en het testpad](releases/0.1.0-rc.4.md)
 
 ## Vrijgaveaudit voor 0.1.0-rc.3
 
-In de simulator liet één klik Jana en TEST stoppen met meeklinken terwijl Senne rook bleef melden. Toen Jana vlak vóór de klik ook rook meldde, kreeg alleen TEST een stopopdracht. De Aqara kreeg bij beide proeven uitsluitend de startopdracht. De tijdlijn en de opdrachtenteller zijn in de simulator gecontroleerd. De thuistest controleert het hoorbare resultaat. [RC3 en het testpad](releases/0.1.0-rc.3.md)
+In de simulator liet één klik de melders in de hal en de berging stoppen met meeklinken terwijl de melder op de overloop rook bleef melden. Toen de melder in de hal vlak vóór de klik ook rook meldde, kreeg alleen de melder in de berging een stopopdracht. De Aqara kreeg bij beide proeven uitsluitend de startopdracht. De tijdlijn en de opdrachtenteller zijn in de simulator gecontroleerd. De thuistest controleert het hoorbare resultaat. [RC3 en het testpad](releases/0.1.0-rc.3.md)
 
 ## Vrijgaveaudit voor 0.1.0-rc.2
 

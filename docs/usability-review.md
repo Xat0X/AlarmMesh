@@ -311,7 +311,7 @@ behouden. Nieuwe CI-resultaten ontbreken omdat niets gecommit/gepusht is.
 ## Bewijs en eindstand
 
 Screenshots staan lokaal in
-`C:/Users/Steven/Documents/ChatGPT/AlarmMesh/ui-usability-2026-11-15/`.
+`ui-usability-2026-11-15/`.
 De matrix gebruikt `*-guide.jpg`, `*-maintenance.jpg`, `*-dialog.jpg` en
 `*-incidents.jpg`. Aanvullend: `awaiting-clear.jpg`, `confirmed-recovery.jpg`,
 `offline-draft.jpg`, `reconnected-draft.jpg` en `final-overview.jpg`.
