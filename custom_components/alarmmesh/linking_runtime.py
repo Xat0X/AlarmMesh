@@ -3,16 +3,23 @@
 import asyncio
 from contextlib import suppress
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import datetime
 
 from homeassistant.core import Context, HomeAssistant, State, callback
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers.event import async_track_state_change_event
+from homeassistant.helpers.event import (
+    async_track_state_change_event,
+    async_track_state_report_event,
+)
+from homeassistant.util import dt as dt_util
 
 from . import matter
 from .capabilities import Capabilities, Control
 from .linking import Activation, plan_activations, update_incidents
 from .status import SourceStatus
+
+GROUP_STOP_CHECK_SECONDS = 5
 
 
 @dataclass(frozen=True)
@@ -26,11 +33,53 @@ class PendingStart:
 
 @dataclass
 class UnconfirmedFeedback:
-    """Observation only, for the remainder of this continuous incident."""
+    """A late first transition can qualify only for an explicit group click."""
 
     control: Control
     context_id: str
     awaiting_idle: bool = False
+    before: State | None = None
+    manual_stop: bool = False
+
+
+@dataclass
+class GroupStopFeedback:
+    control: Control
+    record: dict
+    revision: int
+    context: Context = field(default_factory=Context)
+    issued_at: datetime = field(default_factory=dt_util.utcnow)
+    done: asyncio.Event = field(default_factory=asyncio.Event)
+    active_reported_at: float | None = None
+    retry_allowed: bool = True
+    result: str = "group_stop_unconfirmed"
+
+    @callback
+    def observe(self, event):
+        if self.done.is_set() or event.time_fired < self.issued_at:
+            return
+        state = event.data["new_state"]
+        if _reports_linked_tone(state, self.control):
+            # On an unchanged-state report HA keeps the old State object. Only
+            # the event carries the context of this particular report.
+            if self.retry_allowed and self.context.id in {
+                event.context.id,
+                event.context.parent_id,
+            }:
+                self.active_reported_at = event.time_fired.timestamp()
+                return
+        elif (
+            state
+            and state.state == "stop"
+            and not state.attributes.get("assumed_state")
+        ):
+            self.result = "group_stop_idle"
+            self.done.set()
+            return
+        # An intervening report ends permission to retry. A later idle report
+        # can still answer the user's question about the reported siren state.
+        self.retry_allowed = False
+        self.active_reported_at = None
 
 
 def _reports_linked_tone(state: State | None, control: Control) -> bool:
@@ -66,6 +115,7 @@ class LinkingRuntime:
         self.records: dict[str, dict] = {}
         self._pending_starts: dict[str, PendingStart] = {}
         self._unconfirmed: dict[str, UnconfirmedFeedback] = {}
+        self._group_checks: dict[str, GroupStopFeedback] = {}
         self._stopping: set[str] = set()
         self._task: asyncio.Task | None = None
         self._paused = True
@@ -136,7 +186,9 @@ class LinkingRuntime:
                     )
                     self._no_stop(pending.record, "feedback_intervening", observed_at)
         elif followup := self._unconfirmed.get(target):
-            self._observe_followup(followup, state, observed_at)
+            self._observe_followup(followup, event, observed_at)
+        if check := self._group_checks.get(target):
+            check.observe(event)
         self.changed()
         if not self._closed and not self._paused:
             self.publish()
@@ -195,6 +247,9 @@ class LinkingRuntime:
         self.attempted = {
             target: origins for target, origins in self.attempted.items() if origins
         }
+        for check in self._group_checks.values():
+            if not check.done.is_set() and not self._retry_scope_current(check):
+                check.done.set()
         if self._pending_starts or self._unconfirmed:
             selected = set(self.runtime.source_entity_ids)
             bindings = [
@@ -207,10 +262,26 @@ class LinkingRuntime:
                 if pending.control.binding() not in bindings:
                     self._forget_pending(target, "stop_binding_changed")
             for target, followup in tuple(self._unconfirmed.items()):
+                if self.active and not was_active:
+                    self._unconfirmed.pop(target)
+                    continue
+                record = self.records[target]
+                if followup.manual_stop or followup.before is not None:
+                    if not self._late_group_current(followup.control, record):
+                        followup.before = None
+                        if followup.manual_stop:
+                            followup.manual_stop = False
+                            self._no_stop(
+                                record,
+                                "stop_target_not_clear"
+                                if not self._reports_clear(followup.control.source)
+                                else "stop_binding_changed",
+                            )
                 if (
                     target not in self.attempted
-                    or followup.control.binding() not in bindings
-                ):
+                    and not followup.manual_stop
+                    and followup.before is None
+                ) or followup.control.binding() not in bindings:
                     self._unconfirmed.pop(target)
         if self.active and not was_active:
             self.records = {
@@ -286,12 +357,34 @@ class LinkingRuntime:
         record["stop_reason"] = reason
         record["status"] = "not_stopped"
 
-    def _observe_followup(self, followup, state, observed_at):
-        if not state or state.attributes.get("assumed_state"):
-            return
+    def _observe_followup(self, followup, event, observed_at):
+        state = event.data["new_state"]
         target = followup.control.target
         record = self.records[target]
+        first_transition = (
+            followup.before is not None and event.data["old_state"] is followup.before
+        )
+        followup.before = None
+        if not state or state.attributes.get("assumed_state"):
+            if followup.manual_stop:
+                self._no_stop(record, "feedback_unavailable", observed_at)
+            followup.manual_stop = False
+            return
         if followup.awaiting_idle:
+            if not _reports_linked_tone(
+                state, followup.control
+            ) or followup.context_id not in {state.context.id, state.context.parent_id}:
+                if followup.manual_stop:
+                    if state.state == "stop":
+                        record["stop_reason"] = "feedback_idle_observed"
+                    else:
+                        reason = (
+                            "feedback_context_missing"
+                            if _reports_linked_tone(state, followup.control)
+                            else _tone_loss_reason(state)
+                        )
+                        self._no_stop(record, reason, observed_at)
+                    followup.manual_stop = False
             if state.state != "stop":
                 return
             result = "feedback_idle_observed"
@@ -307,6 +400,13 @@ class LinkingRuntime:
                     in {state.context.id, state.context.parent_id}
                     else "feedback_late_unmatched"
                 )
+                if (
+                    result == "feedback_late_matched"
+                    and first_transition
+                    and self._late_group_current(followup.control, record)
+                ):
+                    followup.manual_stop = True
+                    record["stop_reason"] = "feedback_late_group_stop"
             else:
                 result = "feedback_after_rejection"
         self.observe_sounder(
@@ -344,7 +444,7 @@ class LinkingRuntime:
             if self.records.get(target) is pending.record:
                 if reason == "feedback_window_expired":
                     self._unconfirmed[target] = UnconfirmedFeedback(
-                        pending.control, pending.context_id
+                        pending.control, pending.context_id, before=pending.before
                     )
                 self._no_stop(pending.record, reason)
 
@@ -392,6 +492,7 @@ class LinkingRuntime:
             context = Context()
             if control.safe_stop:
                 record["start_group"] = self._sole_sounding_group(control)
+                record["start_revision"] = self.groups.revision
                 record["start_id"] = context.id
             before = self.hass.states.get(target)
             record["status"] = "sending"
@@ -475,31 +576,78 @@ class LinkingRuntime:
                 matches.append(group["id"])
         return matches[0] if len(matches) == 1 else None
 
-    def _can_stop_for_group(self, group, control):
-        record = self.records[control.target]
-        feedback = self.hass.states.get(control.target)
+    def _group_scope_current(self, control, record, *, allow_clear=False):
+        group = next(
+            (g for g in self.groups.groups if g["id"] == record.get("start_group")),
+            None,
+        )
         return (
             not self._closed
             and not self._paused
             and control.safe_stop
-            and self.owned.get(control.target) is control
-            and control.target not in self._stopping
-            and record.get("start_group") == group["id"]
+            and group is not None
             and group["linking"]["enabled"]
+            and control.binding() in group["linking"]["bindings"]
             and set(group["members"]) <= set(self.runtime.source_entity_ids)
             and control.source in group["members"]
             and self._reports_clear(control.source)
             and not self.capabilities.test_blocked(control.source)
+            and (
+                (
+                    control.target in self.attempted
+                    and self._sole_sounding_group(control) == group["id"]
+                )
+                or (
+                    allow_clear
+                    and control.target not in self.attempted
+                    and all(
+                        self._reports_clear(origin)
+                        for related in self.groups.groups
+                        if related["linking"]["enabled"]
+                        and control.binding() in related["linking"]["bindings"]
+                        for origin in related.get("origins", related["members"])
+                    )
+                )
+            )
+            and self.capabilities.resolve(control.binding()) == control
+        )
+
+    def _late_group_current(self, control, record):
+        return record.get(
+            "start_revision"
+        ) == self.groups.revision and self._group_scope_current(
+            control, record, allow_clear=True
+        )
+
+    def _group_controls(self):
+        return {
+            **self.owned,
+            **{t: f.control for t, f in self._unconfirmed.items() if f.manual_stop},
+        }
+
+    def _can_stop_for_group(self, group, control):
+        record = self.records.get(control.target, {})
+        feedback = self.hass.states.get(control.target)
+        late = self._unconfirmed.get(control.target)
+        late_match = late is not None and late.manual_stop and late.control is control
+        return (
+            record.get("start_group") == group["id"]
+            and (self.owned.get(control.target) is control or late_match)
+            and control.target not in self._stopping
+            and control.target not in self._group_checks
             and _reports_linked_tone(feedback, control)
             and record["start_id"] in {feedback.context.id, feedback.context.parent_id}
-            and self._sole_sounding_group(control) == group["id"]
-            and self.capabilities.resolve(control.binding()) == control
+            and (
+                self._late_group_current(control, record)
+                if late_match
+                else self._group_scope_current(control, record)
+            )
         )
 
     def group_stop_choices(self, group):
         return [
             {"source": control.source, "start_id": self.records[target]["start_id"]}
-            for target, control in self.owned.items()
+            for target, control in self._group_controls().items()
             if self._can_stop_for_group(group, control)
         ]
 
@@ -515,12 +663,12 @@ class LinkingRuntime:
                 or not self._can_stop_for_group(current, control)
             ):
                 return False
-            return await self._send_stop(target, "group_stop_requested")
+            return await self._verified_group_stop(control, revision)
 
         outcomes = await asyncio.gather(
             *(
                 stop_one(target, control)
-                for target, control in tuple(self.owned.items())
+                for target, control in self._group_controls().items()
                 if self.records[target].get("start_id") in start_ids
             )
         )
@@ -582,7 +730,56 @@ class LinkingRuntime:
             return
         await self._send_stop(target, "stop_requested")
 
-    async def _send_stop(self, target, event):
+    def _retry_scope_current(self, check):
+        return (
+            self.records.get(check.control.target) is check.record
+            and self.groups.revision == check.revision
+            and self._group_scope_current(check.control, check.record, allow_clear=True)
+        )
+
+    async def _verified_group_stop(self, control, revision):
+        target = control.target
+        check = GroupStopFeedback(control, self.records[target], revision)
+        self._group_checks[target] = check
+        self._unconfirmed.pop(target, None)
+        unsub = async_track_state_report_event(self.hass, target, check.observe)
+        try:
+            accepted = await self._send_stop(
+                target, "group_stop_requested", check.context
+            )
+            if not accepted:
+                return False
+            for attempt in range(2):
+                try:
+                    async with asyncio.timeout(GROUP_STOP_CHECK_SECONDS):
+                        await check.done.wait()
+                    break
+                except TimeoutError:
+                    pass
+                state = self.hass.states.get(target)
+                if (
+                    check.done.is_set()
+                    or not self._retry_scope_current(check)
+                    or not _reports_linked_tone(state, control)
+                    or check.active_reported_at != state.last_reported.timestamp()
+                ):
+                    break
+                if attempt == 1:
+                    check.result = "group_stop_still_active"
+                    break
+                check.context = Context()
+                check.issued_at = dt_util.utcnow()
+                check.active_reported_at = None
+                if not await self._send_stop(target, "group_stop_retry", check.context):
+                    break
+            check.record["stop_feedback"] = check.result
+            self.observe_sounder(check.record, check.result, self.groups.groups)
+            return True  # The first request was accepted, independently of feedback.
+        finally:
+            unsub()
+            self._group_checks.pop(target, None)
+
+    async def _send_stop(self, target, event, context=None):
         # Claim the target before handing control back to the HA event loop.
         self._stopping.add(target)
         record = self.records[target]
@@ -596,6 +793,7 @@ class LinkingRuntime:
                     "select_option",
                     {"entity_id": target, "option": "stop"},
                     blocking=True,
+                    context=context,
                 )
         except asyncio.CancelledError:
             record["status"] = "outcome_unknown"
@@ -658,6 +856,8 @@ class LinkingRuntime:
 
     async def pause(self):
         self._paused = True
+        for check in self._group_checks.values():
+            check.done.set()
         self._unconfirmed.clear()
         for target in tuple(self._pending_starts):
             self._forget_pending(target, "stop_monitor_paused")

@@ -8,6 +8,10 @@ Open tijdens een rookmelding **Groepen → je groep → Stop meeklinken in deze 
 
 De knop werkt voor een herkende Heiman-bediening waarvan de start aan AlarmMesh is gekoppeld. Een melder met onzekere terugmelding of een doel dat tegelijk voor een andere groep klinkt valt buiten de opdracht. Voor de Aqara op zolder blijft alleen starten beschikbaar. De fysieke knop op een melder geeft geen groepsopdracht.
 
+Bij een Heiman kan de groepsknop ook beschikbaar worden als de eerste herkenbare terugmelding van het meeklinken pas na twee seconden binnenkomt. Dat geldt voor de oorspronkelijke groep en startopdracht. Ook nadat de bron weer rookvrij is, kun je bij **Groepen** op de knop drukken zolang AlarmMesh diezelfde sirenestand nog kan herleiden. Bij eigen rook, een onzekere rookstatus of een nieuwe start vervalt die toestemming. Een late bevestiging geeft uitsluitend toestemming voor een handmatige groepsstop.
+
+Na een groepsstop controleert AlarmMesh per melder de door Home Assistant gemelde sirenestand. Bij `stop` zie je die terugmelding in de tijdlijn. Meldt de bediening na de opdracht opnieuw en herkenbaar dat ze nog meeklinkt, dan controleert AlarmMesh na vijf seconden de rookstatus en groep en kan het één extra stop aanvragen. Bij uitblijvende of onduidelijke terugmelding zie je **De stand stop is niet bevestigd**. De tijdlijn geeft de softwarestand weer. Of de melder fysiek stil is, kun je ter plaatse vaststellen.
+
 ## De melders uit de test
 
 | Melder via Zigbee2MQTT | Bij rook op een andere melder | Wanneer kan AlarmMesh hem stoppen? |

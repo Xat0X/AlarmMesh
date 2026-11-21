@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.0-rc.4 — 2026-11-21
+
+- Use the group stop button for a Heiman that confirms its linked tone late, even after the original smoke report clears. AlarmMesh matches the confirmation to its start and checks the detector's own smoke state again on click.
+- See the reported siren state after a group stop. If a fresh reply to that stop still reports the linked tone, AlarmMesh checks eligibility again after five seconds and can send one more stop. The timeline identifies the repeat and its outcome.
+
 ## 0.1.0-rc.3 — 2026-11-21
 
 - Stop linked sound for a group with one click during an incident. AlarmMesh checks each Heiman's own smoke status and confirmed start again before requesting a stop. The timeline records each stop requested from the group button.

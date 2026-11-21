@@ -1,5 +1,5 @@
 import { exercise, incidentDetail, careView } from "./family.js?v=candidate-readback-1";
-import { TEXT } from "./translations.js?v=group-stop-1";
+import { TEXT } from "./translations.js?v=group-stop-feedback-1";
 import { Drafts } from "./drafts.js?v=family-beta16";
 
 // Safe DOM construction: names, labels and registry data are always text nodes.
@@ -159,7 +159,8 @@ export class AlarmMeshPanel extends HTMLElement {
       const active = this.data.incident?.active_sources || [];
       for (const [id, result] of this.groupStopResults) {
         const group = this.data.groups.find(g => g.id === id);
-        if (!group || !(group.origins || group.members).some(source => active.includes(source)) ||
+        const sameStart = this.data.incident?.targets?.some(target => result.starts.includes(target.start_id));
+        if (!group?.linking?.enabled || (!sameStart && !(group.origins || group.members).some(source => active.includes(source))) ||
             (!result.busy && group.group_stop_choices?.some(choice => !result.starts.includes(choice.start_id))))
           this.groupStopResults.delete(id);
       }
@@ -1706,9 +1707,9 @@ export class AlarmMeshPanel extends HTMLElement {
   renderGroupStop(parent, group, showGroupName = false) {
     const t = this.t, choices = group.group_stop_choices || [];
     const active = this.data.incident?.active_sources || [];
-    if (!group.linking?.enabled || !group.linking.bindings?.length ||
-        !(group.origins || group.members).some(id => active.includes(id))) return;
     const result = this.groupStopResults.get(group.id);
+    if (!group.linking?.enabled || !group.linking.bindings?.length ||
+        (!choices.length && !result && !(group.origins || group.members).some(id => active.includes(id)))) return;
     const section = el("section", undefined, "notice group-stop");
     if (showGroupName) section.append(el("h3", group.name));
     if (choices.length) {
@@ -1917,7 +1918,8 @@ export class AlarmMeshPanel extends HTMLElement {
   }
   sounderStatus(target) {
     const reason = target.status === "not_stopped" && target.stop_reason;
-    return (reason && this.t["activity_result_" + reason]) || this.t[target.status] || this.t.guide_unknown;
+    const status = (reason && this.t["activity_result_" + reason]) || this.t[target.status] || this.t.guide_unknown;
+    return target.stop_feedback ? status + " · " + this.t["activity_result_" + target.stop_feedback] : status;
   }
   renderSounderHistory(parent) {
     const t = this.t, history = this.data.activity;

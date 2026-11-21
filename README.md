@@ -8,7 +8,7 @@
 
 Smoke reports and source availability from existing Home Assistant smoke detector
 entities, with a local panel for detectors, rooms and groups. This test release adds [optional linked sounding](docs/linked-sounding.md), off by default.
-Version 0.1.0-rc.3 also offers [Companion notifications, group
+Version 0.1.0-rc.4 also offers [Companion notifications, group
 script actions, incident details and reviewed built-in self-test requests](docs/incident-features.md).
 New automatic behavior defaults off; existing explicit choices are preserved.
 It includes [opt-in maintenance messages, non-executing action
@@ -54,15 +54,17 @@ BSD-2 activation requires its broadcast setting to explicitly report off;
 AlarmMesh never changes that setting. The original branding, two overview
 entities, source-selection schema and smoke rules remain unchanged.
 
-## Release candidate 0.1.0-rc.3
+## Release candidate 0.1.0-rc.4
 
 During a smoke incident, open the affected group and choose **Stop linked sound in this group**. The panel lists the eligible detectors. A Heiman reporting its own smoke is excluded from the stop request. The Aqara JY-GZ-01AQ supports starting linked sound only.
+
+The group button can also stop a Heiman that confirms its linked tone late. If a fresh reply to the stop still reports the linked tone, AlarmMesh checks again after five seconds and may request one more stop. The timeline shows the reported siren state.
 
 Open **Activity → Smoke and sounder commands** to see which detector reported smoke and when AlarmMesh requested each linked start or stop. Filter by the local start time of your test. For Heiman detectors, the timeline also shows when Home Assistant reported the tone, whether the report matched the start request and why a stop was withheld.
 
 For opt-in testing, enable **Pre-release** in the AlarmMesh Marketplace page and
-choose **0.1.0-rc.3**. Back up before updating and follow the restart prompt.
-Read the [release notes](docs/releases/0.1.0-rc.3.md) before installing.
+choose **0.1.0-rc.4**. Back up before updating and follow the restart prompt.
+Read the [release notes](docs/releases/0.1.0-rc.4.md) before installing.
 
 ## Current status: local panel and two read-only overviews
 

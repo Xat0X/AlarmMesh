@@ -61,6 +61,10 @@ RESULTS = {
     "start_requested",
     "stop_requested",
     "group_stop_requested",
+    "group_stop_retry",
+    "group_stop_idle",
+    "group_stop_unconfirmed",
+    "group_stop_still_active",
     "feedback_linked",
     "feedback_context_missing",
     "feedback_window_expired",
@@ -320,7 +324,12 @@ class Activity:
                 "alarm",
                 "sounder_command"
                 if result
-                in {"start_requested", "stop_requested", "group_stop_requested"}
+                in {
+                    "start_requested",
+                    "stop_requested",
+                    "group_stop_requested",
+                    "group_stop_retry",
+                }
                 else "sounder_feedback",
                 result,
                 source=row["source"],

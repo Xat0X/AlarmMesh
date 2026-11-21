@@ -414,6 +414,29 @@ test("one group stop click submits only displayed starts and survives a live upd
   panel.remove();
 });
 
+test("group dialog offers a late matched start after smoke clears and shows stop feedback", () => {
+  const {panel, root, transport} = setup("nl");
+  const data = guidedGroupData(), group = data.groups[0], jana = data.sources[1];
+  jana.name = "Jana";
+  group.linking.enabled = true;
+  group.group_stop_choices = [{source: jana.entity_id, start_id: "late-start"}];
+  data.incident = {active_sources: [], targets: [{
+    source: jana.entity_id, start_id: "late-start", status: "not_stopped",
+    stop_reason: "feedback_late_group_stop"
+  }]};
+  transport.callbacks.at(-1)(data);
+  panel.openDialog({kind:"group", id:group.id});
+  assert.match(root.querySelector(".group-stop").textContent, /Jana/);
+  assert.equal(root.querySelector(".group-stop-action").disabled, false);
+  panel.closeDialog();
+  group.group_stop_choices = [];
+  Object.assign(data.incident.targets[0], {status:"stop_sent", stop_feedback:"group_stop_idle"});
+  transport.callbacks.at(-1)(data);
+  panel.go("overview");
+  assert.match(root.querySelector(".incident").textContent, /Home Assistant meldt dat de gekoppelde sirene op stop staat/);
+  panel.remove();
+});
+
 test("setup guide handles empty sources and only navigates to existing configuration", () => {
   const { panel, root, transport, calls } = setup();
   const data = normal(); data.sources = []; data.groups = []; data.rooms = []; data.usable = 0;

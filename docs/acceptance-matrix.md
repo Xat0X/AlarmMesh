@@ -1,6 +1,6 @@
 # Acceptatieoverzicht
 
-De [vrijgaveaudit](release-readiness.md) beschrijft de RC3-groepsknop, de eerdere browser- en upgradeproeven en de resterende praktijkcontroles. De oudere beoordelingen volgen hieronder op datum.
+De [vrijgaveaudit](release-readiness.md) beschrijft de RC4-groepsknop met late Heiman-bevestigingen, de browser- en upgradeproeven en de resterende praktijkcontroles. De oudere beoordelingen volgen hieronder op datum.
 
 ## Historical test release — 0.1.0-beta.7
 
