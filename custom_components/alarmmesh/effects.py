@@ -298,7 +298,7 @@ class IncidentEffects:
         async with self.lock:
             await self.store.async_save({"episodes": deepcopy(self.episodes)})
 
-    def _name(self, source):
+    def _source_label(self, source):
         entity = er.async_get(self.hass).async_get(source)
         state = self.hass.states.get(source)
         device = (
@@ -312,9 +312,12 @@ class IncidentEffects:
         name = (
             (entity.name if entity else None)
             or (state.attributes.get("friendly_name") if state else None)
+            or (entity.original_name if entity else None)
             or source
         )
-        return f"{name} ({area.name})" if area else name
+        if not isinstance(name, str) or not name.strip():
+            name = source
+        return name, area.name if area else None
 
     def message(self, episode=None, *, test=False, example=False, include_time=True):
         nl = self.hass.config.language.startswith("nl")
@@ -338,7 +341,16 @@ class IncidentEffects:
                 if self.entry.runtime_data.source_statuses.get(s)
                 is SourceStatus.SMOKE_REPORTED
             ]
-        names = "; ".join(self._name(s) for s in ids[:12])
+        labels = [self._source_label(s) for s in ids[:12]]
+        names = "; ".join(f"{name} ({area})" if area else name for name, area in labels)
+        smoke_alert = phase == "start" and not test
+        if smoke_alert and labels:
+            name = " ".join(labels[0][0].split())
+            if len(name) > 64:
+                name = name[:63].rstrip() + "…"
+            title = ("Rookmelding · " if nl else "Smoke alert · ") + name
+            if len(ids) > 1:
+                title += f" (+{len(ids) - 1})"
         groups = ", ".join(
             g["name"]
             for g in self.groups.groups
@@ -350,15 +362,27 @@ class IncidentEffects:
             for r in self.linking.records.values()
         )
         time = dt_util.as_local(dt_util.utcnow()).isoformat(timespec="seconds")
-        body = f"{names}\n{('Groepen' if nl else 'Groups')}: {groups or '—'}"
+        body = names
+        if groups or not smoke_alert:
+            body += f"\n{('Groepen' if nl else 'Groups')}: {groups or '—'}"
         if include_time:
             body += f"\n{time}"
-        body += f"\n{('Zoemerproblemen' if nl else 'Sounder problems')}: {problems}. "
-        body += (
-            "Fysieke uitvoering niet bevestigd."
-            if nl
-            else "Physical execution is not confirmed."
-        )
+        if problems or not smoke_alert:
+            body += (
+                f"\n{('Zoemerproblemen' if nl else 'Sounder problems')}: {problems}."
+            )
+        if not smoke_alert:
+            body += " " + (
+                "Fysieke uitvoering niet bevestigd."
+                if nl
+                else "Physical execution is not confirmed."
+            )
+        elif episode:
+            body += "\n" + (
+                "Tik om het rookincident te bekijken."
+                if nl
+                else "Tap to view the smoke incident."
+            )
         if test:
             body = (
                 "Dit is uitsluitend een testmelding.\n"
@@ -416,7 +440,7 @@ class IncidentEffects:
             and current["identity"] == receipt["identity"]
         )
 
-    async def _send(self, key, episode, receipt):
+    async def _send(self, key, episode, receipt, *, new_sources=()):
         async with self.linking._semaphore:
             if not self._allowed(key, episode, receipt):
                 receipt["status"] = "blocked"
@@ -434,10 +458,22 @@ class IncidentEffects:
             try:
                 async with deadline:
                     if receipt["kind"] == "notification":
+                        # A follow-up alert leads with the newly reporting detector.
+                        message_episode = episode
+                        if new_sources:
+                            message_episode = {
+                                **episode,
+                                "origins": sorted(
+                                    episode["origins"],
+                                    key=lambda source: source not in new_sources,
+                                ),
+                            }
                         await send_notification(
                             self.hass,
                             receipt["target"],
-                            self.phone_plan(receipt["target"], episode)["message"],
+                            self.phone_plan(receipt["target"], message_episode)[
+                                "message"
+                            ],
                         )
                     else:
                         # One script per call preserves configured start order. This
@@ -517,7 +553,14 @@ class IncidentEffects:
                 "status": "sending",
             }
             episode["receipts"][key] = row
-            tasks.append(self._send("notifications", episode, row))
+            new_sources = (
+                active.difference(old["seen"])
+                if old and episode["phase"] == "start"
+                else ()
+            )
+            tasks.append(
+                self._send("notifications", episode, row, new_sources=new_sources)
+            )
         await asyncio.gather(*tasks)
 
     async def _scripts(self, group, episode):

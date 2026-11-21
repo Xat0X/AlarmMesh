@@ -1769,6 +1769,40 @@ test("old incident link shows current smoke before the cleared history", () => {
   v.panel.remove();
 });
 
+test("opening a live phone alert shows its reporting detector and group stop directly", async () => {
+  const {panel, root, transport, calls} = setup("nl"), data = guidedGroupData();
+  const [origin, follower] = data.sources, group = data.groups[0];
+  origin.name = "Senne"; origin.area_name = "Slaapkamer boven";
+  origin.status = data.result.smoke = "SMOKE_REPORTED"; follower.name = "Jana";
+  const id = "live-alert";
+  data.automation = {...data.automation, episodes: [{
+    group_id:"notifications", id, phase:"start", origins:[origin.entity_id], started:"2026-11-21T20:34:30Z"
+  }]};
+  data.incident = {active_sources:[origin.entity_id], targets:[]};
+  data.activity = {events:[{category:"alarm", kind:"source", source:follower.entity_id,
+    result:"NO_SMOKE_REPORTED", correlation:id, observed_at:"2026-11-21T20:34:32Z"}]};
+  group.linking.enabled = true;
+  group.group_stop_choices = [{source:follower.entity_id, start_id:"jana-start"}];
+  data.groups.push({...group, id:"elsewhere", name:"Andere groep", origins:["binary_sensor.elsewhere"]});
+  panel.linkedIncident = id; panel.page = "incidents";
+  transport.callbacks.at(-1)(data);
+  assert.match(root.querySelector(".phone-incident").textContent, /Senne.*Slaapkamer boven/);
+  assert.doesNotMatch(root.querySelector(".phone-incident-history").textContent, /rookmelding is vrijgegeven/);
+  assert.equal(root.querySelectorAll(".group-stop-action").length, 1);
+  assert.match(root.querySelector(".group-stop").textContent, /Jana/);
+  assert.equal(calls.length, 0);
+  root.querySelector(".group-stop-action").click(); await tick();
+  assert.deepEqual(calls, [{type:"alarmmesh/group_stop", group_id:group.id, revision:data.revision, start_ids:["jana-start"]}]);
+  data.automation.episodes[0].phase = "recovery";
+  transport.callbacks.at(-1)(data);
+  assert.equal(root.querySelector(".group-stop-action"), null);
+  panel.linkedIncident = "expired"; transport.callbacks.at(-1)(data);
+  assert.equal(root.querySelector(".group-stop-action"), null);
+  transport.event("disconnected");
+  assert.equal(root.querySelector(".phone-incident"), null);
+  panel.remove();
+});
+
 test("primary navigation exposes maintenance and room views in both languages", () => {
   for (const language of ["nl", "en"]) {
     const { panel, root, calls } = setup(language);

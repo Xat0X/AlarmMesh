@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.0-rc.5 — 2026-11-21
+
+- Identify the reporting detector from the notification title and its known Home Assistant area from the first line. An update leads with the newly reporting detector.
+- Tap the alert to see the current smoke sources and eligible group stop buttons. The screen shows the reported siren state after a stop. An older notification opens its own incident history.
+
 ## 0.1.0-rc.4 — 2026-11-21
 
 - Use the group stop button for a Heiman that confirms its linked tone late, even after the original smoke report clears. AlarmMesh matches the confirmation to its start and checks the detector's own smoke state again on click.

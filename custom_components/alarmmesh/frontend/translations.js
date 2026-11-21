@@ -1112,6 +1112,8 @@ Object.assign(TEXT.en, {
 
 Object.assign(TEXT.nl, {
   traceTitle: "Rook en startopdrachten",
+  phoneIncident: "Rookmelding",
+  groupStopDetectors: "Meeklinken stoppen bij",
   groupStop: "Stop meeklinken in deze groep",
   groupStopOwnSmoke: "Dit stopt alleen het meeklinken van de genoemde melders. Een melder die zelf rook meldt, blijft alarmeren.",
   groupStopUnavailable: "AlarmMesh kan op dit moment geen melder in deze groep veilig laten stoppen met meeklinken. Bekijk de terugmeldingen in de tijdlijn.",
@@ -1152,6 +1154,8 @@ Object.assign(TEXT.nl, {
 });
 Object.assign(TEXT.en, {
   traceTitle: "Smoke and sounder commands",
+  phoneIncident: "Smoke alert",
+  groupStopDetectors: "Stop linked sound on",
   groupStop: "Stop linked sound in this group",
   groupStopOwnSmoke: "This stops linked sound on the listed detectors. A detector reporting its own smoke keeps alarming.",
   groupStopUnavailable: "AlarmMesh currently has no linked sound it can safely stop in this group. Check each detector’s feedback in the timeline.",

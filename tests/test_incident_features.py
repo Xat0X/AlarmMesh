@@ -182,6 +182,7 @@ async def test_notification_dedup_updates_recovery_and_independent_failures(
     assert len(calls) == 2
     assert all(c[0] == "notify" for c in calls)
     assert "SIMULATED a" in calls[0][2]["message"]
+    assert calls[0][2]["title"] == "Smoke alert · SIMULATED a"
     assert calls[0][2]["data"]["url"].startswith("/alarmmesh?incident=")
     assert "push" not in calls[0][2]["data"]  # No unsupported critical payload.
     await source(hass, entry, A, "on")
@@ -190,6 +191,9 @@ async def test_notification_dedup_updates_recovery_and_independent_failures(
     assert len(calls) == 2
     await source(hass, entry, C, "on")
     assert len(calls) == 4  # One meaningful new-source update per recipient.
+    assert calls[-1][2]["title"] == "Smoke alert · SIMULATED c (+1)"
+    assert calls[-1][2]["message"].startswith("SIMULATED c; SIMULATED a")
+    assert calls[-1][2]["data"]["url"] == calls[0][2]["data"]["url"]
     await source(hass, entry, A, "off")
     await source(hass, entry, C, "unavailable")
     assert len(calls) == 4

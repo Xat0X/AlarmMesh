@@ -226,7 +226,39 @@ export function exercise(panel, host, detail, initial) {
 export function incidentDetail(panel, parent, id) {
   const say=language(panel), events=(panel.data.activity?.events || []).filter(e=>e.category==="alarm" && e.correlation===id);
   const viewCurrent = action(say("Bekijk de huidige situatie","View current situation"),()=>{panel.linkedIncident=null;panel.go("incidents");});
-  if (panel.data.result.smoke === "SMOKE_REPORTED") {
+  const episode = panel.data.automation?.episodes?.find(item =>
+    item.id === id && item.group_id === "notifications" && item.phase === "start");
+  if (episode) {
+    const live = node("section");
+    live.className = "notice incident-now phone-incident";
+    const reporting = panel.data.sources.filter(source =>
+      episode.origins.includes(source.entity_id) && source.status === "SMOKE_REPORTED");
+    if (reporting.length) {
+      live.classList.add("has-smoke");
+      live.append(node("h2", say("Rook gemeld door", "Smoke reported by")));
+      const sources = node("ul");
+      sources.className = "phone-incident-sources";
+      for (const source of reporting) {
+        const row = node("li");
+        row.append(node("strong", source.name || source.entity_id));
+        if (source.area_name) row.append(node("span", source.area_name));
+        if (source.capability?.matter?.source_kind === "interconnect_smoke") row.append(node("span", panel.t.forwardedSmoke));
+        sources.append(row);
+      }
+      live.append(sources);
+    } else {
+      live.append(node("h2", say("Rookincident nog open", "Smoke incident still open")),
+        node("p", say("Laatst betrokken melders", "Previously involved detectors") + " · " +
+          episode.origins.map(source => panel.sourceName(source)).join(", ")));
+    }
+    if (episode.started) live.append(node("small", panel.t.incidentStarted + " · " + panel.formatTime(episode.started)));
+    parent.append(live);
+    for (const group of panel.data.groups) {
+      if ((group.origins || group.members).some(source => episode.origins.includes(source))) {
+        panel.renderGroupStop(parent, group, true);
+      }
+    }
+  } else if (panel.data.result.smoke === "SMOKE_REPORTED") {
     const current = node("section");
     current.className = "notice incident-now";
     current.append(node("h2", panel.t.currentSituation), panel.badge(panel.data.result));
@@ -236,24 +268,30 @@ export function incidentDetail(panel, parent, id) {
     current.append(viewCurrent);
     parent.append(current);
   }
-  parent.append(node("h2",say("Incident uit deze melding","Incident from this alert")));
-  if(!events.length)parent.append(node("p",say("Geen bewaarde gebeurtenissen bij deze verwijzing. De historie kan verlopen zijn.","No retained events match this link. Its history may have expired.")));
+  const history = episode ? node("details") : parent;
+  if (episode) {
+    history.className = "phone-incident-history";
+    history.append(node("summary", panel.t.incidentTimeline));
+    parent.append(history);
+  } else {
+    parent.append(node("h2",say("Incident uit deze melding","Incident from this alert")));
+  }
+  if(!events.length)history.append(node("p",say("Geen bewaarde gebeurtenissen bij deze verwijzing. De historie kan verlopen zijn.","No retained events match this link. Its history may have expired.")));
   const origins=events.filter(e=>e.kind==="incident_origin" || e.kind==="source" && e.result==="SMOKE_REPORTED").reverse();
-  if(events.some(e=>e.kind==="incident_clear" || e.kind==="source" && e.result==="NO_SMOKE_REPORTED"))parent.append(node("strong",say("De geregistreerde rookmelding is vrijgegeven.","The recorded smoke report has cleared.")));
+  if(events.some(e=>e.kind==="incident_clear"))history.append(node("strong",say("De geregistreerde rookmelding is vrijgegeven.","The recorded smoke report has cleared.")));
   if(origins.length){
     const first=origins.filter(e=>e.observed_at===origins[0].observed_at);
-    parent.append(node("strong",say("Eerst vastgelegd: ","First recorded: ")+first.map(e=>panel.sourceName(e.source)).join(" + ")+" · "+panel.formatTime(origins[0].observed_at)));
-    const active=panel.data.automation?.episodes?.find(e=>e.id===id && e.phase==="start");
-    const more=panel.data.sources.filter(s=>s.status==="SMOKE_REPORTED" && active?.origins.includes(s.entity_id) && !first.some(e=>e.source===s.entity_id));
-    if(more.length)parent.append(node("p",say("Ook nu rook gemeld door ", "Also reporting smoke now: ")+more.map(s=>panel.sourceName(s.entity_id)).join(", ")));
+    history.append(node("strong",say("Eerst vastgelegd: ","First recorded: ")+first.map(e=>panel.sourceName(e.source)).join(" + ")+" · "+panel.formatTime(origins[0].observed_at)));
+    const more=panel.data.sources.filter(s=>s.status==="SMOKE_REPORTED" && episode?.origins.includes(s.entity_id) && !first.some(e=>e.source===s.entity_id));
+    if(more.length)history.append(node("p",say("Ook nu rook gemeld door ", "Also reporting smoke now: ")+more.map(s=>panel.sourceName(s.entity_id)).join(", ")));
   }
   for(const event of [...events].reverse()) {
     const name=event.source ? panel.sourceName(event.source) : event.target;
     const label=event.kind==="incident_clear" ? say("Alle betrokken melders meldden geen rook meer","All involved detectors reported clear") :
       event.kind==="incident_origin" ? say("Rook waargenomen","Smoke observed") : panel.activityResult(event);
-    parent.append(node("p",[panel.formatTime(event.observed_at),name,label].filter(Boolean).join(" · ")));
+    history.append(node("p",[panel.formatTime(event.observed_at),name,label].filter(Boolean).join(" · ")));
   }
-  if (!viewCurrent.parentElement) parent.append(viewCurrent);
+  if (!episode && !viewCurrent.parentElement) parent.append(viewCurrent);
 }
 
 export function careView(panel,parent,source,edit=false) {

@@ -1,4 +1,8 @@
-# Vrijgaveaudit voor 0.1.0-rc.4
+# Vrijgaveaudit voor 0.1.0-rc.5
+
+De simulator volgde de meldingslink van iOS en Android tot op het incidentscherm. Eén druk op de groepsknop stopte het meeklinken van twee geschikte Heiman-melders. Toen de tweede melder tijdens het indrukken zelf rook ging melden, kreeg alleen de andere melder een stopopdracht. De weergave op een vergrendelde iPhone is het praktijkpunt voor deze kandidaat. [RC5 en het testpad](releases/0.1.0-rc.5.md)
+
+## Vrijgaveaudit voor 0.1.0-rc.4
 
 Met een vertraging van 2,35 seconden bij Jana kon de groepsknop in de simulator Jana en TEST stoppen. Toen Jana vlak voor de klik zelf rook meldde, kreeg alleen TEST een stop. De simulator controleerde ook de terugmelding na een groepsstop, één herhaling bij een herkenbare actieve sirenestand en het uitblijven van een herhaling bij onduidelijke feedback. Het hoorbare resultaat thuis is een afzonderlijke praktijkcontrole. [RC4 en het testpad](releases/0.1.0-rc.4.md)
 

@@ -1,5 +1,5 @@
-import { exercise, incidentDetail, careView } from "./family.js?v=candidate-readback-1";
-import { TEXT } from "./translations.js?v=group-stop-feedback-1";
+import { exercise, incidentDetail, careView } from "./family.js?v=phone-incident-1";
+import { TEXT } from "./translations.js?v=phone-incident-1";
 import { Drafts } from "./drafts.js?v=family-beta16";
 
 // Safe DOM construction: names, labels and registry data are always text nodes.
@@ -46,6 +46,17 @@ export class AlarmMeshPanel extends HTMLElement {
       if (this.data) this.lastReading = {at:this.lastUpdate, smoke:this.data.sources.filter(s => s.status === "SMOKE_REPORTED").map(s => this.sourceName(s.entity_id)), count:this.data.sources.length};
       this.generation++; this.unsubscribe?.()?.catch?.(() => {}); this.unsubscribe = null; this.data = null; this.diagnostics = null; this.transport = "offline"; this.offlineDraft(); this.updateTestResult(); this.render(); };
     this.onReady = () => this.subscribe();
+    this.onIncidentLocation = () => {
+      const location = window.location;
+      if (location?.pathname.replace(/\/$/, "") !== "/alarmmesh") return;
+      const id = new URLSearchParams(location.search).get("incident");
+      if (id) {
+        this.linkedSource = null;
+        this.returnSource = null;
+        this.linkedIncident = id;
+        this.go("incidents");
+      }
+    };
   }
   set hass(value) {
     const old = this._hass;
@@ -59,8 +70,23 @@ export class AlarmMeshPanel extends HTMLElement {
   set narrow(value) { this._narrow = value; }
   set panel(value) { this._panel = value; }
   get t() { return TEXT[this._hass?.language?.startsWith("nl") ? "nl" : "en"]; }
-  connectedCallback() { const query=new URLSearchParams(window.location?.search || ""); this.linkedIncident=query.get("incident"); this.linkedSource=query.get("source"); if(this.linkedIncident) this.page="incidents"; else if(["incidents","maintenance"].includes(query.get("view"))) this.page=query.get("view"); if (this._hass) this.bindConnection(); this.render(); }
-  disconnectedCallback() { this.unbindConnection(); this.closeDialog(); }
+  connectedCallback() {
+    const query = new URLSearchParams(window.location?.search || "");
+    this.linkedIncident = query.get("incident");
+    this.linkedSource = this.linkedIncident ? null : query.get("source");
+    if (this.linkedIncident) this.page = "incidents";
+    else if (["incidents", "maintenance"].includes(query.get("view"))) this.page = query.get("view");
+    window.addEventListener("location-changed", this.onIncidentLocation);
+    window.addEventListener("popstate", this.onIncidentLocation);
+    if (this._hass) this.bindConnection();
+    this.render();
+  }
+  disconnectedCallback() {
+    window.removeEventListener("location-changed", this.onIncidentLocation);
+    window.removeEventListener("popstate", this.onIncidentLocation);
+    this.unbindConnection();
+    this.closeDialog();
+  }
   unbindConnection() {
     this.generation++;
     this.unsubscribe?.()?.catch?.(() => {}); this.unsubscribe = null;
@@ -171,7 +197,7 @@ export class AlarmMeshPanel extends HTMLElement {
     const t = this.t;
     const sticky = this.shadowRoot.activeElement;
     const stickyKey = sticky?.dataset.sticky, selection = stickyKey ? [sticky.selectionStart, sticky.selectionEnd] : null;
-    const link = el("link"); link.rel = "stylesheet"; link.href = "/alarmmesh-assets/panel.css?v=candidate-readback-1";
+    const link = el("link"); link.rel = "stylesheet"; link.href = "/alarmmesh-assets/panel.css?v=phone-incident-1";
     const shell = el("div", undefined, "shell");
     shell.classList.toggle("dark", Boolean(this._hass?.themes?.darkMode));
     const side = el("aside");
@@ -193,7 +219,8 @@ export class AlarmMeshPanel extends HTMLElement {
     menu.setAttribute("aria-label", "Home Assistant menu");
     header.append(menu, icon("home-outline"), el("span", this.page === "diagnostics" ? "AlarmMesh" : this.data?.title || "AlarmMesh"), el("span", "", "muted"));
     const main = el("main");
-    const heading = el("h1", t[this.page]);
+    const readingAlert = this.page === "incidents" && this.linkedIncident;
+    const heading = el("h1", readingAlert ? t.phoneIncident : t[this.page]);
     heading.dataset.sticky = "heading-" + this.page;
     heading.tabIndex = -1;
     if (parentPage[this.page] && this.page !== "rooms") {
@@ -256,7 +283,7 @@ export class AlarmMeshPanel extends HTMLElement {
     const previous = this.shadowRoot.querySelector(".shell");
     shell.dataset.view = this.page;
     if (previous?.dataset.view === this.page && this.data) {
-      for (const selector of [".more-filters", ".settings-help", ".phone-settings-summary", ".sounder-history"]) {
+      for (const selector of [".more-filters", ".settings-help", ".phone-settings-summary", ".sounder-history", ".phone-incident-history"]) {
         const before = previous.querySelector(selector), after = shell.querySelector(selector);
         if (before && after) after.open = before.open;
       }
@@ -269,7 +296,7 @@ export class AlarmMeshPanel extends HTMLElement {
   updatePageSmoke(main) {
     const existing = main?.querySelector(".page-smoke");
     if (!main || this.data?.result.smoke !== "SMOKE_REPORTED" || this.page === "overview" ||
-        (this.page === "incidents" && !this.linkedIncident)) {
+        this.page === "incidents") {
       existing?.remove();
       return;
     }
@@ -1716,7 +1743,7 @@ export class AlarmMeshPanel extends HTMLElement {
       const ids = choices.map(row => row.start_id);
       const revision = this.data.revision, generation = this.generation;
       const action = button(t.groupStop, async () => {
-        if (action.disabled || !this.data || this.generation !== generation ||
+        if (!action.isConnected || action.disabled || !this.data || this.generation !== generation ||
             this.groupStopResults.get(group.id)?.busy) return;
         action.disabled = true;
         const status = {busy:true, starts:ids};
@@ -1731,15 +1758,22 @@ export class AlarmMeshPanel extends HTMLElement {
         } catch { status.message = t.groupStopUnknown; }
         status.busy = false;
         if (generation === this.generation) this.refreshGroupStop();
-      }, "button group-stop-action");
+      }, "button primary group-stop-action");
       action.disabled = Boolean(result?.busy);
-      section.append(el("p", choices.map(row => this.sourceName(row.source)).join(", ")),
+      action.dataset.sticky = "stop-group-" + group.id;
+      section.append(el("p", t.groupStopDetectors + " · " + choices.map(row => this.sourceName(row.source, true)).join(", ")),
         action, el("p", t.groupStopOwnSmoke));
     } else if (!result) section.append(el("p", t.groupStopUnavailable));
     if (result) {
       const feedback = el("p", result.busy ? t.groupStopBusy : result.message);
       feedback.setAttribute("role", "status");
       section.append(feedback);
+      for (const target of this.data.incident?.targets || []) {
+        if (target.stop_feedback && result.starts.includes(target.start_id)) {
+          section.append(el("p", this.sourceName(target.source, true) + " · " +
+            this.t["activity_result_" + target.stop_feedback], "stop-feedback"));
+        }
+      }
     }
     parent.append(section);
   }
@@ -1809,11 +1843,12 @@ export class AlarmMeshPanel extends HTMLElement {
     const self = parent.querySelector(".selftest-result");
     if (self) self.append(el("h2", t.selfTests), el("p", `${data.sources.find(s => s.entity_id === data.selftest.source)?.name || data.selftest.source}: ${t['test_' + data.selftest.status]}`), el("p", t.deviceResultNote));
   }
-  sourceName(id) {
+  sourceName(id, omitMissingRoom = false) {
     const source = this.data.sources.find(s => s.entity_id === id);
     if (!source) return id;
     const duplicate = this.data.sources.some(other => other.entity_id !== id && other.name === source.name && other.area_id === source.area_id);
-    return `${source.name} · ${source.area_name || this.t.noRoom}${duplicate ? ` · ${id}` : ""}`;
+    const room = source.area_name || (omitMissingRoom ? "" : this.t.noRoom);
+    return [source.name || id, room, duplicate ? id : ""].filter(Boolean).join(" · ");
   }
   notificationReceipt(parent,row) {
     const t=this.t,card=el("section",undefined,"notice");
