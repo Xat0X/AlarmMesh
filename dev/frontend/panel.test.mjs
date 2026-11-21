@@ -1852,3 +1852,37 @@ test("smoke history counts HA dispatches and distinguishes a startup observation
   v.panel.go('incidents'); assert.match(v.root.querySelector('.sounder-history').textContent,/Startopdrachten 1/);
   assert.equal(v.calls.length,0); v.panel.remove();
 });
+
+for (const lang of ['nl', 'en']) {
+  test(`Heiman feedback has its own time, reason and associated start (${lang})`, () => {
+    const v = setup(lang), d = evidenceData();
+    const start = '2026-11-21T11:39:59.222Z';
+    const expiry = '2026-11-21T11:40:01.223Z';
+    const report = '2026-11-21T11:40:01.418Z';
+    const otherStart = '2026-11-21T11:39:59.345Z';
+    const event = (kind, result, observed_at, correlation, detector) => ({
+      category: 'alarm', kind, result, observed_at, correlation, source: detector,
+      id: result + detector, target: 'select.' + detector.split('.').pop(), groups: []
+    });
+    d.activity = {incomplete: false, events: [
+      event('sounder_feedback', 'feedback_window_expired', expiry, 'first', source.entity_id),
+      event('sounder_feedback', 'feedback_late_matched', report, 'first', source.entity_id),
+      event('sounder_feedback', 'feedback_context_missing', expiry, 'second', 'binary_sensor.other'),
+      event('sounder_command', 'start_requested', otherStart, 'second', 'binary_sensor.other'),
+      event('sounder_command', 'start_requested', start, 'first', source.entity_id)
+    ]};
+    v.transport.callbacks.at(-1)(d); v.panel.go('activity');
+    const box = v.root.querySelector('.sounder-history');
+    const rows = [...box.querySelectorAll('.trace-events li')];
+    assert.deepEqual(rows.map(row => row.querySelector('time').getAttribute('datetime')),
+      [report, expiry, expiry, otherStart, start]);
+    assert.match(rows[0].textContent, lang === 'nl' ? /wachttijd was voorbij/ : /after the deadline/);
+    assert.match(rows[2].textContent, lang === 'nl' ? /geen overeenkomend opdrachtkenmerk/ : /no matching request identifier/);
+    assert.match(rows[0].querySelector('small').textContent, /222/);
+    assert.match(rows[2].querySelector('small').textContent, /345/);
+    assert.equal(box.querySelectorAll('.trace-counts li').length, 2);
+    assert.ok([...box.querySelectorAll('.trace-counts li')].every(row => row.textContent.endsWith(' 1')));
+    assert.equal(v.calls.length, 0);
+    v.panel.remove();
+  });
+}

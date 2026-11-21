@@ -219,7 +219,7 @@ class PanelController:
         self.matter_sources = MatterSources(hass, entry)
         self.activity = Activity(hass, entry, hub.publish)
         self.linking = LinkingRuntime(
-            hass, entry, self.groups, hub.publish, self.activity.sounder_command
+            hass, entry, self.groups, hub.publish, self.activity.sounder_event
         )
         self.effects = IncidentEffects(
             hass, entry, self.linking, self.groups, hub.publish
@@ -271,7 +271,7 @@ class PanelController:
             "alarmmesh-panel",
             sidebar_title="AlarmMesh",
             sidebar_icon="mdi:smoke-detector",
-            module_url=f"{ASSET_URL}/panel.js?v=sounder-history-1",
+            module_url=f"{ASSET_URL}/panel.js?v=sounder-feedback-1",
             require_admin=True,
         )
         self.hub.controller = self

@@ -1,4 +1,8 @@
-# Vrijgaveaudit voor 0.1.0-rc.1
+# Vrijgaveaudit voor 0.1.0-rc.2
+
+[RC2](releases/0.1.0-rc.2.md) maakt per Heiman de ontvangsttijd, de koppeling aan de startaanvraag en de reden voor uitstel of afzien van stoppen zichtbaar. De MQTT-simulator behandelt een tijdige en een late terugmelding en een meeklinkende melder die zelf rook detecteert. De pakketcontrole gebruikt RC1 als vorige versie op beide ondersteunde Home Assistant-versies.
+
+## Vrijgaveaudit voor 0.1.0-rc.1
 
 De [releasekandidaat](releases/0.1.0-rc.1.md) voegt een tijdlijn voor rook en startopdrachten toe. Vergelijk het tijdstip van een gehoord heralarm met de startregels voor dezelfde doelmelder. De bijbehorende simulatorproeven behandelen ook een herladen integratie en lokale rook op een meeklinkende doelmelder.
 

@@ -16,6 +16,7 @@ LIMIT = 1000
 PENDING_LIMIT = 128
 CATEGORIES = {"alarm", "maintenance", "selftest", "configuration"}
 KINDS = {
+    "sounder_feedback",
     "sounder_command",
     "startup_smoke",
     "incident_origin",
@@ -59,6 +60,23 @@ RESULTS = {
     "stop_sent",
     "start_requested",
     "stop_requested",
+    "feedback_linked",
+    "feedback_context_missing",
+    "feedback_window_expired",
+    "feedback_late_matched",
+    "feedback_late_unmatched",
+    "feedback_after_rejection",
+    "feedback_idle",
+    "feedback_idle_observed",
+    "feedback_other_tone",
+    "feedback_unavailable",
+    "feedback_intervening",
+    "feedback_binding_changed",
+    "stop_binding_changed",
+    "stop_monitor_paused",
+    "stop_target_not_clear",
+    "stop_target_smoke",
+    "stop_origins_not_clear",
     "not_stopped",
     "already_active",
     "request_sent",
@@ -120,7 +138,10 @@ class Activity:
                 if (
                     not isinstance(row, dict)
                     or (set(row) - {"origins"}) != FIELDS
-                    or ("origins" in row and row["kind"] != "sounder_command")
+                    or (
+                        "origins" in row
+                        and row["kind"] not in {"sounder_command", "sounder_feedback"}
+                    )
                     or not isinstance(row.get("origins", []), list)
                     or len(row.get("origins", [])) > 100
                     or any(
@@ -291,17 +312,20 @@ class Activity:
             self.object_ids[key] = (obj, uuid4().hex)
         return self.object_ids[key][1]
 
-    def sounder_command(self, row, result, groups):
-        """One observation per HA service invocation, independent of its outcome."""
+    def sounder_event(self, row, result, groups, *, observed_at=None):
+        """Keep commands and observations separate under the same request ID."""
         try:
             self.record(
                 "alarm",
-                "sounder_command",
+                "sounder_command"
+                if result in {"start_requested", "stop_requested"}
+                else "sounder_feedback",
                 result,
                 source=row["source"],
                 target=row["target"],
                 origins=row["origins"],
                 correlation=self._request(row),
+                observed_at=observed_at,
                 groups=[
                     group["id"]
                     for group in groups

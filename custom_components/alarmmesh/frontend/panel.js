@@ -1,5 +1,5 @@
 import { exercise, incidentDetail, careView } from "./family.js?v=candidate-readback-1";
-import { TEXT } from "./translations.js?v=sounder-history-1";
+import { TEXT } from "./translations.js?v=sounder-feedback-1";
 import { Drafts } from "./drafts.js?v=family-beta16";
 
 // Safe DOM construction: names, labels and registry data are always text nodes.
@@ -342,7 +342,7 @@ export class AlarmMeshPanel extends HTMLElement {
       for (const id of incident.active_sources) section.append(el("p", `${t.rememberedSmoke}: ${data.sources.find(s => s.entity_id === id)?.name || id}`));
       for (const target of incident.targets) {
         const row = el("div", undefined, "execution-row");
-        row.append(icon(["failed", "blocked", "stop_failed", "outcome_unknown"].includes(target.status) ? "alert-circle-outline" : "bullhorn-outline"), el("span", `${data.sources.find(s => s.entity_id === target.source)?.name || target.source} · ${t[target.status] || target.status}`));
+        row.append(icon(["failed", "blocked", "stop_failed", "outcome_unknown"].includes(target.status) ? "alert-circle-outline" : "bullhorn-outline"), el("span", `${data.sources.find(s => s.entity_id === target.source)?.name || target.source} · ${this.sounderStatus(target)}`));
         section.append(row);
       }
       main.append(section);
@@ -529,7 +529,7 @@ export class AlarmMeshPanel extends HTMLElement {
     for (const outcome of outcomes.filter(o => bindings.some(b => b.target === o.target))) {
       if (["failed", "blocked", "stop_failed", "outcome_unknown", "not_stopped"].includes(outcome.status)) {
         const source = data.sources.find(s => s.entity_id === outcome.source);
-        add(`${source?.name || outcome.source}: ${t[outcome.status] || outcome.status}. ${t.checkFailureAdvice}`,
+        add(`${source?.name || outcome.source}: ${this.sounderStatus(outcome)}. ${t.checkFailureAdvice}`,
           source ? t.inspectDetector : null,
           source ? () => this.openDialog({ kind: "source", id: source.entity_id }) : null, true, "execution");
       }
@@ -1715,7 +1715,7 @@ export class AlarmMeshPanel extends HTMLElement {
     if (groups.length) { const section=el("section",undefined,"notice"); section.append(el("h2",t.groups)); for (const group of groups) section.append(button(group.name,()=>this.openDialog({kind:"group",id:group.id}))); parent.append(section); }
     for (const target of data.incident?.targets || []) {
       const row = el("section", undefined, "notice sounder-receipt");
-      row.append(el("h3", data.sources.find(s => s.entity_id === target.source)?.name || target.source), el("p", t[target.status] || t.guide_unknown));
+      row.append(el("h3", data.sources.find(s => s.entity_id === target.source)?.name || target.source), el("p", this.sounderStatus(target)));
       if (target.origins?.length) row.append(el("p", `${t.recordedOrigins}: ${target.origins.map(id => this.sourceName(id)).join(", ")}`));
       row.append(el("small", t.commandNote)); parent.append(row);
     }
@@ -1857,6 +1857,10 @@ export class AlarmMeshPanel extends HTMLElement {
     filters.append(button(t.clearFilters, clearFilters));
     bar.append(filters); parent.append(bar,results); draw();
   }
+  sounderStatus(target) {
+    const reason = target.status === "not_stopped" && target.stop_reason;
+    return (reason && this.t["activity_result_" + reason]) || this.t[target.status] || this.t.guide_unknown;
+  }
   renderSounderHistory(parent) {
     const t = this.t, history = this.data.activity;
     if (!history) return;
@@ -1873,19 +1877,28 @@ export class AlarmMeshPanel extends HTMLElement {
       year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit",
       second: "2-digit", fractionalSecondDigits: 3
     });
+    const events = history.events.filter(event =>
+      ["source", "startup_smoke", "sounder_command", "sounder_feedback"].includes(event.kind) ||
+      (event.kind === "sounder" && ["failed", "outcome_unknown", "already_active", "stop_failed"].includes(event.result))
+    ).sort((a, b) => Date.parse(b.observed_at) - Date.parse(a.observed_at));
+    const starts = new Map(events.filter(event =>
+      event.kind === "sounder_command" && event.result === "start_requested" && event.correlation
+    ).map(event => [event.correlation, event.observed_at]));
     const draw = () => {
       summary.replaceChildren(); list.replaceChildren();
       const cutoff = Date.parse(since.value), counts = new Map();
-      for (const event of history.events) {
-        if (!["source", "startup_smoke", "sounder_command"].includes(event.kind)) continue;
+      for (const event of events) {
         if (Date.parse(event.observed_at) < cutoff) continue;
         const item = el("li"), time = el("time", clock.format(new Date(event.observed_at)));
         time.title = event.observed_at;
         time.setAttribute("datetime", event.observed_at);
         const message = event.kind === "startup_smoke" ? t.activity_startup_smoke : this.activityResult(event);
         item.append(time, el("p", this.sourceName(event.source) + " · " + message));
+        if (event.kind === "sounder_feedback" && starts.has(event.correlation)) {
+          item.append(el("small", t.traceStartTime + " · " + clock.format(new Date(starts.get(event.correlation)))));
+        }
         if (event.origins?.length) item.append(el("small", t.recordedOrigins + " · " + event.origins.map(id => this.sourceName(id)).join(", ")));
-        if (event.result === "start_requested") counts.set(event.source, (counts.get(event.source) || 0) + 1);
+        if (event.kind === "sounder_command" && event.result === "start_requested") counts.set(event.source, (counts.get(event.source) || 0) + 1);
         list.append(item);
       }
       for (const [id, count] of counts) summary.append(el("li", this.sourceName(id) + " · " + t.traceStarts + " " + count));

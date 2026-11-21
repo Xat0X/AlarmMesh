@@ -938,6 +938,18 @@ async def test_delayed_heiman_start_confirmation_and_physical_hush(
     hass.states.async_set(origin["source"], "off", {"device_class": "smoke"})
     await flush(hass, entry)
     assert calls == (["smoke_siren", "stop"] if attributable else ["smoke_siren"])
+    trace = [
+        r
+        for r in reversed(entry.runtime_data.panel.activity.snapshot()["events"])
+        if r["kind"] in {"sounder_feedback", "sounder_command"}
+        and r["target"] == other["target"]
+    ]
+    assert [r["result"] for r in trace] == (
+        ["start_requested", "feedback_linked", "stop_requested"]
+        if attributable
+        else ["start_requested", "feedback_context_missing"]
+    )
+    assert len({r["correlation"] for r in trace}) == 1
 
 
 async def test_manual_tone_replaces_our_ownership_before_clear(hass, devices):
@@ -967,6 +979,92 @@ async def test_manual_tone_replaces_our_ownership_before_clear(hass, devices):
     assert (
         entry.runtime_data.panel.linking.records[a["target"]]["status"] == "not_stopped"
     )
+
+
+@pytest.mark.parametrize("late_context_matches", [True, False])
+async def test_heiman_feedback_timeline_two_targets(
+    hass, devices, late_context_matches
+):
+    """Two independent starts, a late report and a timely uncorrelated report."""
+    add, calls, _ = devices
+    senne, jana, other = add("senne"), add("jana"), add("test")
+    members = [device["source"] for device in (senne, jana, other)]
+    entry = await setup(hass, members)
+    panel = entry.runtime_data.panel
+    contexts = {}
+
+    async def accept(call):
+        target = call.data["entity_id"]
+        calls.append((target, call.data["option"]))
+        contexts[target] = call.context
+
+    hass.services.async_register("select", "select_option", accept)
+    hass.states.async_set(senne["source"], "on", {"device_class": "smoke"})
+    await flush(hass, entry)
+    assert calls == []  # No default permission.
+    hass.states.async_set(senne["source"], "off", {"device_class": "smoke"})
+    await flush(hass, entry)
+    await configure(hass, entry, members, [jana, other])
+    hass.states.async_set(senne["source"], "on", {"device_class": "smoke"})
+    await flush(hass, entry)
+
+    def report(device, value, context=None):
+        target = device["target"]
+        hass.states.async_set(
+            target, value, dict(hass.states.get(target).attributes), context=context
+        )
+        return hass.states.get(target).last_updated.isoformat()
+
+    other_observed = report(other, "smoke_siren")
+    await flush(hass, entry)
+    # Drive the actual deadline callback before the next HA report.
+    panel.linking._expire_pending(jana["target"])
+    context = contexts[jana["target"]] if late_context_matches else None
+    jana_observed = report(jana, "smoke_siren", context)
+    await flush(hass, entry)
+    for device in (other, jana):
+        report(device, "stop")
+        await flush(hass, entry)
+    hass.states.async_set(senne["source"], "off", {"device_class": "smoke"})
+    await flush(hass, entry)
+    assert not panel.linking.owned
+    assert sorted(calls) == sorted(
+        (device["target"], "smoke_siren") for device in (jana, other)
+    )
+    assert await hass.config_entries.async_reload(entry.entry_id)
+    await flush(hass, entry)
+    history = entry.runtime_data.panel.activity.snapshot()
+    assert not history["incomplete"]
+    traces = {}
+    for device, expected, observed in (
+        (
+            jana,
+            [
+                "feedback_window_expired",
+                "feedback_late_matched"
+                if late_context_matches
+                else "feedback_late_unmatched",
+                "feedback_idle_observed",
+            ],
+            jana_observed,
+        ),
+        (other, ["feedback_context_missing", "feedback_idle_observed"], other_observed),
+    ):
+        events = [
+            r
+            for r in reversed(history["events"])
+            if r["target"] == device["target"]
+            and r["kind"] in {"sounder_feedback", "sounder_command"}
+        ]
+        assert [r["result"] for r in events] == ["start_requested", *expected]
+        assert all(
+            r["source"] == device["source"] and r["origins"] == [senne["source"]]
+            for r in events
+        )
+        assert len({r["correlation"] for r in events}) == 1
+        assert events[-2]["observed_at"] == observed
+        traces[device["target"]] = events[0]["correlation"]
+    assert len(set(traces.values())) == 2
 
 
 async def test_review_new_group_incident_while_other_group_remains_active(

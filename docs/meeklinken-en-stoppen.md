@@ -41,6 +41,8 @@ Een fysieke druk op de bronknop levert daarmee nog geen groepsstop op. Het versc
 
 ## Het incident achteraf bekijken
 
+Voor Heiman HS1SA-E-PLUS en S1-M zie je per melder de sirenestand die Home Assistant doorgaf, het tijdstip tot op de milliseconde en de bijbehorende startopdracht. Bij een bevestigde koppeling wacht AlarmMesh tot de betrokken melders rookvrij zijn. Als de bevestiging uitblijft, vermeldt de tijdlijn of de wachttijd van twee seconden verstreek, het opdrachtkenmerk afweek of de sirenestand onbetrouwbaar was. Een latere terugmelding tijdens hetzelfde incident kan zichtbaar worden nadat automatisch stoppen voor die start is vervallen. De stand *stop* beschrijft wat Home Assistant rapporteerde. Een stopopdracht van AlarmMesh heeft een eigen regel. Oudere incidenten houden de gegevens die destijds werden geregistreerd.
+
 Open **Activiteit → Rook en startopdrachten** en kies bij **Toon vanaf** de lokale begintijd van de test. Bovenaan staat het aantal vastgelegde startaanvragen per doelmelder. De tijdlijn toont de nieuwste gebeurtenis eerst. Bij elke opdracht zie je ook de melder of melders die de aanleiding waren. **Meldde al rook bij het opstarten** betekent dat AlarmMesh bij het inlezen rook zag. Het begin van die rookmelding kan eerder zijn geweest.
 
 Twee startregels voor dezelfde melder zijn twee afzonderlijke Home Assistant-aanroepen. Noteer wanneer je de tweede toon hoorde en vergelijk dat met de tijdlijn. Een eerste start, gevolgd door alleen een stop, bevat één geregistreerde start. Een bevestiging van Home Assistant bewijst geen hoorbaar geluid. De geschiedenis omvat maximaal 30 dagen en 1.000 gebeurtenissen. Bij een onderbreking, een onvolledig logboek of tests met een oudere versie kan bewijs ontbreken.

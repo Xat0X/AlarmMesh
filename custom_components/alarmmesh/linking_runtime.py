@@ -24,6 +24,15 @@ class PendingStart:
     record: dict
 
 
+@dataclass
+class UnconfirmedFeedback:
+    """Observation only, for the remainder of this continuous incident."""
+
+    control: Control
+    context_id: str
+    awaiting_idle: bool = False
+
+
 def _reports_linked_tone(state: State | None, control: Control) -> bool:
     return bool(
         state
@@ -32,12 +41,22 @@ def _reports_linked_tone(state: State | None, control: Control) -> bool:
     )
 
 
+def _tone_loss_reason(state: State | None) -> str:
+    if (
+        not state
+        or state.attributes.get("assumed_state")
+        or state.state in {"unknown", "unavailable"}
+    ):
+        return "feedback_unavailable"
+    return "feedback_idle" if state.state == "stop" else "feedback_other_tone"
+
+
 class LinkingRuntime:
     """One attempt per target/incident; errors never cause a retry storm."""
 
-    def __init__(self, hass: HomeAssistant, entry, groups, publish, observe_command):
+    def __init__(self, hass: HomeAssistant, entry, groups, publish, observe_sounder):
         self.hass, self.entry, self.groups, self.publish = hass, entry, groups, publish
-        self.observe_command = observe_command
+        self.observe_sounder = observe_sounder
         self.runtime = entry.runtime_data
         self.capabilities = Capabilities(hass)
         self.active: set[str] = set()
@@ -46,6 +65,7 @@ class LinkingRuntime:
         self.owned: dict[str, Control] = {}
         self.records: dict[str, dict] = {}
         self._pending_starts: dict[str, PendingStart] = {}
+        self._unconfirmed: dict[str, UnconfirmedFeedback] = {}
         self._task: asyncio.Task | None = None
         self._paused = True
         self._closed = False
@@ -85,26 +105,37 @@ class LinkingRuntime:
     def _related_changed(self, event):
         target = event.data["entity_id"]
         state = event.data["new_state"]
+        observed_at = (state.last_updated if state else event.time_fired).isoformat()
         owned = self.owned.get(target)
         if owned and owned.safe_stop and not _reports_linked_tone(state, owned):
             # A manual stop followed by a rapid new sound can fit in one HA
             # loop iteration. The later sound no longer belongs to AlarmMesh.
             self.owned.pop(target)
             if self.records[target]["status"] != "stopping":
-                self.records[target]["status"] = "not_stopped"
+                self._no_stop(
+                    self.records[target], _tone_loss_reason(state), observed_at
+                )
         if pending := self._pending_starts.get(target):
-            self._forget_pending(target)
-            if (
-                self.records.get(target) is pending.record
-                and event.data["old_state"] is pending.before
-                and state
-                and _reports_linked_tone(state, pending.control)
-                and pending.context_id in {state.context.id, state.context.parent_id}
-                and (resolved := self.capabilities.resolve(pending.control.binding()))
-                and resolved.safe_stop
-            ):
-                self.owned[target] = pending.control
-                pending.record["status"] = "sent"
+            self._pending_starts.pop(target)
+            pending.expiry.cancel()
+            if self.records.get(target) is pending.record:
+                if event.data["old_state"] is pending.before:
+                    self._confirm_start(
+                        pending.record,
+                        pending.control,
+                        state,
+                        pending.context_id,
+                        observed_at,
+                    )
+                else:
+                    self._unconfirmed[target] = UnconfirmedFeedback(
+                        pending.control,
+                        pending.context_id,
+                        _reports_linked_tone(state, pending.control),
+                    )
+                    self._no_stop(pending.record, "feedback_intervening", observed_at)
+        elif followup := self._unconfirmed.get(target):
+            self._observe_followup(followup, state, observed_at)
         self.changed()
         if not self._closed and not self._paused:
             self.publish()
@@ -163,7 +194,7 @@ class LinkingRuntime:
         self.attempted = {
             target: origins for target, origins in self.attempted.items() if origins
         }
-        if self._pending_starts:
+        if self._pending_starts or self._unconfirmed:
             selected = set(self.runtime.source_entity_ids)
             bindings = [
                 binding
@@ -173,7 +204,13 @@ class LinkingRuntime:
             ]
             for target, pending in tuple(self._pending_starts.items()):
                 if pending.control.binding() not in bindings:
-                    self._forget_pending(target)
+                    self._forget_pending(target, "stop_binding_changed")
+            for target, followup in tuple(self._unconfirmed.items()):
+                if (
+                    target not in self.attempted
+                    or followup.control.binding() not in bindings
+                ):
+                    self._unconfirmed.pop(target)
         if self.active and not was_active:
             self.records = {
                 key: value
@@ -240,16 +277,79 @@ class LinkingRuntime:
         )
 
     @callback
-    def _forget_pending(self, target):
+    def _no_stop(self, record, reason, observed_at=None):
+        if record.get("stop_reason") != reason:
+            self.observe_sounder(
+                record, reason, self.groups.groups, observed_at=observed_at
+            )
+        record["stop_reason"] = reason
+        record["status"] = "not_stopped"
+
+    def _observe_followup(self, followup, state, observed_at):
+        if not state or state.attributes.get("assumed_state"):
+            return
+        target = followup.control.target
+        record = self.records[target]
+        if followup.awaiting_idle:
+            if state.state != "stop":
+                return
+            result = "feedback_idle_observed"
+            self._unconfirmed.pop(target)
+        else:
+            if state.state != followup.control.option:
+                return
+            followup.awaiting_idle = True
+            if record["stop_reason"] == "feedback_window_expired":
+                result = (
+                    "feedback_late_matched"
+                    if followup.context_id
+                    in {state.context.id, state.context.parent_id}
+                    else "feedback_late_unmatched"
+                )
+            else:
+                result = "feedback_after_rejection"
+        self.observe_sounder(
+            record, result, self.groups.groups, observed_at=observed_at
+        )
+
+    def _confirm_start(self, record, control, state, context_id, observed_at):
+        if not _reports_linked_tone(state, control):
+            reason = _tone_loss_reason(state)
+        elif context_id not in {state.context.id, state.context.parent_id}:
+            reason = "feedback_context_missing"
+        elif (
+            not (resolved := self.capabilities.resolve(control.binding()))
+            or not resolved.safe_stop
+        ):
+            reason = "feedback_binding_changed"
+        else:
+            self.owned[control.target] = control
+            record["status"] = "sent"
+            self.observe_sounder(
+                record, "feedback_linked", self.groups.groups, observed_at=observed_at
+            )
+            return
+        if reason != "feedback_binding_changed":
+            self._unconfirmed[control.target] = UnconfirmedFeedback(
+                control, context_id, _reports_linked_tone(state, control)
+            )
+        self._no_stop(record, reason, observed_at)
+
+    @callback
+    def _forget_pending(self, target, reason):
         pending = self._pending_starts.pop(target, None)
         if pending:
             pending.expiry.cancel()
             if self.records.get(target) is pending.record:
-                pending.record["status"] = "not_stopped"
+                if reason == "feedback_window_expired":
+                    self._unconfirmed[target] = UnconfirmedFeedback(
+                        pending.control, pending.context_id
+                    )
+                self._no_stop(pending.record, reason)
 
     @callback
     def _expire_pending(self, target):
-        self._forget_pending(target)
+        self._forget_pending(target, "feedback_window_expired")
         self._publish()
 
     async def _activate(self, activation, slots):
@@ -269,7 +369,8 @@ class LinkingRuntime:
                 "status": "blocked",
                 "profile": activation.binding["profile"],
             }
-            self._forget_pending(target)
+            self._forget_pending(target, "feedback_intervening")
+            self._unconfirmed.pop(target, None)
             self.records[target] = record
             if (control := self._current(activation)) is None:
                 return
@@ -292,7 +393,7 @@ class LinkingRuntime:
             self._publish()
             try:
                 async with asyncio.timeout(10):
-                    self.observe_command(record, "start_requested", self.groups.groups)
+                    self.observe_sounder(record, "start_requested", self.groups.groups)
                     await self.hass.services.async_call(
                         control.domain,
                         control.service,
@@ -325,17 +426,14 @@ class LinkingRuntime:
                         )
                         record["status"] = "sent"
                         return
-                    if (
-                        not state
-                        or not _reports_linked_tone(state, control)
-                        or context.id not in {state.context.id, state.context.parent_id}
-                        or not (
-                            resolved := self.capabilities.resolve(control.binding())
-                        )
-                        or not resolved.safe_stop
-                    ):
-                        record["status"] = "not_stopped"
-                        return
+                    self._confirm_start(
+                        record,
+                        control,
+                        state,
+                        context.id,
+                        state.last_updated.isoformat() if state else None,
+                    )
+                    return
                 self.owned[target] = control
                 record["status"] = "sent" if control.safe_stop else "sent_no_auto_stop"
 
@@ -363,7 +461,10 @@ class LinkingRuntime:
             for b in g["linking"]["bindings"]
         ]
         if control.binding() not in bindings:
-            self.records[target]["status"] = "not_stopped"
+            if control.safe_stop:
+                self._no_stop(self.records[target], "stop_binding_changed")
+            else:
+                self.records[target]["status"] = "not_stopped"
             self.owned.pop(target, None)
             return
         if not control.safe_stop:
@@ -371,21 +472,30 @@ class LinkingRuntime:
         target_state = self.hass.states.get(target)
         if not _reports_linked_tone(target_state, control):
             # A later manual tone/stop or lost feedback cannot remain our action.
-            self.records[target]["status"] = "not_stopped"
+            self._no_stop(self.records[target], _tone_loss_reason(target_state))
             self.owned.pop(target, None)
             return
         resolved = self.capabilities.resolve(control.binding())
-        if (
-            self._closed
-            or self._paused
-            or not resolved
-            or not resolved.safe_stop
-            or any(
-                not self._reports_clear(source)
-                for source in {control.source, *self.records[target]["origins"]}
+        if self._closed or self._paused:
+            self._no_stop(self.records[target], "stop_monitor_paused")
+            return
+        if not resolved or not resolved.safe_stop:
+            self._no_stop(self.records[target], "stop_binding_changed")
+            return
+        if not self._reports_clear(control.source):
+            reason = (
+                "stop_target_smoke"
+                if self.runtime.source_statuses.get(control.source)
+                is SourceStatus.SMOKE_REPORTED
+                else "stop_target_not_clear"
             )
+            self._no_stop(self.records[target], reason)
+            return
+        if any(
+            not self._reports_clear(source)
+            for source in self.records[target]["origins"]
         ):
-            self.records[target]["status"] = "not_stopped"
+            self._no_stop(self.records[target], "stop_origins_not_clear")
             return
         # A new origin may have joined while another target's request was in flight.
         if any(action.binding == control.binding() for action in self._plan()):
@@ -397,7 +507,7 @@ class LinkingRuntime:
         self._publish()
         try:
             async with asyncio.timeout(10):
-                self.observe_command(
+                self.observe_sounder(
                     self.records[target], "stop_requested", self.groups.groups
                 )
                 await self.hass.services.async_call(
@@ -422,7 +532,7 @@ class LinkingRuntime:
                 for target, control in tuple(self.owned.items()):
                     state = self.hass.states.get(target)
                     if control.safe_stop and not _reports_linked_tone(state, control):
-                        self.records[target]["status"] = "not_stopped"
+                        self._no_stop(self.records[target], _tone_loss_reason(state))
                         self.owned.pop(target, None)
                 desired = self._plan()
                 for activation in desired:
@@ -461,8 +571,9 @@ class LinkingRuntime:
 
     async def pause(self):
         self._paused = True
+        self._unconfirmed.clear()
         for target in tuple(self._pending_starts):
-            self._forget_pending(target)
+            self._forget_pending(target, "stop_monitor_paused")
         if self._task:
             task = self._task
             task.cancel()

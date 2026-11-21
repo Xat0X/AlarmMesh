@@ -769,6 +769,29 @@ async def main(requested):
             and len({r["correlation"] for r in commands}) == 1,
             "Heiman MQTT calls and command history disagree",
         )
+        confirmed = [
+            r
+            for r in history
+            if r["kind"] == "sounder_feedback"
+            and r["result"] == "feedback_linked"
+            and r["correlation"] == commands[0]["correlation"]
+        ]
+        require(
+            len(confirmed) == 1
+            and commands[0]["observed_at"]
+            <= confirmed[0]["observed_at"]
+            <= commands[1]["observed_at"],
+            "Missing timestamped confirmation for the simulated Heiman",
+        )
+        require(
+            any(
+                r["kind"] == "sounder_feedback"
+                and r["result"] == "stop_target_smoke"
+                and r["correlation"] == commands[0]["correlation"]
+                for r in history
+            ),
+            "Missing reason for withholding the stop while the Heiman reported smoke",
+        )
         for source in (sources[0], sources[1]):
             transitions = [
                 r["result"]
@@ -779,6 +802,51 @@ async def main(requested):
                 transitions[-2:] == ["SMOKE_REPORTED", "NO_SMOKE_REPORTED"],
                 "Missing smoke transition in Heiman simulator timeline",
             )
+        # Replay a separate incident with a late MQTT state report. No device or
+        # broker outside this disposable simulator network is reachable.
+        states[1]["smoke"] = True
+        await publish("alarmmesh_simulation/synthetic1", states[1])
+        topic, payload = await asyncio.wait_for(messages.get(), 10)
+        require(
+            topic.endswith("synthetic0/set/siren_for_automation_only")
+            and payload == "smoke_siren",
+            "Missing second incident start",
+        )
+        await wait_state(
+            lambda: (
+                engine.records[heiman["target"]].get("stop_reason")
+                == "feedback_window_expired"
+            )
+        )
+        states[0]["siren_for_automation_only"] = "smoke_siren"
+        await publish("alarmmesh_simulation/synthetic0", states[0])
+        await wait_state(lambda: hass.states.is_state(heiman["target"], "smoke_siren"))
+        await settle()
+        states[0]["siren_for_automation_only"] = "stop"
+        await publish("alarmmesh_simulation/synthetic0", states[0])
+        await wait_state(lambda: hass.states.is_state(heiman["target"], "stop"))
+        states[1]["smoke"] = False
+        await publish("alarmmesh_simulation/synthetic1", states[1])
+        await wait_state(lambda: not engine.active)
+        await settle()
+        rows = panel.activity.snapshot()["events"]
+        latest = next(r for r in rows if r["result"] == "start_requested")
+        trace = [
+            r["result"]
+            for r in reversed(rows)
+            if r["correlation"] == latest["correlation"]
+            and r["kind"] in {"sounder_feedback", "sounder_command"}
+        ]
+        require(
+            latest["target"] == heiman["target"]
+            and latest["correlation"] != commands[0]["correlation"]
+            and len(trace) == 4
+            and trace[:2] == ["start_requested", "feedback_window_expired"]
+            and trace[2] in {"feedback_late_matched", "feedback_late_unmatched"}
+            and trace[3] == "feedback_idle_observed"
+            and messages.empty(),
+            f"Late feedback must remain observational: {trace}",
+        )
         passed("mqtt_heiman_stop_after_local_smoke_clears")
         require(
             await hass.config_entries.async_unload(entry.entry_id),

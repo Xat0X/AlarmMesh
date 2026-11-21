@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.0-rc.2 — 2026-11-21
+
+- See when Home Assistant reported each Heiman sounder state, whether it matched the start request and why AlarmMesh withheld a stop. Late feedback remains visible after the confirmation window closes.
+
 ## 0.1.0-rc.1 — 2026-11-21
 
 - Review smoke observations, smoke already present at startup, and individual linked start and stop requests. Filter by local test time and see the number of starts per detector.
