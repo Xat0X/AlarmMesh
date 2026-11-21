@@ -1,4 +1,10 @@
-# Vrijgaveaudit voor 0.1.0-beta.20
+# Vrijgaveaudit voor 0.1.0-rc.1
+
+De [releasekandidaat](releases/0.1.0-rc.1.md) voegt een tijdlijn voor rook en startopdrachten toe. Vergelijk het tijdstip van een gehoord heralarm met de startregels voor dezelfde doelmelder. De bijbehorende simulatorproeven behandelen ook een herladen integratie en lokale rook op een meeklinkende doelmelder.
+
+Controleer een upgrade vanaf de gepubliceerde bèta 20 met `dev/release/check-update.ps1 -PreviousRevision 0.1.0-beta.20 -HaVersion <versie> -CommittedCandidate` op de releasecommit. De praktijkpunten uit de audit hieronder blijven van toepassing.
+
+## Vrijgaveaudit voor 0.1.0-beta.20
 
 **20 november 2026 · laatste testversie vóór de productiebeslissing.** Gebruik de Incidents-simulator op poort 8131. De drie belangrijkste wijzigingen zijn rechtstreeks naar actuele rook gaan vanuit een open formulier, terugkeren naar de betrokken melder en een onzekere opslag controleren met de daadwerkelijk bewaarde gegevens.
 

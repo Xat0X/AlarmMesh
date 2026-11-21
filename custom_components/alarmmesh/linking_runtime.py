@@ -35,8 +35,9 @@ def _reports_linked_tone(state: State | None, control: Control) -> bool:
 class LinkingRuntime:
     """One attempt per target/incident; errors never cause a retry storm."""
 
-    def __init__(self, hass: HomeAssistant, entry, groups, publish):
+    def __init__(self, hass: HomeAssistant, entry, groups, publish, observe_command):
         self.hass, self.entry, self.groups, self.publish = hass, entry, groups, publish
+        self.observe_command = observe_command
         self.runtime = entry.runtime_data
         self.capabilities = Capabilities(hass)
         self.active: set[str] = set()
@@ -291,6 +292,7 @@ class LinkingRuntime:
             self._publish()
             try:
                 async with asyncio.timeout(10):
+                    self.observe_command(record, "start_requested", self.groups.groups)
                     await self.hass.services.async_call(
                         control.domain,
                         control.service,
@@ -395,6 +397,9 @@ class LinkingRuntime:
         self._publish()
         try:
             async with asyncio.timeout(10):
+                self.observe_command(
+                    self.records[target], "stop_requested", self.groups.groups
+                )
                 await self.hass.services.async_call(
                     "select",
                     "select_option",

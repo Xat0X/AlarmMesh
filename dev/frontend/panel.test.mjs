@@ -1833,3 +1833,22 @@ test("a new care note edited during readback can be saved separately with a fres
   assert.equal(calls.length,3);assert.notEqual(calls[2].record.id,first.id);assert.equal(calls[2].record.note,"Later");
   panel.remove();
 });
+
+test("smoke history counts HA dispatches and distinguishes a startup observation", () => {
+  const v = setup('nl'), d = evidenceData();
+  const events = [
+    ['source','SMOKE_REPORTED'], ['sounder_command','start_requested'], ['sounder','sent'],
+    ['startup_smoke','SMOKE_REPORTED'], ['sounder_command','start_requested'], ['sounder_command','stop_requested']
+  ].map(([kind,result], i) => ({id:String(i), category:'alarm', kind, result, source:source.entity_id,
+    groups:[], origins:kind==='sounder_command'?[source.entity_id]:[], observed_at:new Date(2026,10,20,10,i).toISOString()}));
+  d.activity={events:events.reverse(), incomplete:true};
+  v.transport.callbacks.at(-1)(d); v.panel.go('activity');
+  const box=v.root.querySelector('.sounder-history');
+  assert.match(box.textContent,/Startopdrachten 2/);
+  assert.match(box.textContent,/al rook bij het opstarten/);
+  assert.equal(box.querySelectorAll('time[datetime]').length,5);
+  const since=box.querySelector('input'); since.value='2026-11-20T10:03'; since.dispatchEvent(new Event('change'));
+  assert.match(box.textContent,/Startopdrachten 1/);
+  v.panel.go('incidents'); assert.match(v.root.querySelector('.sounder-history').textContent,/Startopdrachten 1/);
+  assert.equal(v.calls.length,0); v.panel.remove();
+});

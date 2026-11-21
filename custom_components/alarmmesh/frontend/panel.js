@@ -1,5 +1,5 @@
 import { exercise, incidentDetail, careView } from "./family.js?v=candidate-readback-1";
-import { TEXT } from "./translations.js?v=candidate-readback-1";
+import { TEXT } from "./translations.js?v=sounder-history-1";
 import { Drafts } from "./drafts.js?v=family-beta16";
 
 // Safe DOM construction: names, labels and registry data are always text nodes.
@@ -242,7 +242,7 @@ export class AlarmMeshPanel extends HTMLElement {
     const previous = this.shadowRoot.querySelector(".shell");
     shell.dataset.view = this.page;
     if (previous?.dataset.view === this.page && this.data) {
-      for (const selector of [".more-filters", ".settings-help", ".phone-settings-summary"]) {
+      for (const selector of [".more-filters", ".settings-help", ".phone-settings-summary", ".sounder-history"]) {
         const before = previous.querySelector(selector), after = shell.querySelector(selector);
         if (before && after) after.open = before.open;
       }
@@ -997,7 +997,7 @@ export class AlarmMeshPanel extends HTMLElement {
     const t = this.t;
     if (!this.catalog) { parent.append(el("p", this.catalogError ? t.error : t.loading, "notice")); return; }
     const catalog = this.catalog;
-    parent.append(el("p", `${catalog.definitions} ${t.definitions} / ${catalog.website_rows} ${t.catalogModels} / ${catalog.checked}`, "muted"), el("p", t.catalogNote, "notice"));
+    parent.append(el("p", `${catalog.definitions} ${t.definitions} / ${catalog.website_rows} ${t.catalogModels} / ${catalog.checked}`, "muted"), el("p", t.catalogNote, "notice"), el("p", t.catalogDirection));
     const filters = el("div", undefined, "catalog-filters");
     const search = el("input"); search.type = "search"; search.placeholder = t.searchCatalog; search.setAttribute("aria-label", t.searchCatalog); search.value = this.catalogSearch || "";
     const provider = el("select"); provider.setAttribute("aria-label", t.provider);
@@ -1697,11 +1697,12 @@ export class AlarmMeshPanel extends HTMLElement {
         this.openDialog({kind:"source", id});
       }, "button return-detector"));
     }
-    if(this.linkedIncident){incidentDetail(this,parent,this.linkedIncident);return;}
+    if(this.linkedIncident){incidentDetail(this,parent,this.linkedIncident);parent.append(button(this.t.traceTitle,()=>this.go("activity")));return;}
     parent.append(button(this.t.activity,()=>this.go("activity")));
     const t = this.t, data = this.data;
     const current=el('section',undefined,'notice incident-now');current.append(el('h2',t.currentSituation),this.badge(data.result),el('p',t[data.result.availability]));parent.append(current);
     const explanation=el('details',undefined,'incident-explanation');explanation.append(el('summary',t.howToReadIncidents),el('p',t.incidentNote));parent.append(explanation);
+    this.renderSounderHistory(parent);
     const timeline=el('details',undefined,'incident-timeline');timeline.append(el('summary',t.incidentTimeline),el('p',t.incidentTimelineNote));
     const events=[...(data.activity?.events || [])].filter(r=>r.category==='alarm');const list=el('ol');
     for(const event of events){const item=el('li');item.append(el('time',this.formatTime(event.observed_at)),el('p',`${t['activity_'+event.kind] || t.guide_unknown}: ${this.activityResult(event)}`));if(event.source)item.append(el('p',this.sourceName(event.source)));if(event.target)item.append(el('p',data.automation?.recipients.find(r=>r.service===event.target)?.name || data.automation?.scripts.find(r=>r.entity_id===event.target)?.name || event.target.replace(/^mobile_app_/,'')));const technical=el('details');technical.append(el('summary',t.technicalDetails),el('p',event.correlation || t.guide_unknown));item.append(technical);list.append(item);}
@@ -1856,12 +1857,50 @@ export class AlarmMeshPanel extends HTMLElement {
     filters.append(button(t.clearFilters, clearFilters));
     bar.append(filters); parent.append(bar,results); draw();
   }
+  renderSounderHistory(parent) {
+    const t = this.t, history = this.data.activity;
+    if (!history) return;
+    const box = el("details", undefined, "notice sounder-history");
+    box.append(el("summary", t.traceTitle), el("p", t.traceHelp));
+    if (history.incomplete) box.append(el("p", t.activityIncomplete, "warning-text"));
+    const label = el("label", t.traceSince), since = el("input");
+    since.type = "datetime-local";
+    since.value = this.traceSince || "";
+    since.dataset.sticky = "trace-since";
+    label.append(since);
+    const summary = el("ul", undefined, "trace-counts"), list = el("ol", undefined, "trace-events");
+    const clock = new Intl.DateTimeFormat(this._hass.language, {
+      year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit",
+      second: "2-digit", fractionalSecondDigits: 3
+    });
+    const draw = () => {
+      summary.replaceChildren(); list.replaceChildren();
+      const cutoff = Date.parse(since.value), counts = new Map();
+      for (const event of history.events) {
+        if (!["source", "startup_smoke", "sounder_command"].includes(event.kind)) continue;
+        if (Date.parse(event.observed_at) < cutoff) continue;
+        const item = el("li"), time = el("time", clock.format(new Date(event.observed_at)));
+        time.title = event.observed_at;
+        time.setAttribute("datetime", event.observed_at);
+        const message = event.kind === "startup_smoke" ? t.activity_startup_smoke : this.activityResult(event);
+        item.append(time, el("p", this.sourceName(event.source) + " · " + message));
+        if (event.origins?.length) item.append(el("small", t.recordedOrigins + " · " + event.origins.map(id => this.sourceName(id)).join(", ")));
+        if (event.result === "start_requested") counts.set(event.source, (counts.get(event.source) || 0) + 1);
+        list.append(item);
+      }
+      for (const [id, count] of counts) summary.append(el("li", this.sourceName(id) + " · " + t.traceStarts + " " + count));
+      if (!counts.size) summary.append(el("li", t.traceNoStarts));
+    };
+    since.addEventListener("change", () => { this.traceSince = since.value; draw(); });
+    box.append(label, summary, list); parent.append(box); draw();
+  }
   renderActivity(parent) {
     const t=this.t, history=this.data.activity, f=this.activityFilters;
     parent.append(this.incidentButton());
     parent.append(el("p",t.activitySummary,"section-note"));const limits=el('details',undefined,'activity-limits');limits.append(el('summary',t.aboutInformation),el('p',t.activityLimit));parent.append(limits);
     if(!history) {parent.append(el("p",t.guide_unknown));return;}
     if(history.incomplete) parent.append(el("p",t.activityIncomplete,"notice warning-text"));
+    this.renderSounderHistory(parent);
     if(!history.events.length) {parent.append(el("p",t.activityEmpty,"notice"));return;}
     const bar=el("div",undefined,"filter-bar activity-filters"), list=el("div",undefined,"activity-list");
     const draw=()=>{list.replaceChildren();const rows=history.events.filter(r=>(!f.source || r.source===f.source) && (!f.group || r.groups.includes(f.group)) && (!f.kind || r.kind===f.kind) && (!f.result || r.result===f.result) && (!f.category || r.category===f.category)); if(!rows.length) list.append(el("p",t.noFilterResults)); for(const row of rows) { const item=button("",()=>this.openDialog({kind:"activity",event:row}),"button activity-row"); item.append(el("strong",`${t['activity_'+row.kind] || row.kind} · ${this.activityResult(row)}`),el("span",row.source ? this.sourceName(row.source) : row.groups.map(id=>this.data.groups.find(g=>g.id===id)?.name || id).join(", ")),el("small",`${t.observedAt}: ${this.formatTime(row.observed_at)}`)); list.append(item); }};

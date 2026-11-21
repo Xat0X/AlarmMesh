@@ -719,6 +719,17 @@ async def main(requested):
             and payload == "smoke_siren",
             "Heiman MQTT payload",
         )
+        traced_start = [
+            r
+            for r in panel.activity.snapshot()["events"]
+            if r["kind"] == "sounder_command" and r["target"] == heiman["target"]
+        ]
+        require(
+            len(traced_start) == 1
+            and traced_start[0]["result"] == "start_requested"
+            and traced_start[0]["origins"] == [sources[1]],
+            "Heiman MQTT start and AlarmMesh history disagree",
+        )
         passed("mqtt_action_heiman_cascade_mqtt")
         engine = panel.linking
         # The device reports its external tone independently from its local smoke.
@@ -747,6 +758,27 @@ async def main(requested):
         await wait_state(lambda: hass.states.is_state(heiman["target"], "stop"))
         await settle()
         require(messages.empty(), "Duplicate Heiman stop")
+        history = panel.activity.snapshot()["events"]
+        commands = [
+            r
+            for r in reversed(history)
+            if r["kind"] == "sounder_command" and r["target"] == heiman["target"]
+        ]
+        require(
+            [r["result"] for r in commands] == ["start_requested", "stop_requested"]
+            and len({r["correlation"] for r in commands}) == 1,
+            "Heiman MQTT calls and command history disagree",
+        )
+        for source in (sources[0], sources[1]):
+            transitions = [
+                r["result"]
+                for r in reversed(history)
+                if r["kind"] == "source" and r["source"] == source
+            ]
+            require(
+                transitions[-2:] == ["SMOKE_REPORTED", "NO_SMOKE_REPORTED"],
+                "Missing smoke transition in Heiman simulator timeline",
+            )
         passed("mqtt_heiman_stop_after_local_smoke_clears")
         require(
             await hass.config_entries.async_unload(entry.entry_id),

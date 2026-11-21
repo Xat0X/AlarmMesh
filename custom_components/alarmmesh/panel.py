@@ -217,13 +217,15 @@ class PanelController:
         self.runtime = entry.runtime_data
         self.groups = GroupStore(hass, entry.entry_id)
         self.matter_sources = MatterSources(hass, entry)
-        self.linking = LinkingRuntime(hass, entry, self.groups, hub.publish)
+        self.activity = Activity(hass, entry, hub.publish)
+        self.linking = LinkingRuntime(
+            hass, entry, self.groups, hub.publish, self.activity.sounder_command
+        )
         self.effects = IncidentEffects(
             hass, entry, self.linking, self.groups, hub.publish
         )
         self.selftests = SelfTests(hass, entry, self.linking, hub.publish)
         self.maintenance = Maintenance(hass, entry, self.linking, hub.publish)
-        self.activity = Activity(hass, entry, hub.publish)
         self.effects.record_activity = self.activity.record
         self.care = CareJournal(hass, entry)
         self.phone_evidence = PhoneEvidence(hass, entry, self.effects, hub.publish)
@@ -269,7 +271,7 @@ class PanelController:
             "alarmmesh-panel",
             sidebar_title="AlarmMesh",
             sidebar_icon="mdi:smoke-detector",
-            module_url=f"{ASSET_URL}/panel.js?v=candidate-readback-1",
+            module_url=f"{ASSET_URL}/panel.js?v=sounder-history-1",
             require_admin=True,
         )
         self.hub.controller = self

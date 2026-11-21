@@ -589,6 +589,31 @@ async def test_quiet_target_during_persistent_smoke_before_and_after_reload(
     assert await hass.config_entries.async_reload(entry.entry_id)
     await flush(hass, entry)
     assert [c[2]["option"] for c in calls] == ["smoke_siren", "smoke_siren"]
+    history = entry.runtime_data.panel.activity.snapshot()
+    rows = list(reversed(history["events"]))
+    commands = [r for r in rows if r["kind"] == "sounder_command"]
+    assert [r["result"] for r in commands] == ["start_requested", "start_requested"]
+    assert len({r["correlation"] for r in commands}) == 2
+    assert all(r["origins"] == [origin["source"]] for r in commands)
+    assert all(
+        r["source"] == other["source"] and r["target"] == other["target"]
+        for r in commands
+    )
+    observed = [
+        r
+        for r in rows
+        if r["result"] == "SMOKE_REPORTED"
+        and r["source"] == origin["source"]
+        and r["kind"] in {"source", "startup_smoke"}
+    ]
+    assert [r["kind"] for r in observed] == ["source", "startup_smoke"]
+    assert observed[0]["observed_at"] <= commands[0]["observed_at"]
+    assert (
+        commands[0]["observed_at"]
+        <= observed[1]["observed_at"]
+        <= commands[1]["observed_at"]
+    )
+    assert not history["incomplete"]
 
 
 async def test_rapid_external_stop_and_restart_cannot_be_stopped_as_ours(hass, devices):
@@ -1214,5 +1239,23 @@ async def test_linked_targets_own_smoke_visible_until_explicit_clear(
     hass.states.async_set(target, "off", {"device_class": "smoke"})
     await flush(hass, entry)
     assert len(calls) == expected_calls
+    history = entry.runtime_data.panel.activity.snapshot()
+    commands = [
+        r["result"]
+        for r in reversed(history["events"])
+        if r["kind"] == "sounder_command"
+    ]
+    assert commands == (
+        ["start_requested", "stop_requested"]
+        if expected_calls == 2
+        else ["start_requested"]
+    )
+    for detector_id in (source, target):
+        assert [
+            r["result"]
+            for r in reversed(history["events"])
+            if r["kind"] == "source" and r["source"] == detector_id
+        ] == ["SMOKE_REPORTED", "NO_SMOKE_REPORTED"]
+    assert not history["incomplete"]
     if expected_calls == 2:
         assert calls[-1][2] == {"entity_id": detector["target"], "option": "stop"}

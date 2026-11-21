@@ -1109,3 +1109,22 @@ Object.assign(TEXT.en, {
   overviewActions: "Alarm routes and practice", alarmSettingsHint: "See who gets notified and which detectors can sound together.",
   practiceHint: "Follow a smoke report step by step on screen.", historyHint: "Review earlier reports and actions."
 });
+
+Object.assign(TEXT.nl, {
+  traceTitle: "Rook en startopdrachten",
+  traceHelp: "Alle bewaarde incidenten, nieuwste eerst. Kies de begintijd van je test. Elke getelde start is een aanroep van AlarmMesh aan Home Assistant. Of de melder geluid maakte, kun je hier niet zien. Eerdere versies registreerden deze aanroepen niet afzonderlijk.",
+  traceSince: "Toon vanaf (lokale tijd)", traceStarts: "Startopdrachten", traceNoStarts: "Geen startopdracht vastgelegd in deze periode.",
+  activity_startup_smoke: "Meldde al rook bij het opstarten van AlarmMesh",
+  activity_sounder_command: "Opdracht om mee te klinken",
+  activity_result_start_requested: "AlarmMesh vraagt starten aan", activity_result_stop_requested: "AlarmMesh vraagt stoppen aan",
+  catalogDirection: "Controleer beide kanten van een koppeling. De eerste melder moet rook aan Home Assistant melden. De andere moet via zijn eigen integratie meeklinken ondersteunen. Automatisch stoppen is een aparte mogelijkheid."
+});
+Object.assign(TEXT.en, {
+  traceTitle: "Smoke and sounder commands",
+  traceHelp: "All retained incidents, newest first. Select the start time of your test. Each counted start is a call from AlarmMesh to Home Assistant. Audible sound requires separate observation. Earlier versions did not record these calls individually.",
+  traceSince: "Show from (local time)", traceStarts: "Start requests", traceNoStarts: "No start request recorded in this period.",
+  activity_startup_smoke: "Already reporting smoke when AlarmMesh started",
+  activity_sounder_command: "Linked sounder command",
+  activity_result_start_requested: "AlarmMesh requests a start", activity_result_stop_requested: "AlarmMesh requests a stop",
+  catalogDirection: "Check both ends of a link. The first detector must report smoke to Home Assistant. The other must support linked sound through its own integration. Automatic stop is a separate capability."
+});

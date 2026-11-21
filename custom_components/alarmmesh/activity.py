@@ -16,6 +16,8 @@ LIMIT = 1000
 PENDING_LIMIT = 128
 CATEGORIES = {"alarm", "maintenance", "selftest", "configuration"}
 KINDS = {
+    "sounder_command",
+    "startup_smoke",
     "incident_origin",
     "incident_clear",
     "phone_observation",
@@ -54,6 +56,9 @@ RESULTS = {
     "stopping",
     "stopped",
     "stop_failed",
+    "stop_sent",
+    "start_requested",
+    "stop_requested",
     "not_stopped",
     "already_active",
     "request_sent",
@@ -114,7 +119,14 @@ class Activity:
             for row in data["events"]:
                 if (
                     not isinstance(row, dict)
-                    or set(row) != FIELDS
+                    or (set(row) - {"origins"}) != FIELDS
+                    or ("origins" in row and row["kind"] != "sounder_command")
+                    or not isinstance(row.get("origins", []), list)
+                    or len(row.get("origins", [])) > 100
+                    or any(
+                        not isinstance(origin, str) or len(origin) > 255
+                        for origin in row.get("origins", [])
+                    )
                     or any(
                         not isinstance(row[k], str) or len(row[k]) > 255
                         for k in FIELDS - {"groups"}
@@ -148,6 +160,12 @@ class Activity:
 
     def _prune(self):
         cutoff = dt_util.utcnow() - timedelta(days=30)
+        if self.pending:
+            self.pending = deque(
+                r
+                for r in self.pending
+                if dt_util.parse_datetime(r["observed_at"]) > cutoff
+            )
         self.rows = [
             r for r in self.rows if dt_util.parse_datetime(r["observed_at"]) > cutoff
         ][-LIMIT:]
@@ -163,6 +181,7 @@ class Activity:
         target="",
         correlation="",
         observed_at=None,
+        origins=None,
     ):
         if self.closed or self.paused:
             return
@@ -180,6 +199,10 @@ class Activity:
             "target": str(target)[:255],
             "correlation": str(correlation)[:255],
         }
+        if origins is not None:
+            row["origins"] = list(origins)[:100]
+            if len(origins) > 100:
+                self.incomplete = True
         if len(self.pending) >= PENDING_LIMIT:
             self.pending.popleft()
             self.incomplete = True
@@ -267,6 +290,34 @@ class Activity:
         if old is None or old[0] is not obj:
             self.object_ids[key] = (obj, uuid4().hex)
         return self.object_ids[key][1]
+
+    def sounder_command(self, row, result, groups):
+        """One observation per HA service invocation, independent of its outcome."""
+        try:
+            self.record(
+                "alarm",
+                "sounder_command",
+                result,
+                source=row["source"],
+                target=row["target"],
+                origins=row["origins"],
+                correlation=self._request(row),
+                groups=[
+                    group["id"]
+                    for group in groups
+                    if group["linking"]["enabled"]
+                    and not set(row["origins"]).isdisjoint(
+                        group.get("origins", group["members"])
+                    )
+                    and any(
+                        b["target"] == row["target"]
+                        for b in group["linking"]["bindings"]
+                    )
+                ],
+            )
+        except Exception:
+            # Diagnostics must never suppress a sounder request.
+            self.incomplete = True
 
     def capture(self, panel):
         """Observe published transitions only; initial state is a quiet baseline."""
@@ -430,6 +481,14 @@ class Activity:
                     for s, v in panel.runtime.source_statuses.items()
                     if v.name == "SMOKE_REPORTED"
                 }
+                for source, correlation in self.source_incidents.items():
+                    self.record(
+                        "alarm",
+                        "startup_smoke",
+                        "SMOKE_REPORTED",
+                        source=source,
+                        correlation=correlation,
+                    )
                 self._schedule()
                 return
             for key, (result, category, kind, context) in current.items():

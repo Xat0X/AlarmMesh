@@ -1,6 +1,6 @@
 # Acceptatieoverzicht
 
-De [vrijgaveaudit voor bèta 20](release-readiness.md) beschrijft de browserproeven, de upgrade vanaf bèta 19 en de resterende praktijkcontroles. De oudere beoordelingen volgen hieronder op datum.
+De [vrijgaveaudit voor RC1 en bèta 20](release-readiness.md) beschrijft de browserproeven, de upgrade vanaf bèta 19 en de resterende praktijkcontroles. De oudere beoordelingen volgen hieronder op datum.
 
 ## Historical test release — 0.1.0-beta.7
 

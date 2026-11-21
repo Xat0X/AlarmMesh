@@ -17,6 +17,7 @@ from homeassistant.helpers import entity_registry as er
 
 from custom_components.alarmmesh.capabilities import Capabilities
 from custom_components.alarmmesh.catalog import CATALOG, recognize, validate_catalog
+from custom_components.alarmmesh.linking import plan_activations
 from custom_components.alarmmesh.profiles import PROFILES, Profile, validate_profiles
 
 
@@ -841,4 +842,139 @@ async def test_bsd_gate_rechecked_after_waiting_before_dispatch(hass, catalog_de
     hass.states.async_set(source["source"], "off")
     await flush(hass, entry)
     assert len(calls) == 1  # No switch write or automatic stop.
+    assert await hass.config_entries.async_unload(entry.entry_id)
+
+
+def catalog_variants():
+    for definition in CATALOG["entries"]:
+        for row in [definition, *definition["aliases"]]:
+            for provider, integration in (("zigbee2mqtt", "mqtt"), ("zha", "zha")):
+                yield definition, row, provider, integration
+
+
+def simulated_catalog_device(add, definition, row, provider, integration):
+    adapters = {
+        case[-2]: (case[3], case[4], case[6], case[5], case[7]) for case in CASES
+    }
+    adapters["heiman_mqtt"] = adapters["heiman_cascade_mqtt"]
+    adapters["aqara_mqtt"] = (
+        "select",
+        "buzzer",
+        {"options": ["alarm", "mute"]},
+        "mute",
+        ("switch", "linkage_alarm"),
+    )
+    model, vendor = row["model"], row["vendor"]
+    review = row["providers"][provider]
+    profile = review["profile"]
+    if provider == "zha" and profile:
+        signature = definition["matchers"][provider][0]
+        model, vendor = signature["model"], signature["vendor"]
+    # A plausible sounder on an unreviewed model must not grant a binding.
+    adapter = adapters[profile or "heiman_mqtt"]
+    device = add(model, vendor, integration, *adapter)
+    if profile == "aqara_mqtt":
+        device["register"]("binary_sensor", "buzzer_manual_alarm", "off", {})
+    return device
+
+
+async def test_all_catalog_variants_as_directional_routes(hass, catalog_devices):
+    """Check provider recognition and routing between distinct simulated devices."""
+    add, calls = catalog_devices
+    caps = Capabilities(hass)
+    origins, bindings, reviewed_targets = [], [], set()
+    provider_counts = {"mqtt": 0, "zha": 0}
+    for definition, row, provider, integration in catalog_variants():
+        review = row["providers"][provider]
+        profile = review["profile"]
+        device = simulated_catalog_device(add, definition, row, provider, integration)
+        controls = caps.describe(device["source"])["controls"]
+        assert [c["profile"] for c in controls] == ([profile] if profile else []), (
+            row["model"],
+            provider,
+        )
+        if controls:
+            control = controls[0]
+            assert control["safe_stop"] == (review["stop"] == "implemented")
+            bindings.append(
+                {k: control[k] for k in ("source", "target", "profile", "identity")}
+            )
+            reviewed_targets.add(device["target"])
+            provider_counts[integration] += 1
+        if definition["kind"] == "smoke":
+            # Use two devices when pairing the same model.
+            origin = add(row["model"], row["vendor"], integration)["source"]
+            origins.append(origin)
+    assert len(origins) == 122 and provider_counts == {"mqtt": 21, "zha": 10}
+    members = origins + [b["source"] for b in bindings]
+    group = {
+        "members": members,
+        "origins": origins,
+        "linking": {"enabled": True, "bindings": bindings},
+    }
+    for source in origins:
+        routes = plan_activations({source}, [group, group])
+        assert {r.binding["target"] for r in routes} == reviewed_targets
+        assert len(routes) == len(reviewed_targets)
+        assert all(r.origins == {source} for r in routes)
+    group["linking"]["enabled"] = False
+    assert not plan_activations(set(origins), [group])
+    assert not calls
+
+
+@pytest.mark.parametrize(
+    "definition,row,provider,integration",
+    [
+        pytest.param(
+            definition, row, provider, integration, id=f"{row['model']}-{integration}"
+        )
+        for definition, row, provider, integration in catalog_variants()
+        if row["providers"][provider]["profile"]
+    ],
+)
+async def test_link_across_providers_records_only_actual_call(
+    hass, catalog_devices, definition, row, provider, integration
+):
+    add, calls = catalog_devices
+    target = simulated_catalog_device(add, definition, row, provider, integration)
+    origin = (
+        add("HS1SA-E-PLUS", "Heiman")
+        if integration == "zha"
+        else add("SMSZB-120", "Develco", "zha")
+    )
+    members = [origin["source"], target["source"]]
+    entry = await setup(hass, members)
+    await configure(hass, entry, members, [target])
+    hass.states.async_set(origin["source"], "on", {"device_class": "smoke"})
+    await flush(hass, entry)
+    assert len(calls) == 1 and calls[0][2]["entity_id"] == target["target"]
+    commands = [
+        r
+        for r in entry.runtime_data.panel.activity.snapshot()["events"]
+        if r["kind"] == "sounder_command"
+    ]
+    assert [(r["result"], r["source"], r["origins"]) for r in commands] == [
+        ("start_requested", target["source"], [origin["source"]])
+    ]
+    hass.states.async_set(target["source"], "on", {"device_class": "smoke"})
+    hass.states.async_set(origin["source"], "off", {"device_class": "smoke"})
+    await flush(hass, entry)
+    assert entry.runtime_data.panel.snapshot()["result"]["smoke"] == "SMOKE_REPORTED"
+    assert len(calls) == 1
+    hass.states.async_set(target["source"], "off", {"device_class": "smoke"})
+    await flush(hass, entry)
+    stop = row["providers"][provider]["stop"] == "implemented"
+    assert calls[1:] == (
+        [("select", "select_option", {"entity_id": target["target"], "option": "stop"})]
+        if stop
+        else []
+    )
+    recorded = [
+        r["result"]
+        for r in reversed(entry.runtime_data.panel.activity.snapshot()["events"])
+        if r["kind"] == "sounder_command"
+    ]
+    assert recorded == (
+        ["start_requested", "stop_requested"] if stop else ["start_requested"]
+    )
     assert await hass.config_entries.async_unload(entry.entry_id)

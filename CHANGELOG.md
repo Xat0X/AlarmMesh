@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.0-rc.1 — 2026-11-21
+
+- Review smoke observations, smoke already present at startup, and individual linked start and stop requests. Filter by local test time and see the number of starts per detector.
+- List all 67 catalog models and variants separately, with detection, start and stop capabilities per provider. Simulate linked starts across providers and local smoke on each supported target.
+
 ## 0.1.0-beta.20 — 2026-11-20
 
 - Open the current smoke incident directly from a maintenance task and return to the same detector. During a connection loss, the panel shows when it last received detector data.

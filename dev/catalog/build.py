@@ -34,23 +34,25 @@ def table(snapshot: dict) -> str:
         "Physical validation: zero. ZHA standard IAS routes are conditional, "
         "not a claim that every signature creates a siren.",
         "",
-        "| Canonical vendor / model | Documented variants | Kind "
-        "| MQTT action profile | ZHA action profile |",
-        "| --- | --- | --- | --- | --- |",
+        "Read each direction separately. Start with a selected HA smoke source, "
+        "then look up the receiving detector and its provider below. "
+        "Heat, relay, acoustic and siren rows have different roles. "
+        "Stop applies only to an eligible AlarmMesh-owned linked sounder.",
+        "",
+        "| Vendor / model | Kind | MQTT detection | MQTT start / stop "
+        "| ZHA detection | ZHA start / stop |",
+        "| --- | --- | --- | --- | --- | --- |",
     ]
     for entry in snapshot["entries"]:
-        aliases = (
-            "; ".join(f"{a['vendor']} {a['model']}" for a in entry["aliases"]) or "—"
-        )
-        profiles = [
-            entry["providers"][p]["profile"] or "No reviewed action"
-            for p in ("zigbee2mqtt", "zha")
-        ]
-        url = entry["providers"]["zigbee2mqtt"]["sources"][0]
-        lines.append(
-            f"| [{entry['vendor']} {entry['model']}]({url}) | {aliases} "
-            f"| {entry['kind']} | {profiles[0]} | {profiles[1]} |"
-        )
+        for model in [entry, *entry["aliases"]]:
+            url = model["providers"]["zigbee2mqtt"]["sources"][0]
+            cells = [f"[{model['vendor']} {model['model']}]({url})", entry["kind"]]
+            for provider in ("zigbee2mqtt", "zha"):
+                review = model["providers"][provider]
+                start = review["profile"] or "—"
+                stop = "stop" if review["stop"] == "implemented" else "—"
+                cells.extend([review["detection"], f"{start} / {stop}"])
+            lines.append("| " + " | ".join(cells) + " |")
     lines.extend(
         [
             "",
