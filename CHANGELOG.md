@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.0-rc.3 — 2026-11-21
+
+- Stop linked sound for a group with one click during an incident. AlarmMesh checks each Heiman's own smoke status and confirmed start again before requesting a stop. The timeline records each stop requested from the group button.
+
 ## 0.1.0-rc.2 — 2026-11-21
 
 - See when Home Assistant reported each Heiman sounder state, whether it matched the start request and why AlarmMesh withheld a stop. Late feedback remains visible after the confirmation window closes.

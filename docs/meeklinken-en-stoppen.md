@@ -2,11 +2,17 @@
 
 Onderzoek van 19 november 2026 bij de praktijktest op bèta 15. De gebruiker hoorde meerdere melders opnieuw afgaan. Het tijdstip en de afzender van een eventuele tweede opdracht zijn onbekend. De onderstaande mogelijkheden zijn ontleend aan apparaatdocumentatie, de code en tests met gesimuleerde apparaten.
 
+## Meeklinken stoppen met één druk
+
+Open tijdens een rookmelding **Groepen → je groep → Stop meeklinken in deze groep**. Dezelfde knop staat bij de groep in het actuele incident. Boven de knop staan de melders waarvoor een stop mogelijk is. Zolang Senne rook meldt, kun je bijvoorbeeld het meeklinken van Jana en TEST stoppen. Meldt Jana inmiddels zelf rook, dan krijgt alleen TEST de stopopdracht. In de tijdlijn staat per melder wanneer je de stop hebt aangevraagd.
+
+De knop werkt voor een herkende Heiman-bediening waarvan de start aan AlarmMesh is gekoppeld. Een melder met onzekere terugmelding of een doel dat tegelijk voor een andere groep klinkt valt buiten de opdracht. Voor de Aqara op zolder blijft alleen starten beschikbaar. De fysieke knop op een melder geeft geen groepsopdracht.
+
 ## De melders uit de test
 
 | Melder via Zigbee2MQTT | Bij rook op een andere melder | Wanneer kan AlarmMesh hem stoppen? |
 | --- | --- | --- |
-| Heiman HS1SA-E-PLUS | Een aangevinkte melder kan de opdracht `smoke_siren` krijgen op `siren_for_automation_only`. | Met `stop` op diezelfde bediening, zodra alle betrokken bronnen en de doelmelder zelf geen rook meer melden. AlarmMesh moet de start zelf hebben aangevraagd, de bediening nog herkennen en voldoende terugmelding hebben. |
+| Heiman HS1SA-E-PLUS | Een aangevinkte melder kan de opdracht `smoke_siren` krijgen op `siren_for_automation_only`. | Automatisch zodra alle betrokken bronnen en de doelmelder rookvrij zijn, of eerder met de groepsknop als de doelmelder zelf rookvrij is. Beide gebruiken `stop` op de afzonderlijke bediening voor meeklinken en vereisen een bevestigde eigen start. |
 | Aqara JY-GZ-01AQ, ook verkocht als JY-GZ-03AQ | De keuze `alarm` op `buzzer` vraagt geluid aan als de melder zelf geen rook waarneemt en `linkage_alarm` aan staat. De aparte sensor `buzzer_manual_alarm` geeft de toestand van het handmatig geactiveerde geluid. | Het toestel gebruikt `mute` om dit geluid te stoppen. Dezelfde keuze kan bij lokale rook het eigen alarm circa 80 seconden dempen. Er kan rook ontstaan tussen een HA-statuscontrole en ontvangst van de opdracht. AlarmMesh biedt daarom alleen starten aan voor deze route. |
 
 Op de Heiman kan de fysieke knop het lokale geluid dempen terwijl de rookindicatie aan blijft. Zigbee2MQTT beschrijft de demptijd en het exacte heralarmgedrag van de PLUS als onbevestigd. Bij Aqara kan ook `linkage_alarm_state` uitgaan na handmatig dempen. Deze waarden zijn geen bewijs dat alle betrokken bronnen weer vrij zijn. [Heiman](https://www.zigbee2mqtt.io/devices/HS1SA-E-PLUS.html) · [Aqara](https://www.zigbee2mqtt.io/devices/JY-GZ-01AQ.html)

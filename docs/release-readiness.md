@@ -1,4 +1,8 @@
-# Vrijgaveaudit voor 0.1.0-rc.2
+# Vrijgaveaudit voor 0.1.0-rc.3
+
+In de simulator liet één klik Jana en TEST stoppen met meeklinken terwijl Senne rook bleef melden. Toen Jana vlak vóór de klik ook rook meldde, kreeg alleen TEST een stopopdracht. De Aqara kreeg bij beide proeven uitsluitend de startopdracht. De tijdlijn en de opdrachtenteller zijn in de simulator gecontroleerd. De thuistest controleert het hoorbare resultaat. [RC3 en het testpad](releases/0.1.0-rc.3.md)
+
+## Vrijgaveaudit voor 0.1.0-rc.2
 
 [RC2](releases/0.1.0-rc.2.md) maakt per Heiman de ontvangsttijd, de koppeling aan de startaanvraag en de reden voor uitstel of afzien van stoppen zichtbaar. De MQTT-simulator behandelt een tijdige en een late terugmelding en een meeklinkende melder die zelf rook detecteert. De pakketcontrole gebruikt RC1 als vorige versie op beide ondersteunde Home Assistant-versies.
 

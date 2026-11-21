@@ -60,6 +60,7 @@ RESULTS = {
     "stop_sent",
     "start_requested",
     "stop_requested",
+    "group_stop_requested",
     "feedback_linked",
     "feedback_context_missing",
     "feedback_window_expired",
@@ -318,7 +319,8 @@ class Activity:
             self.record(
                 "alarm",
                 "sounder_command"
-                if result in {"start_requested", "stop_requested"}
+                if result
+                in {"start_requested", "stop_requested", "group_stop_requested"}
                 else "sounder_feedback",
                 result,
                 source=row["source"],

@@ -66,6 +66,7 @@ class LinkingRuntime:
         self.records: dict[str, dict] = {}
         self._pending_starts: dict[str, PendingStart] = {}
         self._unconfirmed: dict[str, UnconfirmedFeedback] = {}
+        self._stopping: set[str] = set()
         self._task: asyncio.Task | None = None
         self._paused = True
         self._closed = False
@@ -357,6 +358,7 @@ class LinkingRuntime:
             target = activation.binding["target"]
             if (
                 target in self.attempted
+                or target in self._stopping
                 or self._closed
                 or self._paused
                 or (target in self.owned and self.owned[target].safe_stop)
@@ -388,6 +390,9 @@ class LinkingRuntime:
             if control.tone is not None:
                 data["tone"] = control.tone
             context = Context()
+            if control.safe_stop:
+                record["start_group"] = self._sole_sounding_group(control)
+                record["start_id"] = context.id
             before = self.hass.states.get(target)
             record["status"] = "sending"
             self._publish()
@@ -452,8 +457,80 @@ class LinkingRuntime:
             )
         )
 
+    def _sole_sounding_group(self, control):
+        """A shared sound cannot be stopped on behalf of just one active group."""
+        matches = []
+        for group in self.groups.groups:
+            if (
+                group["linking"]["enabled"]
+                and control.binding() in group["linking"]["bindings"]
+                and any(
+                    origin != control.source
+                    and (
+                        origin in self.active or self.hass.states.is_state(origin, "on")
+                    )
+                    for origin in group.get("origins", group["members"])
+                )
+            ):
+                matches.append(group["id"])
+        return matches[0] if len(matches) == 1 else None
+
+    def _can_stop_for_group(self, group, control):
+        record = self.records[control.target]
+        feedback = self.hass.states.get(control.target)
+        return (
+            not self._closed
+            and not self._paused
+            and control.safe_stop
+            and self.owned.get(control.target) is control
+            and control.target not in self._stopping
+            and record.get("start_group") == group["id"]
+            and group["linking"]["enabled"]
+            and set(group["members"]) <= set(self.runtime.source_entity_ids)
+            and control.source in group["members"]
+            and self._reports_clear(control.source)
+            and not self.capabilities.test_blocked(control.source)
+            and _reports_linked_tone(feedback, control)
+            and record["start_id"] in {feedback.context.id, feedback.context.parent_id}
+            and self._sole_sounding_group(control) == group["id"]
+            and self.capabilities.resolve(control.binding()) == control
+        )
+
+    def group_stop_choices(self, group):
+        return [
+            {"source": control.source, "start_id": self.records[target]["start_id"]}
+            for target, control in self.owned.items()
+            if self._can_stop_for_group(group, control)
+        ]
+
+    async def stop_group(self, group_id, revision, start_ids):
+        """Only act on the individual starts that were displayed to this admin."""
+
+        async def stop_one(target, control):
+            current = next((g for g in self.groups.groups if g["id"] == group_id), None)
+            if (
+                self.groups.revision != revision
+                or current is None
+                or self.records.get(target, {}).get("start_id") not in start_ids
+                or not self._can_stop_for_group(current, control)
+            ):
+                return False
+            return await self._send_stop(target, "group_stop_requested")
+
+        outcomes = await asyncio.gather(
+            *(
+                stop_one(target, control)
+                for target, control in tuple(self.owned.items())
+                if self.records[target].get("start_id") in start_ids
+            )
+        )
+        self._publish()
+        return {"accepted": sum(outcomes), "requested": len(start_ids)}
+
     async def _stop(self, target, control):
         # No stop after disable/remap/reload; ownership is process-local only.
+        if self.owned.get(target) is not control or target in self._stopping:
+            return
         bindings = [
             b
             for g in self.groups.groups
@@ -503,13 +580,17 @@ class LinkingRuntime:
         # A source becoming unknown never clears its latched incident.
         if any(origin in self.active for origin in self.records[target]["origins"]):
             return
-        self.records[target]["status"] = "stopping"
+        await self._send_stop(target, "stop_requested")
+
+    async def _send_stop(self, target, event):
+        # Claim the target before handing control back to the HA event loop.
+        self._stopping.add(target)
+        record = self.records[target]
+        record["status"] = "stopping"
         self._publish()
         try:
             async with asyncio.timeout(10):
-                self.observe_sounder(
-                    self.records[target], "stop_requested", self.groups.groups
-                )
+                self.observe_sounder(record, event, self.groups.groups)
                 await self.hass.services.async_call(
                     "select",
                     "select_option",
@@ -517,19 +598,25 @@ class LinkingRuntime:
                     blocking=True,
                 )
         except asyncio.CancelledError:
-            self.records[target]["status"] = "outcome_unknown"
+            record["status"] = "outcome_unknown"
             raise
         except Exception:
-            self.records[target]["status"] = "stop_failed"
+            record["status"] = "stop_failed"
         else:
-            self.records[target]["status"] = "stop_sent"
-        self.owned.pop(target, None)  # No automatic stop retries, including failure.
+            record["status"] = "stop_sent"
+        finally:
+            self.owned.pop(target, None)
+            self._stopping.discard(target)
+            self.changed()
+        return record["status"] == "stop_sent"
 
     async def _run(self):
         try:
             while self._dirty and not self._closed and not self._paused:
                 self._dirty = False
                 for target, control in tuple(self.owned.items()):
+                    if target in self._stopping:
+                        continue
                     state = self.hass.states.get(target)
                     if control.safe_stop and not _reports_linked_tone(state, control):
                         self._no_stop(self.records[target], _tone_loss_reason(state))

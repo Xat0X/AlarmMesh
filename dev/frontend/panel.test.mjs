@@ -376,6 +376,44 @@ function guidedGroupData() {
   return data;
 }
 
+test("one group stop click submits only displayed starts and survives a live update", async () => {
+  const { panel, root, transport } = setup("nl");
+  const data = guidedGroupData();
+  const [senne, jana] = data.sources;
+  senne.name = "Senne"; jana.name = "Jana";
+  const testDetector = {...jana, name: "TEST", entity_id: "binary_sensor.test"};
+  data.sources.push(testDetector);
+  const group = data.groups[0];
+  group.members.push(testDetector.entity_id);
+  group.linking.enabled = true;
+  group.group_stop_choices = [{source:jana.entity_id, start_id:"jana-start"}, {source:testDetector.entity_id, start_id:"test-start"}];
+  data.incident = {active_sources:[senne.entity_id], targets:[]};
+  senne.status = data.result.smoke = "SMOKE_REPORTED";
+  transport.callbacks.at(-1)(data);
+  panel.go("incidents");
+  const action = root.querySelector(".group-stop-action");
+  assert.equal(action.textContent, "Stop meeklinken in deze groep");
+  assert.match(action.parentNode.textContent, /Jana.*TEST/);
+  const requests = [];
+  let resolve;
+  panel._hass.callWS = msg => { requests.push(msg); return new Promise(done => {resolve = done;}); };
+  action.click(); action.click();
+  transport.callbacks.at(-1)(data);
+  assert.equal(root.querySelector(".group-stop-action").disabled, true);
+  assert.deepEqual(requests, [{type:"alarmmesh/group_stop", group_id:group.id, revision:data.revision, start_ids:["jana-start", "test-start"]}]);
+  group.group_stop_choices = [];
+  transport.callbacks.at(-1)(data);
+  resolve({accepted:2, requested:2}); await tick();
+  assert.match(root.querySelector(".group-stop [role=status]").textContent, /2 van de 2/);
+  assert.equal(root.querySelector(".group-stop-action"), null);
+  assert.equal(panel.data.result.smoke, "SMOKE_REPORTED");
+  panel.openDialog({kind:"group", id:group.id});
+  assert.ok(root.querySelector("dialog .group-stop"));
+  transport.event("disconnected");
+  assert.equal(root.querySelector("dialog .group-stop"), null);
+  panel.remove();
+});
+
 test("setup guide handles empty sources and only navigates to existing configuration", () => {
   const { panel, root, transport, calls } = setup();
   const data = normal(); data.sources = []; data.groups = []; data.rooms = []; data.usable = 0;

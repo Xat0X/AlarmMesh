@@ -1,5 +1,5 @@
 import { exercise, incidentDetail, careView } from "./family.js?v=candidate-readback-1";
-import { TEXT } from "./translations.js?v=sounder-feedback-1";
+import { TEXT } from "./translations.js?v=group-stop-1";
 import { Drafts } from "./drafts.js?v=family-beta16";
 
 // Safe DOM construction: names, labels and registry data are always text nodes.
@@ -37,6 +37,7 @@ export class AlarmMeshPanel extends HTMLElement {
     this.data = null;
     this.transport = "loading";
     this.generation = 0;
+    this.groupStopResults = new Map();
     this.detail = null;
     let storage;try{storage=globalThis.localStorage;}catch{storage=null;}this.drafts=new Drafts(storage);
     this.deviceFilters = {name:"", room:"", group:"", provider:"", status:"", maintenance:""};
@@ -151,6 +152,18 @@ export class AlarmMeshPanel extends HTMLElement {
     if (label.textContent !== message) label.textContent = message;
   }
   render() {
+    if (!this.data) {
+      this.groupStopResults.clear();
+      if (this.detail?.kind === "group") this.closeDialog();
+    } else {
+      const active = this.data.incident?.active_sources || [];
+      for (const [id, result] of this.groupStopResults) {
+        const group = this.data.groups.find(g => g.id === id);
+        if (!group || !(group.origins || group.members).some(source => active.includes(source)) ||
+            (!result.busy && group.group_stop_choices?.some(choice => !result.starts.includes(choice.start_id))))
+          this.groupStopResults.delete(id);
+      }
+    }
     this.updateRecoverySmoke();
     if (!this.shadowRoot) return;
     this.shadowRoot.querySelector("dialog")?.classList.toggle("dark", Boolean(this._hass?.themes?.darkMode));
@@ -669,6 +682,7 @@ export class AlarmMeshPanel extends HTMLElement {
       if (!group) { this.closeDialog(); return; }
       dialog.append(el("h2", group.name || t.noRoom), this.badge(group.result), el("p", t[group.result.availability]));
       if (detail.kind === "group") {
+        this.renderGroupStop(dialog, group);
         dialog.append(button(t.edit, () => this.openDialog({kind:"edit", group}), "button primary"), button(t.optionalActions, () => this.openDialog({kind:"edit", group, section:"actions"})));
         const checks = el("details", undefined, "advanced-options");
         checks.append(el("summary", t.groupCheckTitle));
@@ -1689,6 +1703,49 @@ export class AlarmMeshPanel extends HTMLElement {
     parent.append(section);
     return () => ({ enabled: enabled.checked, start: lists.start.map(b => ({ ...b })), recovery: lists.recovery.map(b => ({ ...b })) });
   }
+  renderGroupStop(parent, group, showGroupName = false) {
+    const t = this.t, choices = group.group_stop_choices || [];
+    const active = this.data.incident?.active_sources || [];
+    if (!group.linking?.enabled || !group.linking.bindings?.length ||
+        !(group.origins || group.members).some(id => active.includes(id))) return;
+    const result = this.groupStopResults.get(group.id);
+    const section = el("section", undefined, "notice group-stop");
+    if (showGroupName) section.append(el("h3", group.name));
+    if (choices.length) {
+      const ids = choices.map(row => row.start_id);
+      const revision = this.data.revision, generation = this.generation;
+      const action = button(t.groupStop, async () => {
+        if (action.disabled || !this.data || this.generation !== generation ||
+            this.groupStopResults.get(group.id)?.busy) return;
+        action.disabled = true;
+        const status = {busy:true, starts:ids};
+        this.groupStopResults.set(group.id, status);
+        this.refreshGroupStop();
+        try {
+          const reply = await this._hass.callWS({
+            type:"alarmmesh/group_stop", group_id:group.id, revision, start_ids:ids
+          });
+          status.message = t.groupStopResult.replace("{sent}", String(reply.accepted))
+            .replace("{total}", String(reply.requested));
+        } catch { status.message = t.groupStopUnknown; }
+        status.busy = false;
+        if (generation === this.generation) this.refreshGroupStop();
+      }, "button group-stop-action");
+      action.disabled = Boolean(result?.busy);
+      section.append(el("p", choices.map(row => this.sourceName(row.source)).join(", ")),
+        action, el("p", t.groupStopOwnSmoke));
+    } else if (!result) section.append(el("p", t.groupStopUnavailable));
+    if (result) {
+      const feedback = el("p", result.busy ? t.groupStopBusy : result.message);
+      feedback.setAttribute("role", "status");
+      section.append(feedback);
+    }
+    parent.append(section);
+  }
+  refreshGroupStop() {
+    this.render();
+    if (this.detail?.kind === "group") this.renderDialog();
+  }
   renderIncidents(parent) {
     if (this.returnSource && this.data.sources.some(s => s.entity_id === this.returnSource)) {
       const id = this.returnSource;
@@ -1701,6 +1758,7 @@ export class AlarmMeshPanel extends HTMLElement {
     parent.append(button(this.t.activity,()=>this.go("activity")));
     const t = this.t, data = this.data;
     const current=el('section',undefined,'notice incident-now');current.append(el('h2',t.currentSituation),this.badge(data.result),el('p',t[data.result.availability]));parent.append(current);
+    for (const group of data.groups) this.renderGroupStop(current, group, true);
     const explanation=el('details',undefined,'incident-explanation');explanation.append(el('summary',t.howToReadIncidents),el('p',t.incidentNote));parent.append(explanation);
     this.renderSounderHistory(parent);
     const timeline=el('details',undefined,'incident-timeline');timeline.append(el('summary',t.incidentTimeline),el('p',t.incidentTimelineNote));

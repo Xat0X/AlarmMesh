@@ -271,7 +271,7 @@ class PanelController:
             "alarmmesh-panel",
             sidebar_title="AlarmMesh",
             sidebar_icon="mdi:smoke-detector",
-            module_url=f"{ASSET_URL}/panel.js?v=sounder-feedback-1",
+            module_url=f"{ASSET_URL}/panel.js?v=group-stop-1",
             require_admin=True,
         )
         self.hub.controller = self
@@ -433,6 +433,7 @@ class PanelController:
         groups = [
             {
                 **group,
+                "group_stop_choices": self.linking.group_stop_choices(group),
                 "result": summary(group["members"]),
                 "unselected": [
                     member
@@ -559,6 +560,7 @@ async def async_prepare(hass: HomeAssistant) -> PanelHub:
         hass.data[DATA_HUB] = PanelHub()
         websocket_api.async_register_command(hass, ws_subscribe)
         websocket_api.async_register_command(hass, ws_group)
+        websocket_api.async_register_command(hass, ws_group_stop)
         websocket_api.async_register_command(hass, ws_catalog)
         websocket_api.async_register_command(hass, ws_settings)
         websocket_api.async_register_command(hass, ws_phone_preview)
@@ -631,6 +633,29 @@ async def ws_group(hass, connection, msg):
     connection.send_result(msg["id"], {"revision": controller.groups.revision})
     controller.linking.changed()
     hub.publish()
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "alarmmesh/group_stop",
+        vol.Required("group_id"): vol.All(str, vol.Length(min=32, max=32)),
+        vol.Required("revision"): vol.All(int, vol.Range(min=0)),
+        vol.Required("start_ids"): vol.All(
+            [vol.All(str, vol.Length(min=1, max=64))], vol.Length(min=1, max=256)
+        ),
+    }
+)
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_group_stop(hass, connection, msg):
+    controller = hass.data[DATA_HUB].controller
+    if controller is None:
+        connection.send_error(msg["id"], "not_loaded", "AlarmMesh is not loaded")
+        return
+    result = await controller.linking.stop_group(
+        msg["group_id"], msg["revision"], set(msg["start_ids"])
+    )
+    connection.send_result(msg["id"], result)
 
 
 @websocket_api.websocket_command({vol.Required("type"): "alarmmesh/catalog"})

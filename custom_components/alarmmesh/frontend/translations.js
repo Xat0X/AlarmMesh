@@ -1112,6 +1112,13 @@ Object.assign(TEXT.en, {
 
 Object.assign(TEXT.nl, {
   traceTitle: "Rook en startopdrachten",
+  groupStop: "Stop meeklinken in deze groep",
+  groupStopOwnSmoke: "Dit stopt alleen het meeklinken van de genoemde melders. Een melder die zelf rook meldt, blijft alarmeren.",
+  groupStopUnavailable: "AlarmMesh kan op dit moment geen melder in deze groep veilig laten stoppen met meeklinken. Bekijk de terugmeldingen in de tijdlijn.",
+  groupStopBusy: "Stopopdrachten worden aangevraagd…",
+  groupStopResult: "Home Assistant accepteerde {sent} van de {total} stopopdrachten. Bekijk de tijdlijn per melder.",
+  groupStopUnknown: "Het antwoord ontbreekt. Controleer de tijdlijn per melder.",
+  activity_result_group_stop_requested: "AlarmMesh vraagt op jouw verzoek het meeklinken in de groep te stoppen.",
   activity_result_stop_target_smoke: "Nog geen stopopdracht. De meeklinkende melder meldt zelf rook.",
   activity_result_feedback_binding_changed: "Meeklinken teruggemeld met het juiste opdrachtkenmerk. De ingestelde bediening kon niet meer worden bevestigd. Automatisch stoppen vervalt.",
   traceStartTime: "Bij startopdracht van",
@@ -1140,6 +1147,13 @@ Object.assign(TEXT.nl, {
 });
 Object.assign(TEXT.en, {
   traceTitle: "Smoke and sounder commands",
+  groupStop: "Stop linked sound in this group",
+  groupStopOwnSmoke: "This stops linked sound on the listed detectors. A detector reporting its own smoke keeps alarming.",
+  groupStopUnavailable: "AlarmMesh currently has no linked sound it can safely stop in this group. Check each detector’s feedback in the timeline.",
+  groupStopBusy: "Requesting stops…",
+  groupStopResult: "Home Assistant accepted {sent} of {total} stop requests. Check each detector in the timeline.",
+  groupStopUnknown: "No reply received. Check each detector in the timeline.",
+  activity_result_group_stop_requested: "AlarmMesh requests a stop for linked sound at your request in this group.",
   activity_result_stop_target_smoke: "Waiting to stop. The linked detector itself is reporting smoke.",
   activity_result_feedback_binding_changed: "Linked tone reported with a matching request identifier. The configured control could no longer be verified. Automatic stop is unavailable for this start.",
   traceStartTime: "For the start requested at",
