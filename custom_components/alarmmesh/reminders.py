@@ -7,7 +7,6 @@ from contextlib import suppress
 from copy import deepcopy
 from datetime import date, datetime, time, timedelta
 from uuid import uuid4
-from zoneinfo import ZoneInfo
 
 from homeassistant.const import EVENT_CORE_CONFIG_UPDATE, EVENT_HOMEASSISTANT_STARTED
 from homeassistant.core import CoreState, callback
@@ -31,12 +30,14 @@ STATES = {
 FIELDS = {"identity", "enabled", "date", "interval", "recipient", "cycle", "status"}
 
 
-def due_at(value: str, zone: str):
+def due_at(value: str):
     """09:00 local calendar time avoids ambiguous/nonexistent DST night hours."""
     parsed = date.fromisoformat(value)
     if parsed.isoformat() != value:
         raise ValueError
-    return datetime.combine(parsed, time(9), ZoneInfo(zone)).astimezone(dt_util.UTC)
+    return datetime.combine(
+        parsed, time(9), dt_util.get_default_time_zone()
+    ).astimezone(dt_util.UTC)
 
 
 class Reminders:
@@ -142,7 +143,7 @@ class Reminders:
                 "recipients": [{"service": item["recipient"], "enabled": True}],
             }
         )
-        due_at(item["date"], self.hass.config.time_zone)
+        due_at(item["date"])
 
     async def save(self, operation, source, revision, value, confirmed):
         if self.closed or self.paused or self.linking._paused or self.fault:
@@ -167,6 +168,7 @@ class Reminders:
                     and old["identity"] != identity
                 ):
                     raise AutomationError("reminder_identity_changed")
+                today = dt_util.as_local(dt_util.utcnow()).date()
                 if operation == "save":
                     if (
                         not isinstance(value, dict)
@@ -188,11 +190,6 @@ class Reminders:
                     if operation == "snooze":
                         if set(value) != {"date"}:
                             raise AutomationError("invalid_reminder")
-                        today = (
-                            dt_util.utcnow()
-                            .astimezone(ZoneInfo(self.hass.config.time_zone))
-                            .date()
-                        )
                         try:
                             if date.fromisoformat(value["date"]) <= today:
                                 raise ValueError
@@ -206,25 +203,15 @@ class Reminders:
                             raise AutomationError("invalid_reminder")
                         item["status"] = "handled"
                         if item["enabled"] and item["interval"]:
-                            local_today = (
-                                dt_util.utcnow()
-                                .astimezone(ZoneInfo(self.hass.config.time_zone))
-                                .date()
-                            )
                             item.update(
                                 date=(
-                                    local_today + timedelta(days=item["interval"])
+                                    today + timedelta(days=item["interval"])
                                 ).isoformat(),
                                 cycle=uuid4().hex,
                                 status="pending",
                             )
                 try:
                     self._validate(item)
-                    today = (
-                        dt_util.utcnow()
-                        .astimezone(ZoneInfo(self.hass.config.time_zone))
-                        .date()
-                    )
                     if (
                         operation != "handle" or item["status"] == "pending"
                     ) and not today <= date.fromisoformat(
@@ -280,7 +267,7 @@ class Reminders:
             if (
                 item["enabled"]
                 and item["status"] == "pending"
-                and due_at(item["date"], self.hass.config.time_zone) <= dt_util.utcnow()
+                and due_at(item["date"]) <= dt_util.utcnow()
             ):
                 item["status"] = "startup_suppressed"
         self.changed()
@@ -315,7 +302,7 @@ class Reminders:
             and item["enabled"]
             and item["status"] == "pending"
             and self.identity(source) == item["identity"]
-            and due_at(item["date"], self.hass.config.time_zone) <= dt_util.utcnow()
+            and due_at(item["date"]) <= dt_util.utcnow()
         )
 
     async def _run(self):
@@ -431,11 +418,9 @@ class Reminders:
             return
         now = dt_util.utcnow()
         future = [
-            due_at(i["date"], self.hass.config.time_zone)
+            due_at(i["date"])
             for i in self.items.values()
-            if i["enabled"]
-            and i["status"] == "pending"
-            and due_at(i["date"], self.hass.config.time_zone) > now
+            if i["enabled"] and i["status"] == "pending" and due_at(i["date"]) > now
         ]
         if future:
             self.cancel_timer = async_call_later(

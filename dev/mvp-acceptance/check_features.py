@@ -450,18 +450,12 @@ async def check_features(hass, entry, registry, fixtures, ws_request, require, p
         passed("observed_activity_and_organizational_copy_without_authority")
         from datetime import timedelta
         from unittest.mock import patch
-        from zoneinfo import ZoneInfo
 
         from homeassistant.util import dt as dt_util
 
         r = panel.reminders
         require(not r.items, "Reminders enabled by upgrade")
-        day = (
-            dt_util.utcnow()
-            .astimezone(ZoneInfo(hass.config.time_zone))
-            .date()
-            .isoformat()
-        )
+        day = dt_util.as_local(dt_util.utcnow()).date().isoformat()
         value = {
             "identity": r.identity(a),
             "enabled": True,

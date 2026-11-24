@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.2 — 2026-11-24
+
+- Maintenance reminders use Home Assistant’s loaded time zone when saving, snoozing and scheduling. Reminders follow the local calendar and fall due at 09:00, including across daylight-saving changes.
+
 ## 0.1.1 — 2026-11-21
 
 - Open AlarmMesh in your Home Assistant Marketplace or HACS directly from the README.

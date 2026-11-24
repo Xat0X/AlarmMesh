@@ -213,8 +213,9 @@ async def test_expired_loaded_history_is_removed_from_storage_without_new_events
 
 
 @pytest.mark.parametrize("day,utc_hour", [("2026-03-29", 7), ("2026-10-25", 8)])
-def test_calendar_date_uses_ha_timezone_across_dst(day, utc_hour):
-    due = due_at(day, "Europe/Brussels")
+async def test_calendar_date_uses_ha_timezone_across_dst(hass, day, utc_hour):
+    await hass.config.async_update(time_zone="Europe/Brussels")
+    due = due_at(day)
     assert due.hour == utc_hour and due.date().isoformat() == day
 
 
@@ -232,6 +233,29 @@ async def test_reminder_defaults_and_exact_confirmation(
     with pytest.raises(AutomationError, match="invalid_reminder"):
         await schedule(hass, entry, d["source"], "2026-11-16", interval=1)
     assert not r.items and not outputs[0]
+
+
+async def test_reminder_uses_local_date_when_utc_is_still_yesterday(
+    hass, catalog_devices, outputs, freezer
+):
+    freezer.move_to("2026-11-15T23:30:00Z")
+    await hass.config.async_update(time_zone="Europe/Brussels")
+    entry, detector = await prepare(hass, catalog_devices)
+    source = detector["source"]
+    with pytest.raises(AutomationError, match="invalid_reminder"):
+        await schedule(hass, entry, source, "2026-11-15")
+    reminders = await schedule(hass, entry, source, "2026-11-16", interval=30)
+    with pytest.raises(AutomationError, match="invalid_reminder"):
+        await reminders.save(
+            "snooze", source, reminders.revision, {"date": "2026-11-16"}, True
+        )
+    await reminders.save(
+        "snooze", source, reminders.revision, {"date": "2026-11-17"}, True
+    )
+    await reminders.save("handle", source, reminders.revision, {}, True)
+    await settle(hass, entry)
+    assert reminders.items[source]["date"] == "2026-12-16"
+    assert not outputs[0]
 
 
 async def test_due_once_snooze_handle_repeat_never_test_success(
