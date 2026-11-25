@@ -16,6 +16,8 @@ the [review snapshot](../dev/catalog/review.json).
 
 Current user guide for group sounders, physical hush, readback and start/stop per model: [Meeklinken en stoppen](meeklinken-en-stoppen.md).
 
+The current catalog also includes Alecto SMART-SMOKE10 via Zigbee2MQTT. Select its **Smoke state** sensor directly. The 14 November inventory below predates this addition.
+
 ## Inventory and denominators
 
 Checked **2026-11-14**, starting from clean main

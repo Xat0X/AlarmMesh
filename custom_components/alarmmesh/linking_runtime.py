@@ -17,6 +17,7 @@ from homeassistant.util import dt as dt_util
 from . import matter
 from .capabilities import Capabilities, Control
 from .linking import Activation, plan_activations, update_incidents
+from .runtime import current_source_status, source_status_from_state
 from .status import SourceStatus
 
 GROUP_STOP_CHECK_SECONDS = 5
@@ -547,7 +548,8 @@ class LinkingRuntime:
         state = self.hass.states.get(source)
         return bool(
             state
-            and state.state == "off"
+            and source_status_from_state(self.hass, source, state)
+            is SourceStatus.NO_SMOKE_REPORTED
             and not state.attributes.get("assumed_state")
             and self.runtime.source_statuses.get(source)
             is SourceStatus.NO_SMOKE_REPORTED
@@ -568,7 +570,9 @@ class LinkingRuntime:
                 and any(
                     origin != control.source
                     and (
-                        origin in self.active or self.hass.states.is_state(origin, "on")
+                        origin in self.active
+                        or current_source_status(self.hass, origin)
+                        is SourceStatus.SMOKE_REPORTED
                     )
                     for origin in group.get("origins", group["members"])
                 )

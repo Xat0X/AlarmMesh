@@ -35,7 +35,7 @@ from .phone_evidence import PhoneEvidence
 from .preview import alarm_settings, group_preview, source_preview
 from .recovery import recover_groups, recovery_plan
 from .reminders import Reminders
-from .runtime import AlarmMeshConfigEntry
+from .runtime import AlarmMeshConfigEntry, source_status_from_state
 from .self_test import SelfTests
 from .status import SourceStatus, StatusResult, evaluate_status
 from .zwave import invalid_source as invalid_zwave_source
@@ -271,7 +271,7 @@ class PanelController:
             "alarmmesh-panel",
             sidebar_title="AlarmMesh",
             sidebar_icon="mdi:smoke-detector",
-            module_url=f"{ASSET_URL}/panel.js?v=public-010",
+            module_url=f"{ASSET_URL}/panel.js?v=alecto-source",
             require_admin=True,
         )
         self.hub.controller = self
@@ -292,7 +292,14 @@ class PanelController:
     def _registry_changed(self, *_args):
         changed = False
         for source, status in self.runtime.source_statuses.items():
-            if status is not SourceStatus.UNKNOWN and (
+            if source.startswith("sensor."):
+                current = source_status_from_state(
+                    self.hass, source, self.hass.states.get(source)
+                )
+                if current is not status:
+                    self.runtime.source_statuses[source] = current
+                    changed = True
+            elif status is not SourceStatus.UNKNOWN and (
                 is_co_source(self.hass, source)
                 or invalid_zwave_source(self.hass, source)
             ):

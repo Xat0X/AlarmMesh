@@ -16,7 +16,7 @@ AlarmMesh brings the smoke detectors you already have in Home Assistant into one
 
 [![Open AlarmMesh in your Home Assistant](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Xat0X&repository=AlarmMesh&category=integration)
 
-You need Home Assistant **2026.10.4 or later**, administrator access, and at least one existing smoke detector entity (`binary_sensor` with device class `smoke`). Set up the detectors in their own integration first. You can use AlarmMesh immediately for monitoring, with all automatic actions off.
+You need Home Assistant **2026.10.4 or later**, administrator access, and at least one existing smoke detector entity (`binary_sensor` with device class `smoke`, or the Alecto SMART-SMOKE10 Zigbee2MQTT `Smoke state` sensor). Set up the detectors in their own integration first. You can use AlarmMesh immediately for monitoring, with all automatic actions off.
 
 1. **Install the integration.** The button opens AlarmMesh in the Marketplace on Home Assistant 2026.11 or later, or in HACS on 2026.10.4. Confirm adding the repository if prompted, install AlarmMesh, and restart Home Assistant if asked. [Manual installation and updates](docs/installation.md)
 2. **Choose your detectors.** Open **Settings → Devices & services → Add integration → AlarmMesh** and select the smoke entities you want to follow. Give each a recognizable name and assign its area in Home Assistant. These names appear in the panel and in phone alerts.
@@ -63,11 +63,12 @@ In this example, a report from the landing would sound the bedroom detector and 
 
 | Example | What to expect |
 | --- | --- |
+| Alecto SMART-SMOKE10 via Zigbee2MQTT | Choose **Smoke state** directly. `alarm` reports smoke and `normal` clears it. Missing or unavailable readings remain indeterminate. Detection only. |
 | Heiman HS1SA-E-PLUS via Zigbee2MQTT | With a verified control and linking enabled, it can sound along. The group button can stop a linked tone that AlarmMesh started and identified. The detector's own smoke status is checked again before a stop. |
 | Aqara JY-GZ-01AQ via Zigbee2MQTT | Can start linked sound when its prerequisites are met. AlarmMesh never sends the Aqara mute command because it can also silence the detector's own local alarm. |
 | Matter smoke detector | AlarmMesh can display smoke reports and the diagnostics exposed by Home Assistant. The Matter integration in AlarmMesh offers no remote sounder or mute command. |
 
-Look up your model **and its provider** in the compatibility catalog. The catalog covers **52 converter definitions and 67 model or variant entries**, including devices with limited capabilities. [Device catalog](docs/device-catalog.md) · [Linked sound and prerequisites](docs/linked-sounding.md) · [Matter](docs/matter-support.md) · [Z-Wave JS](docs/zwave-support.md)
+Look up your model **and its provider** in the compatibility catalog. The catalog covers **53 converter definitions and 68 model or variant entries**, including devices with limited capabilities. [Device catalog](docs/device-catalog.md) · [Linked sound and prerequisites](docs/linked-sounding.md) · [Matter](docs/matter-support.md) · [Z-Wave JS](docs/zwave-support.md)
 
 ## Guides and support
 

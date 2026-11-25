@@ -107,9 +107,12 @@ def catalog_devices(hass):
             hass.states.async_set(entity.entity_id, state, attrs)
             return entity.entity_id
 
-        source = register(
-            "binary_sensor", "smoke", "off", {"device_class": "smoke"}, "smoke"
-        )
+        if (vendor, model, origin) == ("Alecto", "SMART-SMOKE10", "mqtt"):
+            source = register("sensor", "smoke_state", "normal", {})
+        else:
+            source = register(
+                "binary_sensor", "smoke", "off", {"device_class": "smoke"}, "smoke"
+            )
         target = register(
             domain,
             key,
@@ -134,6 +137,75 @@ def catalog_devices(hass):
     return add, calls
 
 
+async def test_alecto_selection_requires_the_registered_z2m_smoke_property(
+    hass, catalog_devices
+):
+    from custom_components.alarmmesh.config_flow import _validate_sources
+    from custom_components.alarmmesh.runtime import current_source_status
+    from custom_components.alarmmesh.status import SourceStatus
+
+    add, calls = catalog_devices
+    alecto = add("SMART-SMOKE10", "Alecto")
+    source = alecto["register"]("sensor", "smoke_state", "normal", {})
+    registry = er.async_get(hass)
+    renamed = registry.async_update_entity(
+        source, new_entity_id="sensor.simulated_renamed"
+    ).entity_id
+    hass.states.async_set(renamed, "alarm")
+    assert _validate_sources(hass, [renamed]) is None
+    assert current_source_status(hass, renamed) is SourceStatus.SMOKE_REPORTED
+
+    unrelated = [
+        alecto["register"]("sensor", "smoke_value", "alarm", {}),
+        add("SMART-SMOKE10", "Other")["register"]("sensor", "smoke_state", "alarm", {}),
+        add("Other", "Alecto")["register"]("sensor", "smoke_state", "alarm", {}),
+        add("SMART-SMOKE10", "Alecto", "zha")["register"](
+            "sensor", "smoke_state", "alarm", {}
+        ),
+    ]
+    for entity_id in unrelated:
+        assert _validate_sources(hass, [entity_id]) == "wrong_domain"
+        assert current_source_status(hass, entity_id) is SourceStatus.UNKNOWN
+    registry.async_update_entity(renamed, disabled_by=er.RegistryEntryDisabler.USER)
+    assert _validate_sources(hass, [renamed]) == "wrong_domain"
+    assert current_source_status(hass, renamed) is SourceStatus.UNKNOWN
+    assert not calls
+
+
+async def test_replace_unavailable_tuya_source_with_offline_alecto(
+    hass, catalog_devices
+):
+    from homeassistant.data_entry_flow import FlowResultType
+
+    from custom_components.alarmmesh.const import CONF_SOURCE_ENTITY_IDS
+    from custom_components.alarmmesh.status import SourceStatus
+
+    add, calls = catalog_devices
+    previous = add("Legacy smoke", "Simulation", "tuya")["source"]
+    replacement = add("SMART-SMOKE10", "Alecto")["source"]
+    hass.states.async_set(previous, "unavailable", {"device_class": "smoke"})
+    hass.states.async_set(replacement, "unavailable")
+    entry = await setup(hass, [previous])
+    options = hass.config_entries.options
+    form = await options.async_init(entry.entry_id)
+    field = next(iter(form["data_schema"].schema.values()))
+    assert {previous, replacement} <= set(field.config["include_entities"])
+    assert entry.runtime_data.source_entity_ids == (previous,)
+    result = await options.async_configure(
+        form["flow_id"], {CONF_SOURCE_ENTITY_IDS: [replacement]}
+    )
+    await hass.async_block_till_done()
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert entry.runtime_data.source_statuses == {replacement: SourceStatus.UNREACHABLE}
+    hass.states.async_set(replacement, "normal")
+    await hass.async_block_till_done()
+    assert entry.runtime_data.source_statuses == {
+        replacement: SourceStatus.NO_SMOKE_REPORTED
+    }
+    assert not calls
+    assert await hass.config_entries.async_unload(entry.entry_id)
+
+
 def test_catalog_complete_generated_and_provider_specific():
     validate_catalog(CATALOG)
     snapshot = json.loads(Path("dev/catalog/review.json").read_text(encoding="utf-8"))
@@ -143,7 +215,7 @@ def test_catalog_complete_generated_and_provider_specific():
         encoding="utf-8"
     ) == render(snapshot)
     assert CATALOG == snapshot
-    assert CATALOG["definitions"] == 52 and CATALOG["website_rows"] == 67
+    assert CATALOG["definitions"] == 53 and CATALOG["website_rows"] == 68
     assert CATALOG["variants"] == 15
     for entry in CATALOG["entries"]:
         for alias in entry["aliases"]:
@@ -902,10 +974,12 @@ async def test_all_catalog_variants_as_directional_routes(hass, catalog_devices)
             reviewed_targets.add(device["target"])
             provider_counts[integration] += 1
         if definition["kind"] == "smoke":
+            if row["model"] == "SMART-SMOKE10" and provider == "zha":
+                continue  # Only the Zigbee2MQTT smoke_state route was reviewed.
             # Use two devices when pairing the same model.
             origin = add(row["model"], row["vendor"], integration)["source"]
             origins.append(origin)
-    assert len(origins) == 122 and provider_counts == {"mqtt": 21, "zha": 10}
+    assert len(origins) == 123 and provider_counts == {"mqtt": 21, "zha": 10}
     members = origins + [b["source"] for b in bindings]
     group = {
         "members": members,

@@ -2,12 +2,13 @@
 
 Generated from [the reviewed snapshot](../dev/catalog/review.json). Use [the guide](device-compatibility.md) or the panel for filters and limits.
 
-52 canonical definitions; 67 website model/variant rows. Every row has separate A-F assessments for both providers. A listed action depends on eligible HA entities and confirmation. Physical validation: zero. ZHA standard IAS routes are conditional, not a claim that every signature creates a siren.
+53 canonical definitions covering 68 website model/variant rows. Every row has separate A-F assessments for both providers. A listed action depends on eligible HA entities and confirmation. Physical validation: zero. ZHA standard IAS routes are conditional, not a claim that every signature creates a siren.
 
 Read each direction separately. Start with a selected HA smoke source, then look up the receiving detector and its provider below. Heat, relay, acoustic and siren rows have different roles. Stop applies only to an eligible AlarmMesh-owned linked sounder.
 
 | Vendor / model | Kind | MQTT detection | MQTT start / stop | ZHA detection | ZHA start / stop |
 | --- | --- | --- | --- | --- | --- |
+| [Alecto SMART-SMOKE10](https://www.zigbee2mqtt.io/devices/SMART-SMOKE10.html) | smoke | documented | — / — | unconfirmed | — / — |
 | [Aqara JY-GZ-01AQ](https://www.zigbee2mqtt.io/devices/JY-GZ-01AQ.html) | smoke | documented | aqara_mqtt / — | conditional | aqara_zha / — |
 | [Aqara JY-GZ-03AQ](https://www.zigbee2mqtt.io/devices/JY-GZ-01AQ.html) | smoke | documented | aqara_mqtt / — | conditional | — / — |
 | [BYUN M415-6C](https://www.zigbee2mqtt.io/devices/M415-6C.html) | contact_proxy | documented | — / — | conditional | — / — |
@@ -78,7 +79,7 @@ Read each direction separately. Start with a selected HA smoke source, then look
 
 ## Matter (separate provider review)
 
-The 52/67 counts above describe the unchanged Z2M website inventory. Matter evidence uses the same snapshot; no entry authorizes a sounder. See [Matter capability matrix](matter-support.md).
+The counts above cover the Zigbee2MQTT inventory, including the Alecto smoke status enum. Matter evidence uses the same snapshot; no entry authorizes a sounder. See [Matter capability matrix](matter-support.md).
 
 | Model | Region / variant | HA route |
 | --- | --- | --- |

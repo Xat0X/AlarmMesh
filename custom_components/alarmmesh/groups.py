@@ -14,6 +14,7 @@ from .automation import (
     validate_actions,
 )
 from .capabilities import Capabilities
+from .runtime import valid_source_ref
 
 MAX_NAME = 64
 MAX_MEMBERS = 256
@@ -202,17 +203,7 @@ class GroupStore:
         if (
             not isinstance(members, list)
             or len(members) > MAX_MEMBERS
-            or any(
-                not isinstance(member, str)
-                or not member.startswith("binary_sensor.")
-                or len(member) > 255
-                or not member[14:]
-                or any(
-                    c not in "abcdefghijklmnopqrstuvwxyz0123456789_"
-                    for c in member[14:]
-                )
-                for member in members
-            )
+            or any(not valid_source_ref(member) for member in members)
             or len(set(members)) != len(members)
         ):
             raise GroupError("invalid_members")

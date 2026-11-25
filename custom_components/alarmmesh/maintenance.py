@@ -19,6 +19,7 @@ from .automation import (
     send_notification,
     validate_notifications,
 )
+from .runtime import valid_source_ref
 from .status import SourceStatus
 
 KINDS = ("battery", "fault", "unavailable")
@@ -125,12 +126,7 @@ class Maintenance:
                     or len(record["identity"]) != 64
                     or not isinstance(record["sources"], list)
                     or not 1 <= len(record["sources"]) <= 256
-                    or any(
-                        not isinstance(s, str)
-                        or len(s) > 255
-                        or not s.startswith("binary_sensor.")
-                        for s in record["sources"]
-                    )
+                    or any(not valid_source_ref(s) for s in record["sources"])
                     or not isinstance(record["issues"], dict)
                     or set(record["issues"]) != set(KINDS)
                 ):

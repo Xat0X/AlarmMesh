@@ -61,11 +61,12 @@ copy the integration into a disposable instance as described in
 ## Configure and check the two overviews
 
 Open **Settings > Devices & services > Add integration > AlarmMesh**. Select one
-existing smoke source (`binary_sensor`, device class `smoke`) and submit. Only one
+existing smoke source and submit. Choose a smoke binary sensor, or **Smoke state**
+for an Alecto SMART-SMOKE10 connected through Zigbee2MQTT. Only one
 AlarmMesh configuration is supported. No `alarmmesh:` YAML is needed. Open the
 entry's two entities:
 
-| Overview | With that source explicitly `off` |
+| Overview | With that source reporting `off` (Alecto reports `normal`) |
 | --- | --- |
 | Smoke | `off`, displayed in Dutch as “Niet gedetecteerd”: no smoke reported |
 | Source availability | `complete`, “Alle bronnen melden een status” |

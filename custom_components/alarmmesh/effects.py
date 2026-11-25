@@ -34,6 +34,7 @@ from .notification_profiles import (
     build_plan,
     receiver_metadata,
 )
+from .runtime import valid_source_ref
 from .status import SourceStatus
 
 REQUEST_TIMEOUT = 10
@@ -110,11 +111,7 @@ class IncidentEffects:
                 if (
                     not isinstance(rows, list)
                     or len(rows) > 256
-                    or any(
-                        not isinstance(s, str)
-                        or not re.fullmatch(r"binary_sensor\.[a-z0-9_]+", s)
-                        for s in rows
-                    )
+                    or any(not valid_source_ref(s) for s in rows)
                 ):
                     raise AutomationError("invalid_storage")
             for receipt in episode["receipts"].values():

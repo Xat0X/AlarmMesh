@@ -56,7 +56,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: AlarmMeshConfigEntry) ->
         return (
             SourceStatus.UNKNOWN
             if is_co_source(hass, entity_id) or invalid_zwave_source(hass, entity_id)
-            else source_status_from_state(state)
+            else source_status_from_state(hass, entity_id, state)
         )
 
     @callback

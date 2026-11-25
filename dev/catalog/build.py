@@ -28,7 +28,8 @@ def table(snapshot: dict) -> str:
         "Generated from [the reviewed snapshot](../dev/catalog/review.json). "
         "Use [the guide](device-compatibility.md) or the panel for filters and limits.",
         "",
-        "52 canonical definitions; 67 website model/variant rows. "
+        f"{snapshot['definitions']} canonical definitions covering "
+        f"{snapshot['website_rows']} website model/variant rows. "
         "Every row has separate A-F assessments for both providers. "
         "A listed action depends on eligible HA entities and confirmation. "
         "Physical validation: zero. ZHA standard IAS routes are conditional, "
@@ -58,7 +59,8 @@ def table(snapshot: dict) -> str:
             "",
             "## Matter (separate provider review)",
             "",
-            "The 52/67 counts above describe the unchanged Z2M website inventory. "
+            "The counts above cover the Zigbee2MQTT inventory, "
+            "including the Alecto smoke status enum. "
             "Matter evidence uses the same snapshot; "
             "no entry authorizes a sounder. "
             "See [Matter capability matrix](matter-support.md).",

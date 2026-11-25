@@ -1,6 +1,6 @@
 import { exercise, incidentDetail, careView } from "./family.js?v=phone-incident-1";
 import { TEXT } from "./translations.js?v=public-010";
-import { Drafts } from "./drafts.js?v=family-beta16";
+import { Drafts } from "./drafts.js?v=alecto-source";
 
 // Safe DOM construction: names, labels and registry data are always text nodes.
 const el = (tag, text, cls) => {

@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "checked": "2026-11-14",
-  "method": "Official generated supported-devices dataset: row.exposes.includes(\"smoke\"); converter whiteLabel equivalence only. 67 rows, 59 page links, 52 canonical definitions.",
+  "method": "Official smoke expose inventory plus the reviewed Alecto SMART-SMOKE10 smoke_state enum. Converter whiteLabel equivalence only. 68 rows, 60 page links, 53 canonical definitions.",
   "sources": {
     "Koenkk/zigbee2mqtt.io": "df1ef4602fdc2c5bc54c9b7352590afc98e2366b",
     "Koenkk/zigbee-herdsman-converters": "afdaa028a0972d801da762196ddfb2df631ea0cc",
@@ -10,10 +10,78 @@
     "zigpy/zha": "2da1a5b5676158ac7b603ce6b9f42641cb90e7a0"
   },
   "converter_package": "26.131.0",
-  "website_rows": 67,
-  "definitions": 52,
+  "website_rows": 68,
+  "definitions": 53,
   "variants": 15,
   "entries": [
+    {
+      "id": "alecto_smart_smoke10",
+      "vendor": "Alecto",
+      "model": "SMART-SMOKE10",
+      "description": "Smoke detector",
+      "kind": "smoke",
+      "aliases": [],
+      "zigbee_models": [],
+      "fingerprints": [],
+      "test_flags": {
+        "checking_result": [
+          "checking"
+        ]
+      },
+      "matchers": {
+        "zigbee2mqtt": [
+          {
+            "vendor": "alecto",
+            "model": "smart-smoke10"
+          }
+        ],
+        "zha": []
+      },
+      "providers": {
+        "zigbee2mqtt": {
+          "detection": "documented",
+          "information": [
+            "smoke_state",
+            "battery",
+            "battery_state",
+            "checking_result"
+          ],
+          "activation": "not_available",
+          "profile": null,
+          "stop": "not_authorized",
+          "self_test": "implemented_read_only",
+          "requirements": [
+            "Select the registered Smoke state sensor on the Alecto MQTT device. AlarmMesh reads alarm and normal."
+          ],
+          "gaps": [
+            "Device self-check and silence are separate controls. No group sounder command is documented."
+          ],
+          "sources": [
+            "https://www.zigbee2mqtt.io/devices/SMART-SMOKE10.html",
+            "https://github.com/Koenkk/zigbee-herdsman-converters/blob/afdaa028a0972d801da762196ddfb2df631ea0cc/src/devices/alecto.ts"
+          ]
+        },
+        "zha": {
+          "detection": "unconfirmed",
+          "information": [],
+          "activation": "unconfirmed",
+          "profile": null,
+          "stop": "not_authorized",
+          "self_test": "not_available",
+          "requirements": [
+            "The reviewed enum source requires Zigbee2MQTT discovery."
+          ],
+          "gaps": [
+            "ZHA detection has not been verified for this device."
+          ],
+          "sources": [
+            "https://www.zigbee2mqtt.io/devices/SMART-SMOKE10.html"
+          ]
+        }
+      },
+      "physical_tested": false,
+      "checked": "2026-11-25"
+    },
     {
       "id": "aqara_jy_gz_01aq",
       "vendor": "Aqara",

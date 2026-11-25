@@ -15,8 +15,9 @@ async function main() {
   const text = await response.text();
   const match = text.match(/window\.ZIGBEE2MQTT_SUPPORTED_DEVICES\s*=\s*(\[[\s\S]*?\]);/);
   if (!match) throw Error("Official dataset structure changed; review required");
-  // Same predicate as the official website's exposes filter, no model guessing.
-  const rows = JSON.parse(match[1]).filter(row => row.exposes.includes("smoke"));
+  // The reviewed Alecto publishes an enum outside the standard smoke filter.
+  const rows = JSON.parse(match[1]).filter(row => row.exposes.includes("smoke") ||
+    (row.vendor === "Alecto" && row.model === "SMART-SMOKE10" && row.exposes.includes("smoke_state")));
   const definitions = [];
   for (const file of fs.readdirSync(path.join(root, "dist/devices")).sort()) {
     if (file.endsWith(".js")) for (const definition of require(path.join(root, "dist/devices", file)).definitions || []) {

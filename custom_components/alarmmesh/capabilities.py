@@ -12,6 +12,7 @@ from . import matter, zwave
 from .catalog import action_profile, recognize
 from .const import DOMAIN
 from .profiles import PROFILES
+from .runtime import is_alecto_source, mqtt_source_parts
 
 
 @dataclass(frozen=True)
@@ -47,6 +48,8 @@ class Capabilities:
         """Identity/provenance contradictions block execution, never clear smoke."""
         entity = er.async_get(self.hass).async_get(source)
         state = self.hass.states.get(source)
+        if source.startswith("sensor."):
+            return not is_alecto_source(self.hass, entity)
         device_class = (
             (entity.device_class if entity else None)
             or (state.attributes.get("device_class") if state else None)
@@ -84,24 +87,14 @@ class Capabilities:
             if entity and entity.device_id
             else None
         )
-        if not entity or entity.platform != "mqtt" or not device:
+        parts = mqtt_source_parts(entity, device)
+        if not parts:
             return ()
-        ids = [
-            value.removeprefix("zigbee2mqtt_")
-            for domain, value in device.identifiers
-            if domain == "mqtt" and value.startswith("zigbee2mqtt_")
-        ]
-        if len(ids) != 1:
-            return ()
-        prefix = f"{ids[0]}_smoke_"
-        if not entity.unique_id.startswith(prefix) or not (
-            base := entity.unique_id.removeprefix(prefix)
-        ):
-            return ()
-        unique_id = f"{ids[0]}_{property_name}_{base}"
+        mqtt_id, base = parts
+        unique_id = f"{mqtt_id}_{property_name}_{base}"
         # Writable binary exposes use a switch_ discovery object ID. The shorter
         # form is also used by existing installations and other entity types.
-        switch_id = f"{ids[0]}_switch_{property_name}_{base}"
+        switch_id = f"{mqtt_id}_switch_{property_name}_{base}"
         return tuple(
             e
             for e in self.related(source)
@@ -126,7 +119,11 @@ class Capabilities:
             if entity and entity.platform in {"mqtt", "zha", "matter", "zwave_js"}
             else "unknown_origin"
         )
-        if entity and self.mqtt_property(source, "smoke"):
+        if is_alecto_source(self.hass, entity) or (
+            entity
+            and entity.domain == "binary_sensor"
+            and self.mqtt_property(source, "smoke")
+        ):
             origin = "zigbee2mqtt"
         model = (
             (
@@ -207,6 +204,7 @@ class Capabilities:
             "battery",
             "battery_low",
             "battery_state",
+            "checking_result",
             "smoke_battery",
             "fault",
             "fault_state",
@@ -356,6 +354,8 @@ class Capabilities:
             )
             return result
         if not device or not entity or entity.disabled_by:
+            return result
+        if is_alecto_source(self.hass, entity):
             return result
         source_state = self.hass.states.get(source)
         cls = (

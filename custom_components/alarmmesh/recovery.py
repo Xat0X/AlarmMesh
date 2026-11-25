@@ -9,6 +9,8 @@ from homeassistant.helpers import entity_registry as er
 
 from .automation import AutomationError
 from .config_flow import _validate_sources
+from .runtime import current_source_status
+from .status import SourceStatus
 
 
 def recovery_plan(panel, source):
@@ -55,7 +57,8 @@ def recovery_plan(panel, source):
     ).hexdigest()
     affected = set().union(*(set(g["members"]) for g in refs)) | {source}
     blocked = bool(panel.linking.active & affected) or any(
-        panel.hass.states.is_state(s, "on") for s in affected
+        current_source_status(panel.hass, s) is SourceStatus.SMOKE_REPORTED
+        for s in affected
     )
     blocked |= panel.selftests._request is not None
     enabled = panel.effects.settings.value["enabled"] or any(
@@ -94,8 +97,8 @@ async def recover_groups(panel, source, target, groups, token):
             raise AutomationError("recovery_disable")
         if (
             target not in {c["entity_id"] for c in plan["candidates"]}
-            or panel.hass.states.get(target) is None
-            or panel.hass.states.get(target).state != "off"
+            or current_source_status(panel.hass, target)
+            is not SourceStatus.NO_SMOKE_REPORTED
         ):
             raise AutomationError("recovery_candidate")
         if (

@@ -18,22 +18,37 @@ from homeassistant.helpers import selector
 
 from . import matter, zwave
 from .const import CONF_SOURCE_ENTITY_IDS, DOMAIN, NAME
+from .runtime import is_alecto_source
 
 
-def _source_schema() -> vol.Schema:
-    """Offer multiple smoke binary sensors; validate metadata separately."""
+def _source_schema(hass: HomeAssistant) -> vol.Schema:
+    """Offer reviewed enum sources alongside the existing smoke binary sensors."""
+    registry = er.async_get(hass)
+    alecto_ids = [
+        e.entity_id for e in registry.entities.values() if is_alecto_source(hass, e)
+    ]
+    config = selector.EntitySelectorConfig(multiple=True)
+    if alecto_ids:
+        binary_ids = set(hass.states.async_entity_ids(Platform.BINARY_SENSOR))
+        binary_ids.update(
+            e.entity_id
+            for e in registry.entities.values()
+            if e.domain == Platform.BINARY_SENSOR and not e.disabled_by
+        )
+        config["include_entities"] = sorted(
+            alecto_ids
+            + [
+                entity_id
+                for entity_id in binary_ids
+                if not _validate_sources(hass, [entity_id])
+            ]
+        )
+    else:
+        config["filter"] = selector.EntityFilterSelectorConfig(
+            domain=Platform.BINARY_SENSOR, device_class=BinarySensorDeviceClass.SMOKE
+        )
     return vol.Schema(
-        {
-            vol.Required(CONF_SOURCE_ENTITY_IDS): selector.EntitySelector(
-                selector.EntitySelectorConfig(
-                    multiple=True,
-                    filter=selector.EntityFilterSelectorConfig(
-                        domain=Platform.BINARY_SENSOR,
-                        device_class=BinarySensorDeviceClass.SMOKE,
-                    ),
-                )
-            )
-        }
+        {vol.Required(CONF_SOURCE_ENTITY_IDS): selector.EntitySelector(config)}
     )
 
 
@@ -56,9 +71,11 @@ def _validate_sources(hass: HomeAssistant, sources: Any) -> str | None:
 
     registry = er.async_get(hass)
     for entity_id in sources:
-        if split_entity_id(entity_id)[0] != Platform.BINARY_SENSOR:
-            return "wrong_domain"
         registered = registry.async_get(entity_id)
+        if split_entity_id(entity_id)[0] != Platform.BINARY_SENSOR:
+            if is_alecto_source(hass, registered):
+                continue
+            return "wrong_domain"
         if (
             registered
             and registered.platform == "matter"
@@ -123,7 +140,7 @@ class AlarmMeshConfigFlow(ConfigFlow, domain=DOMAIN):
                 )
 
         return self.async_show_form(
-            step_id="user", data_schema=_source_schema(), errors=errors
+            step_id="user", data_schema=_source_schema(self.hass), errors=errors
         )
 
 
@@ -147,7 +164,7 @@ class AlarmMeshOptionsFlow(OptionsFlowWithReload):
         return self.async_show_form(
             step_id="init",
             data_schema=self.add_suggested_values_to_schema(
-                _source_schema(),
+                _source_schema(self.hass),
                 {
                     CONF_SOURCE_ENTITY_IDS: self.config_entry.options.get(
                         CONF_SOURCE_ENTITY_IDS, []

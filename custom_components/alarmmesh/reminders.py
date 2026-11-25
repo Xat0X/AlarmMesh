@@ -16,6 +16,7 @@ from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
 from .automation import AutomationError, recipients, send_notification
+from .runtime import valid_source_ref
 
 INTERVALS = (0, 30, 90, 180, 365)
 STATES = {
@@ -106,9 +107,7 @@ class Reminders:
                 raise ValueError
             for source, item in data["items"].items():
                 if (
-                    not isinstance(source, str)
-                    or not source.startswith("binary_sensor.")
-                    or len(source) > 255
+                    not valid_source_ref(source)
                     or not isinstance(item, dict)
                     or set(item) != FIELDS
                 ):
