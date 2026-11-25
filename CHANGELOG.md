@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.3-beta.1 — 2026-11-25
+
+- Choose the Alecto SMART-SMOKE10 Zigbee2MQTT **Smoke state** sensor directly as a smoke source. The overview and groups show smoke for `alarm`, no smoke for `normal`, and incomplete information while the detector is unavailable.
+
 ## 0.1.2 — 2026-11-24
 
 - Maintenance reminders use Home Assistant’s loaded time zone when saving, snoozing and scheduling. Reminders follow the local calendar and fall due at 09:00, including across daylight-saving changes.
