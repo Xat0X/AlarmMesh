@@ -15,9 +15,11 @@ async function main() {
   const text = await response.text();
   const match = text.match(/window\.ZIGBEE2MQTT_SUPPORTED_DEVICES\s*=\s*(\[[\s\S]*?\]);/);
   if (!match) throw Error("Official dataset structure changed; review required");
-  // The reviewed Alecto publishes an enum outside the standard smoke filter.
+  const snapshot = JSON.parse(fs.readFileSync(reviewPath || path.join(__dirname, "review.json"), "utf8"));
+  const exceptions = snapshot.entries.filter(entry => entry.mqtt_smoke_properties);
   const rows = JSON.parse(match[1]).filter(row => row.exposes.includes("smoke") ||
-    (row.vendor === "Alecto" && row.model === "SMART-SMOKE10" && row.exposes.includes("smoke_state")));
+    exceptions.some(entry => entry.vendor === row.vendor && entry.model === row.model &&
+      Object.values(entry.mqtt_smoke_properties).flat().every(prop => row.exposes.includes(prop))));
   const definitions = [];
   for (const file of fs.readdirSync(path.join(root, "dist/devices")).sort()) {
     if (file.endsWith(".js")) for (const definition of require(path.join(root, "dist/devices", file)).definitions || []) {

@@ -12,7 +12,7 @@ from . import matter, zwave
 from .catalog import action_profile, recognize
 from .const import DOMAIN
 from .profiles import PROFILES
-from .runtime import is_alecto_source, mqtt_source_parts
+from .runtime import is_reviewed_mqtt_source, mqtt_source_parts, source_device_class
 
 
 @dataclass(frozen=True)
@@ -48,13 +48,11 @@ class Capabilities:
         """Identity/provenance contradictions block execution, never clear smoke."""
         entity = er.async_get(self.hass).async_get(source)
         state = self.hass.states.get(source)
-        if source.startswith("sensor."):
-            return not is_alecto_source(self.hass, entity)
-        device_class = (
-            (entity.device_class if entity else None)
-            or (state.attributes.get("device_class") if state else None)
-            or (entity.original_device_class if entity else None)
-        )
+        device_class = source_device_class(entity, state)
+        if source.startswith("sensor.") or (
+            entity and entity.platform == "mqtt" and device_class != "smoke"
+        ):
+            return not is_reviewed_mqtt_source(self.hass, entity)
         return (
             source.partition(".")[0] != "binary_sensor"
             or (entity is not None and entity.platform == DOMAIN)
@@ -119,7 +117,7 @@ class Capabilities:
             if entity and entity.platform in {"mqtt", "zha", "matter", "zwave_js"}
             else "unknown_origin"
         )
-        if is_alecto_source(self.hass, entity) or (
+        if is_reviewed_mqtt_source(self.hass, entity) or (
             entity
             and entity.domain == "binary_sensor"
             and self.mqtt_property(source, "smoke")
@@ -355,7 +353,7 @@ class Capabilities:
             return result
         if not device or not entity or entity.disabled_by:
             return result
-        if is_alecto_source(self.hass, entity):
+        if is_reviewed_mqtt_source(self.hass, entity):
             return result
         source_state = self.hass.states.get(source)
         cls = (

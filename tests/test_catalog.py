@@ -109,6 +109,10 @@ def catalog_devices(hass):
 
         if (vendor, model, origin) == ("Alecto", "SMART-SMOKE10", "mqtt"):
             source = register("sensor", "smoke_state", "normal", {})
+        elif (vendor, model, origin) == ("AVATTO", "ZSD20", "mqtt"):
+            source = register("sensor", "smoke_sensor_state", "normal", {})
+        elif (vendor, model, origin) == ("Sunricher", "SR-ZG9070A-SS", "mqtt"):
+            source = register("binary_sensor", "smoke_alarm_1", "off", {})
         else:
             source = register(
                 "binary_sensor", "smoke", "off", {"device_class": "smoke"}, "smoke"
@@ -172,6 +176,51 @@ async def test_alecto_selection_requires_the_registered_z2m_smoke_property(
     assert not calls
 
 
+@pytest.mark.parametrize(
+    "vendor,model,domain,prop,active,clear",
+    [
+        ("AVATTO", "ZSD20", "sensor", "smoke_sensor_state", "alarm", "normal"),
+        ("Sunricher", "SR-ZG9070A-SS", "binary_sensor", "smoke_alarm_1", "on", "off"),
+        ("Sunricher", "SR-ZG9070A-SS", "binary_sensor", "smoke_alarm_2", "on", "off"),
+    ],
+)
+async def test_reviewed_smoke_requires_matching_device_property_and_provider(
+    hass, catalog_devices, vendor, model, domain, prop, active, clear
+):
+    from custom_components.alarmmesh.config_flow import _validate_sources
+    from custom_components.alarmmesh.runtime import current_source_status
+    from custom_components.alarmmesh.status import SourceStatus
+
+    add, calls = catalog_devices
+    fixture = add(model, vendor)
+    source = fixture["register"](domain, prop, clear, {})
+    assert _validate_sources(hass, [source]) is None
+    for value, expected in (
+        (active, SourceStatus.SMOKE_REPORTED),
+        (clear, SourceStatus.NO_SMOKE_REPORTED),
+        ("unknown", SourceStatus.UNKNOWN),
+        ("unavailable", SourceStatus.UNREACHABLE),
+    ):
+        hass.states.async_set(source, value)
+        assert current_source_status(hass, source) is expected
+
+    for target in (
+        add(model, "Unknown")["register"](domain, prop, active, {}),
+        add("TS0601", vendor)["register"](domain, prop, active, {}),
+        add(model, vendor, "zha")["register"](domain, prop, active, {}),
+        fixture["register"](domain, "alarm_1", active, {}),
+        fixture["register"](domain, "checking_result", active, {}),
+        fixture["register"]("switch", "silence", "on", {}),
+    ):
+        assert _validate_sources(hass, [target])
+    registry = er.async_get(hass)
+    registry.async_update_entity(source, disabled_by=er.RegistryEntryDisabler.USER)
+    hass.states.async_set(source, clear)
+    assert _validate_sources(hass, [source])
+    assert current_source_status(hass, source) is SourceStatus.UNKNOWN
+    assert not calls
+
+
 async def test_replace_unavailable_tuya_source_with_offline_alecto(
     hass, catalog_devices
 ):
@@ -215,7 +264,7 @@ def test_catalog_complete_generated_and_provider_specific():
         encoding="utf-8"
     ) == render(snapshot)
     assert CATALOG == snapshot
-    assert CATALOG["definitions"] == 53 and CATALOG["website_rows"] == 68
+    assert CATALOG["definitions"] == 55 and CATALOG["website_rows"] == 70
     assert CATALOG["variants"] == 15
     for entry in CATALOG["entries"]:
         for alias in entry["aliases"]:
@@ -974,12 +1023,12 @@ async def test_all_catalog_variants_as_directional_routes(hass, catalog_devices)
             reviewed_targets.add(device["target"])
             provider_counts[integration] += 1
         if definition["kind"] == "smoke":
-            if row["model"] == "SMART-SMOKE10" and provider == "zha":
-                continue  # Only the Zigbee2MQTT smoke_state route was reviewed.
+            if definition.get("mqtt_smoke_properties") and provider == "zha":
+                continue  # Only the Zigbee2MQTT source route was reviewed.
             # Use two devices when pairing the same model.
             origin = add(row["model"], row["vendor"], integration)["source"]
             origins.append(origin)
-    assert len(origins) == 123 and provider_counts == {"mqtt": 21, "zha": 10}
+    assert len(origins) == 125 and provider_counts == {"mqtt": 21, "zha": 10}
     members = origins + [b["source"] for b in bindings]
     group = {
         "members": members,

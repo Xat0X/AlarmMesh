@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.3-beta.2 — 2026-11-26
+
+- Select **Smoke sensor state** on an AVATTO ZSD20 connected through Zigbee2MQTT. AlarmMesh reads its `alarm` and `normal` reports directly.
+- Select both **Smoke alarm 1** and **Smoke alarm 2** on a Sunricher SR-ZG9070A-SS and add them to the same group. Either input reporting smoke keeps the group in alarm. If one is unavailable and the other is clear, the group shows an indeterminate smoke status.
+
 ## 0.1.3-beta.1 — 2026-11-25
 
 - Choose the Alecto SMART-SMOKE10 Zigbee2MQTT **Smoke state** sensor directly as a smoke source. The overview and groups show smoke for `alarm`, no smoke for `normal`, and incomplete information while the detector is unavailable.

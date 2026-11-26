@@ -215,33 +215,63 @@ async def zha_checks(passed):
         passed(name)
 
 
-async def alecto_checks(hass, publish, messages, binary_source):
-    """Real MQTT discovery to the source picker, persisted group and incident view."""
+async def mqtt_source_checks(
+    hass,
+    publish,
+    messages,
+    binary_source,
+    vendor,
+    model,
+    domain,
+    properties,
+    diagnostic,
+):
+    """Exercise the source picker and smoke states using isolated MQTT discovery."""
     from custom_components.alarmmesh.const import CONF_SOURCE_ENTITY_IDS, DOMAIN
 
-    uid = "0x00000000000000ad"
-    topic = "alarmmesh_simulation/alecto"
+    uid = "simulated_" + vendor.lower()
+    topic = "alarmmesh_simulation/" + uid
     device = {
         "identifiers": [f"zigbee2mqtt_{uid}"],
-        "manufacturer": "Alecto",
-        "model": "Smoke detector",
-        "model_id": "SMART-SMOKE10",
-        "name": "SIMULATED Alecto",
+        "manufacturer": vendor,
+        "model_id": model,
+        "model": model,
+        "name": "SIMULATED " + vendor,
     }
     registry = er.async_get(hass)
-    for prop in ("smoke_state", "checking_result"):
-        unique = f"{uid}_{prop}_alarmmesh_simulation"
-        await publish(
-            f"homeassistant/sensor/{unique}/config",
-            {
-                "unique_id": unique,
-                "device": device,
-                "name": prop,
-                "state_topic": topic,
-                "availability_topic": topic + "/availability",
-                "value_template": "{{ value_json." + prop + " }}",
-            },
+    binary = domain == "binary_sensor"
+    clear, alarm = (False, True) if binary else ("normal", "alarm")
+    values = dict.fromkeys(properties, clear)
+    values[diagnostic] = "check_success" if diagnostic == "checking_result" else "ok"
+
+    def unique(prop):
+        return f"{uid}_{prop}_alarmmesh_simulation"
+
+    def entity(prop):
+        return registry.async_get_entity_id(
+            "sensor" if prop == diagnostic else domain, "mqtt", unique(prop)
         )
+
+    for prop in values:
+        platform = "sensor" if prop == diagnostic else domain
+        template = "{{ value_json." + prop
+        config = {
+            "unique_id": unique(prop),
+            "device": device,
+            "name": prop,
+            "state_topic": topic,
+            "availability_topic": f"{topic}/{prop}/availability",
+            "value_template": template + " }}",
+        }
+        if platform == "binary_sensor":
+            config.update(
+                value_template=template + " | string | lower }}",
+                payload_on="true",
+                payload_off="false",
+            )
+        await publish(f"homeassistant/{platform}/{unique(prop)}/config", config)
+        await publish(f"{topic}/{prop}/availability", "online")
+    await publish(topic, values)
 
     async def until(predicate):
         changed = asyncio.Event()
@@ -259,94 +289,109 @@ async def alecto_checks(hass, publish, messages, binary_source):
         finally:
             remove()
 
-    await publish(topic + "/availability", "online")
-    await publish(topic, {"smoke_state": "normal", "checking_result": "check_success"})
-
-    def entity(prop):
-        return registry.async_get_entity_id(
-            "sensor", "mqtt", f"{uid}_{prop}_alarmmesh_simulation"
-        )
-
     await until(
         lambda: (
-            entity("smoke_state")
-            and hass.states.is_state(entity("smoke_state"), "normal")
-            and entity("checking_result")
+            all(
+                entity(p)
+                and hass.states.is_state(entity(p), "off" if binary else "normal")
+                for p in properties
+            )
+            and entity(diagnostic)
         )
     )
-    source = entity("smoke_state")
+    sources = [entity(p) for p in properties]
     flow = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": SOURCE_USER}
     )
     listed = next(iter(flow["data_schema"].schema.values())).config["include_entities"]
     require(
-        source in listed
-        and binary_source in listed
-        and entity("checking_result") not in listed,
+        set(sources + [binary_source]).issubset(listed)
+        and entity(diagnostic) not in listed,
         "Incorrect source picker",
     )
-    selection = {CONF_SOURCE_ENTITY_IDS: [source]}
-    flow = await hass.config_entries.flow.async_configure(flow["flow_id"], selection)
-    require(flow["type"] is FlowResultType.CREATE_ENTRY, "Alecto selection rejected")
+    flow = await hass.config_entries.flow.async_configure(
+        flow["flow_id"], {CONF_SOURCE_ENTITY_IDS: sources}
+    )
+    require(flow["type"] is FlowResultType.CREATE_ENTRY, f"{model} selection rejected")
     entry = flow["result"]
     await hass.async_block_till_done()
-    panel = entry.runtime_data.panel
-    await panel.groups.async_mutate(
+    await entry.runtime_data.panel.groups.async_mutate(
         {
             "operation": "create",
             "revision": 0,
-            "name": "Simulated Alecto",
-            "members": [source],
+            "name": "Simulated " + vendor,
+            "members": sources,
         },
-        (source,),
+        tuple(sources),
     )
     require(
-        await hass.config_entries.async_reload(entry.entry_id), "Alecto reload failed"
+        await hass.config_entries.async_reload(entry.entry_id), f"{model} reload failed"
     )
     await hass.async_block_till_done()
     panel = entry.runtime_data.panel
 
-    async def expect(status, smoke, availability):
-        await until(lambda: entry.runtime_data.source_statuses[source].name == status)
-        snapshot = panel.snapshot()
-        row = snapshot["sources"][0]
-        expected = {"smoke": smoke, "availability": availability}
-        require(
-            row["status"] == status and not row["identity_changed"],
-            "Unexpected source identity/status",
+    async def expect(states, smoke, availability):
+        await until(
+            lambda: (
+                [entry.runtime_data.source_statuses[src].name for src in sources]
+                == states
+            )
         )
+        snapshot = panel.snapshot()
+        expected = {"smoke": smoke, "availability": availability}
         require(
             snapshot["result"] == expected
             and snapshot["groups"][0]["result"] == expected,
             "Incorrect group/overview state",
         )
-        require(
-            row["capability"]["origin"] == "zigbee2mqtt"
-            and row["capability"]["controls"] == []
-            and not row["selftest"]["available"],
-            "Unexpected control",
-        )
+        require(len(snapshot["sources"]) == len(sources), "Incorrect source count")
+        for row in snapshot["sources"]:
+            require(
+                not row["identity_changed"]
+                and row["capability"]["origin"] == "zigbee2mqtt"
+                and row["capability"]["controls"] == []
+                and not row["selftest"]["available"],
+                "Unexpected identity or control",
+            )
         require(
             not snapshot["groups"][0]["linking"]["enabled"] and messages.empty(),
             "Unexpected device command",
         )
 
-    await expect("NO_SMOKE_REPORTED", "NO_SMOKE_REPORTED", "COMPLETE")
-    await publish(topic, {"smoke_state": "alarm", "checking_result": "check_success"})
-    await expect("SMOKE_REPORTED", "SMOKE_REPORTED", "COMPLETE")
-    await publish(topic + "/availability", "offline")
-    await expect("UNREACHABLE", "INDETERMINATE", "INCOMPLETE")
-    await publish(topic, {"smoke_state": "normal", "checking_result": "check_success"})
-    await publish(topic + "/availability", "online")
-    await expect("NO_SMOKE_REPORTED", "NO_SMOKE_REPORTED", "COMPLETE")
-    await publish(
-        topic, {"smoke_state": "unexpected", "checking_result": "check_success"}
-    )
-    await expect("UNKNOWN", "INDETERMINATE", "INCOMPLETE")
+    async def update(prop, value):
+        values[prop] = value
+        await publish(topic, values)
+
+    idle, active = "NO_SMOKE_REPORTED", "SMOKE_REPORTED"
+    first = properties[0]
+    await expect([idle] * len(sources), idle, "COMPLETE")
+    await update(first, alarm)
+    if binary:
+        second = properties[1]
+        await expect([active, idle], active, "COMPLETE")
+        await update(second, alarm)
+        await expect([active, active], active, "COMPLETE")
+        await update(first, clear)
+        await expect([idle, active], active, "COMPLETE")
+        await publish(f"{topic}/{first}/availability", "offline")
+        await expect(["UNREACHABLE", active], active, "INCOMPLETE")
+        await update(second, clear)
+        await expect(["UNREACHABLE", idle], "INDETERMINATE", "INCOMPLETE")
+    else:
+        await expect([active], active, "COMPLETE")
+        await publish(f"{topic}/{first}/availability", "offline")
+        await expect(["UNREACHABLE"], "INDETERMINATE", "INCOMPLETE")
+        await update(first, clear)
+    await publish(f"{topic}/{first}/availability", "online")
+    await expect([idle] * len(sources), idle, "COMPLETE")
+    if not binary:
+        await update(first, "unexpected")
+        await expect(["UNKNOWN"], "INDETERMINATE", "INCOMPLETE")
     opts = await hass.config_entries.options.async_init(entry.entry_id)
     require(
-        source
-        in next(iter(opts["data_schema"].schema.values())).config["include_entities"],
+        set(sources).issubset(
+            next(iter(opts["data_schema"].schema.values())).config["include_entities"]
+        ),
         "Missing in options",
     )
     hass.config_entries.options.async_abort(opts["flow_id"])
@@ -628,9 +673,44 @@ async def main(requested):
             sources.append(source)
             targets.append(target)
         passed("real_mqtt_discovery_and_states")
-        current = "mqtt_alecto_enum_source"
-        await alecto_checks(hass, publish, messages, sources[0])
-        passed(current)
+        for current, vendor, model, domain, props, diagnostic in (
+            (
+                "mqtt_alecto_enum_source",
+                "Alecto",
+                "SMART-SMOKE10",
+                "sensor",
+                ["smoke_state"],
+                "checking_result",
+            ),
+            (
+                "mqtt_avatto_enum_source",
+                "AVATTO",
+                "ZSD20",
+                "sensor",
+                ["smoke_sensor_state"],
+                "fault",
+            ),
+            (
+                "mqtt_sunricher_dual_smoke",
+                "Sunricher",
+                "SR-ZG9070A-SS",
+                "binary_sensor",
+                ["smoke_alarm_1", "smoke_alarm_2"],
+                "tamper",
+            ),
+        ):
+            await mqtt_source_checks(
+                hass,
+                publish,
+                messages,
+                sources[0],
+                vendor,
+                model,
+                domain,
+                props,
+                diagnostic,
+            )
+            passed(current)
         current = "driver_profiles"
         from custom_components.alarmmesh.capabilities import Capabilities
         from custom_components.alarmmesh.const import CONF_SOURCE_ENTITY_IDS

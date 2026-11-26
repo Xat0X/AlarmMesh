@@ -1,4 +1,4 @@
-# Device support and evidence — 0.1.0-beta.3
+# Device support and evidence
 
 AlarmMesh continues to read any explicitly selected, valid Home Assistant
 `binary_sensor` with device class `smoke`, including unknown models. Recognition
@@ -16,7 +16,9 @@ the [review snapshot](../dev/catalog/review.json).
 
 Current user guide for group sounders, physical hush, readback and start/stop per model: [Meeklinken en stoppen](meeklinken-en-stoppen.md).
 
-The current catalog also includes Alecto SMART-SMOKE10 via Zigbee2MQTT. Select its **Smoke state** sensor directly. The 14 November inventory below predates this addition.
+The current catalog covers 55 definitions and 70 model or variant entries. Three Zigbee2MQTT models publish smoke through model-specific properties. Alecto SMART-SMOKE10 reports `smoke_state` and AVATTO ZSD20 reports `smoke_sensor_state`. Both publish `alarm` or `normal`. Sunricher SR-ZG9070A-SS publishes two binary inputs, `smoke_alarm_1` and `smoke_alarm_2`. Select and group both. A positive input keeps the group in alarm. With no positive input, a missing or unavailable input leaves the group indeterminate. These source mappings grant no sounder control.
+
+The [MultIR MIR-SM100-E](https://www.zigbee2mqtt.io/devices/MIR-SM100-E.html) exposes generic IAS alarm bits. The published mapping does not identify which bit means smoke. The [Ecolink FFZB1-SM-ECO](https://www.zigbee2mqtt.io/devices/FFZB1-SM-ECO.html) listens for a separate alarm sounding. Neither received a smoke-source exception. Combination detectors with a standard smoke entity continue to use that entity. The 14 November inventory below predates the three model-specific additions.
 
 ## Inventory and denominators
 

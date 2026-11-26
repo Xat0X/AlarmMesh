@@ -523,7 +523,7 @@ async def main(requested: str, config_dir: Path) -> int:
 
         validate_catalog(CATALOG)
         require(
-            CATALOG["definitions"] == 53 and CATALOG["website_rows"] == 68,
+            CATALOG["definitions"] == 55 and CATALOG["website_rows"] == 70,
             "Catalog coverage",
         )
         # Same explicit registry/action fixture, expanded; still no driver claim.

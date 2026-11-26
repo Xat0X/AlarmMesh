@@ -18,7 +18,10 @@ If the Marketplace listing has a blank icon, you can still find **AlarmMesh** by
 ## Configure AlarmMesh
 
 1. Open **Settings → Devices & services → Add integration**, search for **AlarmMesh** and select it.
-2. Select the smoke detector entities you want to monitor. Choose a Home Assistant binary sensor with the `smoke` device class, or **Smoke state** for an Alecto SMART-SMOKE10 connected through Zigbee2MQTT.
+2. Select the smoke detector entities you want to monitor. Choose a Home Assistant binary sensor with the `smoke` device class, or the matching Zigbee2MQTT source below.
+   - **Alecto SMART-SMOKE10** — select **Smoke state**.
+   - **AVATTO ZSD20** — select **Smoke sensor state**.
+   - **Sunricher SR-ZG9070A-SS** — select **Smoke alarm 1** and **Smoke alarm 2**. When creating a group, include both inputs so that a smoke report on either one is visible.
 3. Open **AlarmMesh** in the sidebar. Check that the detector names and areas are recognizable. Use **Silent practice** to see how a smoke report would reach the rest of your home. Linked sound and automatic actions are off by default.
 
 AlarmMesh supports one configuration entry. To change the selected detectors later, use **Configure** on that entry. If you rename a source entity ID, select its new ID there.

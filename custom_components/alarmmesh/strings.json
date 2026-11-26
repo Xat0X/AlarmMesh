@@ -9,7 +9,7 @@
           "source_entity_ids": "Smoke detectors"
         },
         "data_description": {
-          "source_entity_ids": "Choose at least one existing smoke detector in Home Assistant. An unreachable detector can remain selected if Home Assistant still identifies it as a smoke detector."
+          "source_entity_ids": "Choose at least one existing smoke detector in Home Assistant. If a detector has two smoke inputs, select both. An unreachable detector can remain selected if Home Assistant still identifies it as a smoke detector."
         }
       }
     },
@@ -35,7 +35,7 @@
           "source_entity_ids": "Smoke detectors"
         },
         "data_description": {
-          "source_entity_ids": "Choose at least one existing smoke detector in Home Assistant. An unreachable detector can remain selected if Home Assistant still identifies it as a smoke detector."
+          "source_entity_ids": "Choose at least one existing smoke detector in Home Assistant. If a detector has two smoke inputs, select both. An unreachable detector can remain selected if Home Assistant still identifies it as a smoke detector."
         }
       }
     },

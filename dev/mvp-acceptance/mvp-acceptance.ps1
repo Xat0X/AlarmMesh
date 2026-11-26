@@ -210,7 +210,7 @@ function Check-Config {
         $report.driver_checks = $drivers.scenarios
         if ($drivers.result -ne 'PASS' -or $drivers.actual_ha_version -ne $HaVersion -or
             $drivers.requested_ha_version -ne $HaVersion -or $drivers.run_id -ne $runId -or $drivers.git_commit -ne $commit -or
-            @($drivers.scenarios.PSObject.Properties).Count -ne 25 -or
+            @($drivers.scenarios.PSObject.Properties).Count -ne 27 -or
             @($drivers.scenarios.PSObject.Properties | Where-Object { $_.Value -ne 'PASS' }).Count -gt 0) {
             throw 'Driver report did not confirm this run, version, commit and all scenarios.'
         }

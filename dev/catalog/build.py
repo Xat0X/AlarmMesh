@@ -60,7 +60,7 @@ def table(snapshot: dict) -> str:
             "## Matter (separate provider review)",
             "",
             "The counts above cover the Zigbee2MQTT inventory, "
-            "including the Alecto smoke status enum. "
+            "including the reviewed model-specific smoke properties. "
             "Matter evidence uses the same snapshot; "
             "no entry authorizes a sounder. "
             "See [Matter capability matrix](matter-support.md).",

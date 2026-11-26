@@ -16,6 +16,7 @@ from homeassistant.core import CALLBACK_TYPE, State, callback
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 
+from .catalog_data import CATALOG
 from .status import SourceStatus, StatusResult
 
 if TYPE_CHECKING:
@@ -84,22 +85,31 @@ def valid_source_ref(value: object) -> bool:
     )
 
 
-def mqtt_source_parts(entity, device) -> tuple[str, str] | None:
-    """Return the device ID and base topic used in Z2M discovery unique IDs."""
+# Only reviewed exceptions to Home Assistant's smoke device class.
+_MQTT_SMOKE_PROPERTIES = {
+    (entry["vendor"].casefold(), model.casefold(), domain): tuple(properties)
+    for entry in CATALOG["entries"]
+    for domain, properties in entry.get("mqtt_smoke_properties", {}).items()
+    for model in (entry["model"], f"{entry['description']} ({entry['model']})")
+}
+
+
+def mqtt_source_parts(entity, device, *, reviewed_only=False) -> tuple[str, str] | None:
+    """Match a Z2M source property and extract its discovery base topic."""
     if not entity or entity.platform != "mqtt" or not device:
         return None
-    prop = "smoke"
-    if entity.domain == "sensor":
-        model = (device.model_id or device.model or "").casefold()
-        if (device.manufacturer or "").casefold() != "alecto" or model not in {
-            "smart-smoke10",
-            "smoke detector (smart-smoke10)",
-        }:
-            return None
-        prop = "smoke_state"
-    elif entity.domain != "binary_sensor":
+    properties = _MQTT_SMOKE_PROPERTIES.get(
+        (
+            (device.manufacturer or "").casefold(),
+            (device.model_id or device.model or "").casefold(),
+            entity.domain,
+        ),
+        (),
+    )
+    if not reviewed_only and entity.domain == "binary_sensor":
+        properties = (*properties, "smoke")
+    if not properties:
         return None
-
     ids = [
         value.removeprefix("zigbee2mqtt_")
         for domain, value in device.identifiers
@@ -107,23 +117,28 @@ def mqtt_source_parts(entity, device) -> tuple[str, str] | None:
     ]
     if len(ids) != 1:
         return None
-    prefix = f"{ids[0]}_{prop}_"
-    if entity.unique_id.startswith(prefix) and (
-        base := entity.unique_id[len(prefix) :]
-    ):
-        return ids[0], base
+    for prop in properties:
+        prefix = f"{ids[0]}_{prop}_"
+        if entity.unique_id.startswith(prefix) and (
+            base := entity.unique_id[len(prefix) :]
+        ):
+            return ids[0], base
     return None
 
 
-def is_alecto_source(hass, entity) -> bool:
-    """Accept only this enabled MQTT sensor on its registered Alecto device."""
+def is_reviewed_mqtt_source(hass, entity) -> bool:
+    """Accept an enabled, reviewed source on its own registered MQTT device."""
     if (
         not entity
-        or entity.domain != "sensor"
+        or entity.domain not in {"sensor", "binary_sensor"}
         or entity.platform != "mqtt"
         or entity.disabled_by
         or not entity.device_id
     ):
+        return False
+    if entity.domain == "binary_sensor" and source_device_class(
+        entity, hass.states.get(entity.entity_id)
+    ) not in (None, "smoke"):
         return False
     device = dr.async_get(hass).async_get(entity.device_id)
     owner = (
@@ -136,7 +151,16 @@ def is_alecto_source(hass, entity) -> bool:
         and owner
         and owner.domain == "mqtt"
         and entity.config_entry_id in device.config_entries
-        and mqtt_source_parts(entity, device)
+        and mqtt_source_parts(entity, device, reviewed_only=True)
+    )
+
+
+def source_device_class(entity, state) -> str | None:
+    """A registry override takes precedence over the current and original class."""
+    return (
+        (entity.device_class if entity else None)
+        or (state.attributes.get("device_class") if state else None)
+        or (entity.original_device_class if entity else None)
     )
 
 
@@ -144,14 +168,24 @@ def source_status_from_state(hass, entity_id: str, state: State | None) -> Sourc
     """Translate a cached local state; unexpected values remain unknown."""
     if state is None:
         return SourceStatus.MISSING
+    entity = er.async_get(hass).async_get(entity_id)
     if entity_id.startswith("sensor."):
-        if not is_alecto_source(hass, er.async_get(hass).async_get(entity_id)):
+        if not is_reviewed_mqtt_source(hass, entity):
             return SourceStatus.UNKNOWN
         return {
             "alarm": SourceStatus.SMOKE_REPORTED,
             "normal": SourceStatus.NO_SMOKE_REPORTED,
             STATE_UNAVAILABLE: SourceStatus.UNREACHABLE,
         }.get(state.state, SourceStatus.UNKNOWN)
+    if (
+        entity
+        and entity.platform == "mqtt"
+        and entity.original_device_class != "smoke"
+        and state.attributes.get("device_class") != "smoke"
+        and entity.device_class != "smoke"
+        and not is_reviewed_mqtt_source(hass, entity)
+    ):
+        return SourceStatus.UNKNOWN
     return {
         STATE_ON: SourceStatus.SMOKE_REPORTED,
         STATE_OFF: SourceStatus.NO_SMOKE_REPORTED,

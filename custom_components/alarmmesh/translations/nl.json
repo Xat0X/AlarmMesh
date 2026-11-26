@@ -9,7 +9,7 @@
           "source_entity_ids": "Rookmelders"
         },
         "data_description": {
-          "source_entity_ids": "Kies minstens een bestaande rookmelder uit Home Assistant. Een tijdelijk onbereikbare melder mag blijven staan als Home Assistant hem nog als rookmelder herkent."
+          "source_entity_ids": "Kies minstens een bestaande rookmelder uit Home Assistant. Geeft je melder twee rooksignalen door, kies ze dan allebei. Een tijdelijk onbereikbare melder mag blijven staan als Home Assistant hem nog als rookmelder herkent."
         }
       }
     },
@@ -35,7 +35,7 @@
           "source_entity_ids": "Rookmelders"
         },
         "data_description": {
-          "source_entity_ids": "Kies minstens een bestaande rookmelder uit Home Assistant. Een tijdelijk onbereikbare melder mag blijven staan als Home Assistant hem nog als rookmelder herkent."
+          "source_entity_ids": "Kies minstens een bestaande rookmelder uit Home Assistant. Geeft je melder twee rooksignalen door, kies ze dan allebei. Een tijdelijk onbereikbare melder mag blijven staan als Home Assistant hem nog als rookmelder herkent."
         }
       }
     },

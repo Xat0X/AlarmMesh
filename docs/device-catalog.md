@@ -2,7 +2,7 @@
 
 Generated from [the reviewed snapshot](../dev/catalog/review.json). Use [the guide](device-compatibility.md) or the panel for filters and limits.
 
-53 canonical definitions covering 68 website model/variant rows. Every row has separate A-F assessments for both providers. A listed action depends on eligible HA entities and confirmation. Physical validation: zero. ZHA standard IAS routes are conditional, not a claim that every signature creates a siren.
+55 canonical definitions covering 70 website model/variant rows. Every row has separate A-F assessments for both providers. A listed action depends on eligible HA entities and confirmation. Physical validation: zero. ZHA standard IAS routes are conditional, not a claim that every signature creates a siren.
 
 Read each direction separately. Start with a selected HA smoke source, then look up the receiving detector and its provider below. Heat, relay, acoustic and siren rows have different roles. Stop applies only to an eligible AlarmMesh-owned linked sounder.
 
@@ -11,6 +11,7 @@ Read each direction separately. Start with a selected HA smoke source, then look
 | [Alecto SMART-SMOKE10](https://www.zigbee2mqtt.io/devices/SMART-SMOKE10.html) | smoke | documented | — / — | unconfirmed | — / — |
 | [Aqara JY-GZ-01AQ](https://www.zigbee2mqtt.io/devices/JY-GZ-01AQ.html) | smoke | documented | aqara_mqtt / — | conditional | aqara_zha / — |
 | [Aqara JY-GZ-03AQ](https://www.zigbee2mqtt.io/devices/JY-GZ-01AQ.html) | smoke | documented | aqara_mqtt / — | conditional | — / — |
+| [AVATTO ZSD20](https://www.zigbee2mqtt.io/devices/ZSD20.html) | smoke | documented | — / — | unconfirmed | — / — |
 | [BYUN M415-6C](https://www.zigbee2mqtt.io/devices/M415-6C.html) | contact_proxy | documented | — / — | conditional | — / — |
 | [Bosch 8750001213](https://www.zigbee2mqtt.io/devices/8750001213.html) | smoke | documented | bosch_twinguard_mqtt / — | conditional | — / — |
 | [Bosch BSD-2](https://www.zigbee2mqtt.io/devices/BSD-2.html) | smoke | documented | bosch_bsd_mqtt / — | conditional | — / — |
@@ -52,6 +53,7 @@ Read each direction separately. Start with a selected HA smoke source, then look
 | [Schneider Electric W599501](https://www.zigbee2mqtt.io/devices/W599001.html) | smoke | documented | — / — | conditional | — / — |
 | [ShinaSystem FAM-300Z](https://www.zigbee2mqtt.io/devices/FAM-300Z.html) | smoke | documented | shina_mqtt / — | conditional | — / — |
 | [Slacky-DIY Smoke Sensor TLSR8258](https://www.zigbee2mqtt.io/devices/Smoke_Sensor_TLSR8258.html) | smoke | documented | — / — | conditional | — / — |
+| [Sunricher SR-ZG9070A-SS](https://www.zigbee2mqtt.io/devices/SR-ZG9070A-SS.html) | smoke | documented | — / — | unconfirmed | — / — |
 | [Trust ZSDR-850](https://www.zigbee2mqtt.io/devices/ZSDR-850.html) | smoke | documented | — / — | conditional | — / — |
 | [Tuya 228WZH](https://www.zigbee2mqtt.io/devices/228WZH.html) | smoke | documented | — / — | conditional | — / — |
 | [Tuya PA-44Z](https://www.zigbee2mqtt.io/devices/PA-44Z.html) | smoke | documented | — / — | conditional | — / — |
@@ -79,7 +81,7 @@ Read each direction separately. Start with a selected HA smoke source, then look
 
 ## Matter (separate provider review)
 
-The counts above cover the Zigbee2MQTT inventory, including the Alecto smoke status enum. Matter evidence uses the same snapshot; no entry authorizes a sounder. See [Matter capability matrix](matter-support.md).
+The counts above cover the Zigbee2MQTT inventory, including the reviewed model-specific smoke properties. Matter evidence uses the same snapshot; no entry authorizes a sounder. See [Matter capability matrix](matter-support.md).
 
 | Model | Region / variant | HA route |
 | --- | --- | --- |

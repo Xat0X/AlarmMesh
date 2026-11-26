@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "checked": "2026-11-14",
-  "method": "Official smoke expose inventory plus the reviewed Alecto SMART-SMOKE10 smoke_state enum. Converter whiteLabel equivalence only. 68 rows, 60 page links, 53 canonical definitions.",
+  "checked": "2026-11-26",
+  "method": "Official smoke expose inventory plus exact model-specific smoke properties reviewed for Alecto, AVATTO and Sunricher. Converter whiteLabel equivalence only. 70 rows, 62 page links, 55 canonical definitions.",
   "sources": {
     "Koenkk/zigbee2mqtt.io": "df1ef4602fdc2c5bc54c9b7352590afc98e2366b",
     "Koenkk/zigbee-herdsman-converters": "afdaa028a0972d801da762196ddfb2df631ea0cc",
@@ -10,8 +10,8 @@
     "zigpy/zha": "2da1a5b5676158ac7b603ce6b9f42641cb90e7a0"
   },
   "converter_package": "26.131.0",
-  "website_rows": 68,
-  "definitions": 53,
+  "website_rows": 70,
+  "definitions": 55,
   "variants": 15,
   "entries": [
     {
@@ -80,7 +80,12 @@
         }
       },
       "physical_tested": false,
-      "checked": "2026-11-25"
+      "checked": "2026-11-25",
+      "mqtt_smoke_properties": {
+        "sensor": [
+          "smoke_state"
+        ]
+      }
     },
     {
       "id": "aqara_jy_gz_01aq",
@@ -250,6 +255,83 @@
         }
       },
       "physical_tested": false
+    },
+    {
+      "id": "avatto_zsd20",
+      "vendor": "AVATTO",
+      "model": "ZSD20",
+      "description": "Smart smoke alarm",
+      "kind": "smoke",
+      "aliases": [],
+      "zigbee_models": [],
+      "fingerprints": [
+        {
+          "model": "TS0601",
+          "manufacturer": "_TZE284_uqzwwjas"
+        },
+        {
+          "model": "TS0601",
+          "manufacturer": "_TZE284_zeeqkb0p"
+        }
+      ],
+      "test_flags": {},
+      "matchers": {
+        "zigbee2mqtt": [
+          {
+            "vendor": "avatto",
+            "model": "zsd20"
+          }
+        ],
+        "zha": []
+      },
+      "providers": {
+        "zigbee2mqtt": {
+          "detection": "documented",
+          "information": [
+            "smoke_sensor_state",
+            "battery",
+            "fault"
+          ],
+          "activation": "not_available",
+          "profile": null,
+          "stop": "not_authorized",
+          "self_test": "not_available",
+          "requirements": [
+            "Select Smoke sensor state. Alarm and normal are the two documented values."
+          ],
+          "gaps": [
+            "Device test, fault and muffling are separate from smoke detection."
+          ],
+          "sources": [
+            "https://www.zigbee2mqtt.io/devices/ZSD20.html",
+            "https://github.com/Koenkk/zigbee-herdsman-converters/blob/afdaa028a0972d801da762196ddfb2df631ea0cc/src/devices/avatto.ts"
+          ]
+        },
+        "zha": {
+          "detection": "unconfirmed",
+          "information": [],
+          "activation": "unconfirmed",
+          "profile": null,
+          "stop": "not_authorized",
+          "self_test": "not_available",
+          "requirements": [
+            "Source properties were reviewed for Zigbee2MQTT discovery."
+          ],
+          "gaps": [
+            "ZHA detection has not been verified for this device."
+          ],
+          "sources": [
+            "https://www.zigbee2mqtt.io/devices/ZSD20.html"
+          ]
+        }
+      },
+      "physical_tested": false,
+      "checked": "2026-11-26",
+      "mqtt_smoke_properties": {
+        "sensor": [
+          "smoke_sensor_state"
+        ]
+      }
     },
     {
       "id": "byun_m415_6c",
@@ -3554,6 +3636,77 @@
         }
       },
       "physical_tested": false
+    },
+    {
+      "id": "sunricher_sr_zg9070a_ss",
+      "vendor": "Sunricher",
+      "model": "SR-ZG9070A-SS",
+      "description": "Smart photoelectric smoke alarm",
+      "kind": "smoke",
+      "aliases": [],
+      "zigbee_models": [
+        "HK-SENSOR-SMO"
+      ],
+      "fingerprints": [],
+      "test_flags": {},
+      "matchers": {
+        "zigbee2mqtt": [
+          {
+            "vendor": "sunricher",
+            "model": "sr-zg9070a-ss"
+          }
+        ],
+        "zha": []
+      },
+      "providers": {
+        "zigbee2mqtt": {
+          "detection": "documented",
+          "information": [
+            "smoke_alarm_1",
+            "smoke_alarm_2",
+            "battery"
+          ],
+          "activation": "documented_not_implemented",
+          "profile": null,
+          "stop": "not_authorized",
+          "self_test": "not_available",
+          "requirements": [
+            "Select both smoke alarm inputs and include both in the same group. Either input can report smoke."
+          ],
+          "gaps": [
+            "The warning command has no reviewed AlarmMesh linked-sound profile. Both inputs belong to one physical detector."
+          ],
+          "sources": [
+            "https://www.zigbee2mqtt.io/devices/SR-ZG9070A-SS.html",
+            "https://github.com/Koenkk/zigbee-herdsman-converters/blob/afdaa028a0972d801da762196ddfb2df631ea0cc/src/devices/sunricher.ts"
+          ]
+        },
+        "zha": {
+          "detection": "unconfirmed",
+          "information": [],
+          "activation": "unconfirmed",
+          "profile": null,
+          "stop": "not_authorized",
+          "self_test": "not_available",
+          "requirements": [
+            "Source properties were reviewed for Zigbee2MQTT discovery."
+          ],
+          "gaps": [
+            "ZHA detection has not been verified for this device."
+          ],
+          "sources": [
+            "https://www.zigbee2mqtt.io/devices/SR-ZG9070A-SS.html"
+          ]
+        }
+      },
+      "physical_tested": false,
+      "checked": "2026-11-26",
+      "mqtt_smoke_properties": {
+        "binary_sensor": [
+          "smoke_alarm_1",
+          "smoke_alarm_2"
+        ]
+      }
     },
     {
       "id": "trust_zsdr_850",

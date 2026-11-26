@@ -292,7 +292,8 @@ class PanelController:
     def _registry_changed(self, *_args):
         changed = False
         for source, status in self.runtime.source_statuses.items():
-            if source.startswith("sensor."):
+            entity = er.async_get(self.hass).async_get(source)
+            if source.startswith("sensor.") or (entity and entity.platform == "mqtt"):
                 current = source_status_from_state(
                     self.hass, source, self.hass.states.get(source)
                 )
