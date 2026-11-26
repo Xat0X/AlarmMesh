@@ -5,6 +5,10 @@
   <img src="custom_components/alarmmesh/brand/logo@2x.png" alt="AlarmMesh" width="330">
 </picture>
 
+[![Install AlarmMesh in Home Assistant](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Xat0X&repository=AlarmMesh&category=integration)
+
+Available directly in the **Home Assistant Marketplace** and **HACS**.
+
 AlarmMesh brings the smoke detectors you already have in Home Assistant into one view. If the landing detector reports smoke, you can see its name on your phone, tap the alert to open that incident, and see which other detectors have reported smoke. You decide whether any phones, linked sounders or Home Assistant scripts take part.
 
 > [!IMPORTANT]
@@ -14,11 +18,9 @@ AlarmMesh brings the smoke detectors you already have in Home Assistant into one
 
 ## Get started
 
-[![Open AlarmMesh in your Home Assistant](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Xat0X&repository=AlarmMesh&category=integration)
-
 You need Home Assistant **2026.10.4 or later**, administrator access, and at least one existing smoke detector entity (`binary_sensor` with device class `smoke`, or the Alecto SMART-SMOKE10 Zigbee2MQTT `Smoke state` sensor). Set up the detectors in their own integration first. You can use AlarmMesh immediately for monitoring, with all automatic actions off.
 
-1. **Install the integration.** The button opens AlarmMesh in the Marketplace on Home Assistant 2026.11 or later, or in HACS on 2026.10.4. Confirm adding the repository if prompted, install AlarmMesh, and restart Home Assistant if asked. [Manual installation and updates](docs/installation.md)
+1. **Install AlarmMesh.** Use the button above, or search for **AlarmMesh** in **Settings → Marketplace** (Home Assistant 2026.11 or later) or **HACS** (2026.10.4 or a later 2026.10 patch). Choose **Install** in the Marketplace or **Download** in HACS. Restart Home Assistant if prompted. [Installation guide](docs/installation.md)
 2. **Choose your detectors.** Open **Settings → Devices & services → Add integration → AlarmMesh** and select the smoke entities you want to follow. Give each a recognizable name and assign its area in Home Assistant. These names appear in the panel and in phone alerts.
 3. **Check your setup.** Open **AlarmMesh** in the sidebar. **My alarm settings** shows the route for each detector. Open **Silent practice** to walk through an example with your family. You can do this before enabling any notifications or linked sound.
 
